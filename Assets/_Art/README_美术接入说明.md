@@ -37,7 +37,7 @@ House_Blockout
 │   ├─ ExplorerSpawnPoints/SpawnPoint_0..4
 │   ├─ SecretExitCandidates/SecretExitCandidate_i_<房间>/{Carpet, HatchAnchor}
 │   ├─ Safe_Kinko/{InteractPoint, KeyAnchor}
-│   ├─ MemorialPoint_Butsudan/InteractPoint     （超度地点提案）
+│   ├─ MemorialPoint_Butsudan/InteractPoint     （超度地点，具体超度操作待定）
 │   ├─ Gate_Main/{GateDoor_L, GateDoor_R, InteractPoint}
 │   └─ EscapeZone_Gate
 ├─ Props

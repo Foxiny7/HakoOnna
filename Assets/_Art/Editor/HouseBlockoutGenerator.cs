@@ -8,7 +8,7 @@ namespace HakoOnna.Art.EditorTools
     /// <summary>
     /// 生成日式老宅灰盒场景：两层主屋 + 土蔵（仓库）+ 围墙庭院。
     /// 坐标：1 单位 = 1 米，x 向东，z 向北，原点 = 主屋西南角。
-    /// 布局为美术提案（地图布局是待定项），确认后再细化。
+    /// 布局已由设计者确认（MVP 使用这一张地图）。
     /// </summary>
     public static class HouseBlockoutGenerator
     {
