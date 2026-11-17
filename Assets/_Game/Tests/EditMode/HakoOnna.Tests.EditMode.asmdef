@@ -1,0 +1,6 @@
+{
+  "name": "HakoOnna.Tests.EditMode",
+  "references": ["HakoOnna.RulesCore", "HakoOnna.Config"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

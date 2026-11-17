@@ -1,0 +1,4 @@
+{
+  "name": "HakoOnna.Config",
+  "references": ["HakoOnna.RulesCore"]
+}
