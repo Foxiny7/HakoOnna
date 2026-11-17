@@ -6,7 +6,7 @@ namespace HakoOnna.Rules
 {
     public enum Role { Explorer, HakoOnna, HakoBito, Spectator }
     public enum SearchKind { Normal, Deep }
-    public enum ItemKind { WeaknessA, WeaknessB, WeaknessC, Diary, GateKey, MaryDoll, Remains, Pliers }
+    public enum ItemKind { Gasoline, WhiteWoodenStake, RustyChain, Diary, GateKey, MaryDoll, Remains, Pliers, Flashlight }
     public enum WeaknessOutcome { Rejected, Consumed, HakoOnnaDefeated, ExplorerConverted }
 
     // Server-only state. Dispatch all commands and clock updates serially.
@@ -29,7 +29,7 @@ namespace HakoOnna.Rules
 
         public Player AddExplorer(int playerId, params ItemKind?[] items)
         {
-            var player = new Player(Role.Explorer, items);
+            var player = new Player(Role.Explorer, items.Append(ItemKind.Flashlight).ToArray());
             players.Add(playerId, player);
             return player;
         }
@@ -171,7 +171,7 @@ namespace HakoOnna.Rules
 
         private static bool IsWeakness(ItemKind? item)
         {
-            return item == ItemKind.WeaknessA || item == ItemKind.WeaknessB || item == ItemKind.WeaknessC;
+            return item == ItemKind.Gasoline || item == ItemKind.WhiteWoodenStake || item == ItemKind.RustyChain;
         }
 
         public sealed class Player

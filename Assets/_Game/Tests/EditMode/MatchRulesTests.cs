@@ -19,11 +19,20 @@ namespace HakoOnna.Tests
         [SetUp]
         public void SetUp()
         {
-            rules = new MatchRules(new RulesSettings(2, 3), ItemKind.WeaknessA);
+            rules = new MatchRules(new RulesSettings(2, 3), ItemKind.Gasoline);
             source = rules.AddContainer(Source, ItemKind.Diary);
             destination = rules.AddContainer(Destination);
             hakoOnna = rules.PlaceHakoOnna(HakoOnnaId, Source);
-            explorer = rules.AddExplorer(ExplorerId, ItemKind.WeaknessA, ItemKind.WeaknessB, ItemKind.GateKey);
+            explorer = rules.AddExplorer(ExplorerId, ItemKind.Gasoline, ItemKind.WhiteWoodenStake, ItemKind.GateKey);
+        }
+
+        [Test]
+        public void ExplorerStartsWithAFlashlightInAnInventorySlot()
+        {
+            var startingExplorer = rules.AddExplorer(3);
+
+            Assert.AreEqual(1, startingExplorer.Inventory.Count);
+            Assert.AreEqual(ItemKind.Flashlight, startingExplorer.Inventory[0]);
         }
 
         [Test]
@@ -31,6 +40,8 @@ namespace HakoOnna.Tests
         {
             Assert.IsTrue(rules.BeginSearch(ExplorerId, Source, SearchKind.Normal));
             rules.AdvanceTo(1);
+            Assert.IsFalse(source.IsOpen);
+            Assert.AreEqual(0.5, rules.SearchProgress(Source));
             Assert.IsTrue(rules.TryTransfer(HakoOnnaId, Destination));
             rules.AdvanceTo(2);
 
@@ -55,6 +66,7 @@ namespace HakoOnna.Tests
             Assert.IsNull(explorer.Inventory[0]);
             Assert.IsNull(explorer.Inventory[1]);
             Assert.IsNull(explorer.Inventory[2]);
+            Assert.IsNull(explorer.Inventory[3]);
             Assert.IsFalse(source.IsOpen);
             Assert.IsNull(source.SearcherId);
             Assert.AreEqual(ItemKind.Diary, source.Item);
@@ -101,6 +113,7 @@ namespace HakoOnna.Tests
             Assert.IsTrue(rules.BeginSearch(ExplorerId, Source, SearchKind.Deep));
             rules.AdvanceTo(2);
             Assert.AreEqual(0.5, rules.SearchProgress(Source));
+            Assert.IsFalse(source.IsOpen);
             Assert.AreEqual(Role.Explorer, explorer.Role);
             rules.AdvanceTo(4);
 
@@ -155,7 +168,7 @@ namespace HakoOnna.Tests
             Assert.IsFalse(rules.TryTransfer(3, Destination));
             Assert.AreEqual(Role.Explorer, explorer.Role);
             Assert.IsNull(explorer.Inventory[0]);
-            Assert.AreEqual(ItemKind.WeaknessB, explorer.Inventory[1]);
+            Assert.AreEqual(ItemKind.WhiteWoodenStake, explorer.Inventory[1]);
             Assert.AreEqual(ItemKind.Diary, source.Item);
         }
 
@@ -175,6 +188,7 @@ namespace HakoOnna.Tests
             Assert.IsNull(explorer.Inventory[0]);
             Assert.IsNull(explorer.Inventory[1]);
             Assert.IsNull(explorer.Inventory[2]);
+            Assert.IsNull(explorer.Inventory[3]);
             Assert.IsNull(destination.SearcherId);
             Assert.AreEqual(0d, rules.SearchProgress(Destination));
         }
@@ -196,11 +210,11 @@ namespace HakoOnna.Tests
         {
             Assert.AreEqual(WeaknessOutcome.Rejected, rules.UseWeakness(ExplorerId, 2, Destination));
             Assert.AreEqual(WeaknessOutcome.Rejected, rules.UseWeakness(ExplorerId, 0, 99));
-            Assert.AreEqual(ItemKind.WeaknessA, explorer.Inventory[0]);
+            Assert.AreEqual(ItemKind.Gasoline, explorer.Inventory[0]);
             Assert.AreEqual(WeaknessOutcome.Consumed, rules.UseWeakness(ExplorerId, 0, Destination));
             Assert.AreEqual(WeaknessOutcome.Rejected, rules.UseWeakness(ExplorerId, 0, Destination));
             Assert.IsNull(explorer.Inventory[0]);
-            Assert.AreEqual(ItemKind.WeaknessB, explorer.Inventory[1]);
+            Assert.AreEqual(ItemKind.WhiteWoodenStake, explorer.Inventory[1]);
             Assert.AreEqual(Role.Explorer, explorer.Role);
         }
 
