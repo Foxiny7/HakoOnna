@@ -108,6 +108,8 @@ namespace HakoOnna.Art.EditorTools
             public bool pinned, spawn, solid;
             /// <summary>组里有场景物体（容器、代码家具、出生点、保险箱、仏坛），放不下也不能撤。</summary>
             public bool hasGo;
+            /// <summary>组里有容器（选门扇停靠的一侧时尽量不碰）。</summary>
+            public bool hasBox;
             /// <summary>贴着 x / z 方向的墙：避让时这个方向不动，只沿墙滑。</summary>
             public bool lockX, lockZ;
             public bool dropped;
@@ -176,27 +178,19 @@ namespace HakoOnna.Art.EditorTools
         /// 必须保持畅通的步行路线（两两一组：起点、终点），和 PlayerDoorwayTests 的路线一致，
         /// 另加两条楼梯侧面的路线。家具放大、补家具都不能往上面压。
         /// 縁側朝院子的四个开口改成关着的玻璃拉门后，穿过它们的路线已删掉（测试那边等 Codex 改）。
+        /// 2026-11-19 封掉 11 处门洞后，穿过它们的路线也删掉了（Door_3/5/8/10/11/12/13/14/18/28/41，测试等 Codex 删）。
         /// </summary>
         static readonly Vector3[] WalkLanes =
         {
             new Vector3(5.46f, 0f, -1.3999f), new Vector3(5.46f, 0f, .9899f),
             new Vector3(5.46f, 0f, 9.0201f), new Vector3(5.46f, 0f, 11f),
             new Vector3(9.1054f, 0f, 6.37f), new Vector3(12.8018f, .55f, 6.37f),
-            new Vector3(9.1054f, 0f, 1.36f), new Vector3(12.6895f, .55f, 1.36f),
             new Vector3(9.1054f, 0f, 13.65f), new Vector3(12.8018f, .55f, 13.65f),
-            new Vector3(9.1054f, 0f, 18.66f), new Vector3(12.6895f, .55f, 18.66f),
             new Vector3(3.64f, 0f, 19.03f), new Vector3(3.64f, 0f, 21.42f),
-            new Vector3(17.2101f, .55f, 6.37f), new Vector3(19.19f, .55f, 6.37f),
             new Vector3(24.49f, .55f, 6.37f), new Vector3(26.4699f, .55f, 6.37f),
-            new Vector3(17.2101f, .55f, 13.65f), new Vector3(19.19f, .55f, 13.65f),
-            new Vector3(24.49f, .55f, 13.65f), new Vector3(26.4699f, .55f, 13.65f),
-            new Vector3(14.56f, .55f, 9.0201f), new Vector3(14.56f, .55f, 11f),
-            new Vector3(19.9999f, .55f, 9.0201f), new Vector3(19.9999f, .55f, 11f),
-            new Vector3(32.4001f, .55f, 9.0201f), new Vector3(32.4001f, .55f, 11f),
             new Vector3(14.56f, .55f, 1.3062f), new Vector3(14.56f, .55f, 3.72f),
             new Vector3(21.84f, .55f, 1.3062f), new Vector3(21.84f, .55f, 3.72f),
             new Vector3(30f, .55f, 1.3062f), new Vector3(30f, .55f, 3.72f),
-            new Vector3(33.59f, .55f, 6.37f), new Vector3(36.0039f, .55f, 6.37f),
             new Vector3(33.59f, .55f, 13.65f), new Vector3(36.0039f, .55f, 13.65f),
             new Vector3(14.56f, .55f, 16.3f), new Vector3(14.56f, .55f, 18.7139f),
             new Vector3(21.84f, .55f, 16.3f), new Vector3(21.84f, .55f, 18.7139f),
@@ -205,7 +199,6 @@ namespace HakoOnna.Art.EditorTools
             new Vector3(33.59f, .55f, 1.365f), new Vector3(36.0039f, .55f, 1.365f),
             new Vector3(12.7399f, .55f, 18.596f), new Vector3(12.7399f, .55f, 21.0099f),
             new Vector3(19.9999f, .55f, 18.596f), new Vector3(19.9999f, .55f, 21.0099f),
-            new Vector3(13.447f, .55f, 24.6f), new Vector3(15.5499f, .55f, 24.6f),
             new Vector3(16.38f, 0f, 32.34f), new Vector3(16.38f, .3f, 36.4176f),
             new Vector3(20.0253f, .3f, 39.2f), new Vector3(24.08f, 0f, 39.2f),
             new Vector3(5.46f, 0f, -12.3201f), new Vector3(5.46f, 0f, -9.5201f),
@@ -214,7 +207,6 @@ namespace HakoOnna.Art.EditorTools
             new Vector3(17.2101f, 4.15f, 13.65f), new Vector3(19.19f, 4.15f, 13.65f),
             new Vector3(13.6001f, 4.15f, 18.596f), new Vector3(13.6001f, 4.15f, 21.0099f),
             new Vector3(20.9999f, 4.15f, 18.596f), new Vector3(20.9999f, 4.15f, 21.0099f),
-            new Vector3(15.3901f, 4.15f, 23.2f), new Vector3(17.37f, 4.15f, 23.2f),
             new Vector3(13.6001f, 4.15f, 25.4001f), new Vector3(13.6001f, 4.15f, 27.8139f),
             new Vector3(20.9999f, 4.15f, 25.4001f), new Vector3(20.9999f, 4.15f, 27.8139f),
             new Vector3(9.08f, 0f, 18.4485f), new Vector3(9.08f, 4.15f, 27.8308f),
@@ -393,6 +385,7 @@ namespace HakoOnna.Art.EditorTools
                 if (items[i].go != null)
                 {
                     g.hasGo = true;
+                    if (IsBox(i)) g.hasBox = true;
                     if (g.label.Length < 60) g.label += (g.label.Length > 0 ? "+" : "") + items[i].go.name;
                 }
                 float vol = (b.size.x + .01f) * (b.size.y + .01f) * (b.size.z + .01f);
@@ -455,6 +448,10 @@ namespace HakoOnna.Art.EditorTools
                 g.snapO = g.o;
             }
 
+            // 推拉门开着时门扇停在门洞旁边的墙面上：按推回墙边后的位置选停靠的一面和方向（避开容器、钉住的陈设），
+            // 选好的停靠区之后当成禁区，压到的家具、陈设沿墙让开（见 Conflicts）
+            ChooseDoorParking(groups);
+
             // 还比原来挤的组平移让开（不缩小）
             var now = new Bounds[n];
             void Refresh() { for (int i = 0; i < n; i++) now[i] = groups[i].dropped ? new Bounds(Vector3.one * -999f, Vector3.zero) : groups[i].At(groups[i].s); }
@@ -473,6 +470,8 @@ namespace HakoOnna.Art.EditorTools
             {
                 var g = groups[i];
                 if (g.dropped) return null;
+                string park = ParkConflict(now[i]);
+                if (park != null) return park;
                 if (g.hasSolid && !g.pinned && g.room != null)
                 {
                     var sNow = g.SolidAt(g.s);
@@ -808,6 +807,11 @@ namespace HakoOnna.Art.EditorTools
                       $"，背后薄件嵌墙再靠墙 {closed} 组" +
                       (droppedNames.Count > 0 ? $"；放不下撤掉 {droppedNames.Count} 组：{string.Join(" ", droppedNames)}" : "") +
                       (stuckNames.Count > 0 ? $"；仍有冲突 {stuckNames.Count} 组：{string.Join(" ", stuckNames)}" : ""));
+            // 容器挪了位置要问用户：把有容器的组的搬家记录打出来
+            var boxNotes = new List<string>();
+            foreach (var g in groups)
+                if (g.hasBox && !string.IsNullOrEmpty(g.note)) boxNotes.Add($"{g.label}：{g.note.Trim()}");
+            if (boxNotes.Count > 0) Debug.Log("[Hako Art] 有容器的组的搬家记录：" + string.Join("；", boxNotes));
             return xform;
         }
 

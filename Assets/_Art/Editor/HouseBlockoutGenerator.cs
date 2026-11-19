@@ -58,6 +58,8 @@ namespace HakoOnna.Art.EditorTools
             public float line0, center0; // V3 旧尺寸下的世界坐标
             public bool window;
             public bool glass; // 落地玻璃拉门：按窗处理（有碰撞，关着），只是看得见外面
+            public DoorKind kind;  // 推拉门的种类；None = 没有门扇的开口（土间连通、楼梯口）
+            public int leaves;     // 门扇数（1 / 2 / 4）
         }
 
         static Room R(string id, string label, int g, float x0, float z0, float x1, float z1, Material floor, bool hasFloor = true) =>
@@ -187,53 +189,48 @@ namespace HakoOnna.Art.EditorTools
             R("Fence", "塀", GFence, -4.55f, -5.46f, 23.66f, 25.48f, null, false),
         };
 
+        /// <summary>
+        /// 门窗。2026-11-19 用户批准：房间开口减到 1~2 个（玄関、台所这种入口 / 土间算极端情况），
+        /// 封掉 11 处（玄関↔縁側、台所↔廊下、次の間↔仏間 / 居間、仏間↔納戸、座敷↔東縁側 / 奥の間、
+        /// 居間↔納戸、納戸↔奥の間、便所↔風呂、物置↔子供部屋）。其中 3 处做成钉死的旧门（见 Doors.cs 的 Sealed）。
+        /// Door(...) 标出门扇种类和扇数：所有带门扇的门都能开关（DoorVisual），默认开着。
+        /// </summary>
         static List<Opening> DefineOpenings() => new List<Opening>
         {
-            DX(G0, 0f, 2.73f, 1.8f, 2f),
-            DX(G0, 5.005f, 2.73f, 3.6f, 2.31f),
-            DZ(G0, 5.46f, 3.185f, 1.8f),
-            DZ(G0, 5.46f, 0.68f, 0.9f),
-            DZ(G0, 5.46f, 6.825f, 1.8f),
-            DZ(G0, 5.46f, 9.33f, 0.9f),
-            DX(G0, 10.01f, 1.82f, 0.9f, 2f),
-            DX(G0, 10.01f, 4.54f, 1.4f, 2.85f),
-            DZ(G0, 9.1f, 3.185f, 3.4f),
-            DZ(G0, 12.74f, 3.185f, 3.4f),
-            DZ(G0, 9.1f, 6.825f, 1.8f),
-            DZ(G0, 12.74f, 6.825f, 1.8f),
-            DX(G0, 5.005f, 7.28f, 1.8f),
-            DX(G0, 5.005f, 10f, 0.9f),
-            DX(G0, 5.005f, 16.2f, 1.6f),
-            DX(G0, 1.365f, 7.28f, 3.4f),
-            DX(G0, 1.365f, 10.92f, 3.4f),
-            DX(G0, 1.365f, 15f, 4.3f),
-            DZ(G0, 17.29f, 3.185f, 3.4f),
-            DZ(G0, 17.29f, 6.825f, 1.8f),
-            DX(G0, 8.645f, 7.28f, 0.9f),
-            DX(G0, 8.645f, 10.92f, 0.9f),
-            DX(G0, 8.645f, 15f, 0.9f),
-            DZ(G0, 17.29f, 9.33f, 1.2f),
-            DZP(G0, 17.29f, 0.6825f, 1.365f),
-            DX(G0, 10.01f, 6.37f, 0.8f),
-            DX(G0, 10.01f, 10f, 0.9f),
-            DX(G0, 10.01f, 13.65f, 1.4f, 2.85f),
-            DZ(G0, 7.28f, 12.3f, 0.8f),
+            Door(DX(G0, 0f, 2.73f, 1.8f, 2f), DoorKind.Koshi, 2),       // 玄関正门（格子拉门）
+            DX(G0, 5.005f, 2.73f, 3.6f, 2.31f),                          // 玄関↔台所：同一片土间，无门
+            Door(DZ(G0, 5.46f, 3.185f, 1.8f), DoorKind.Fusuma, 2),      // 玄関↔次の間
+            Door(DZ(G0, 5.46f, 6.825f, 1.8f), DoorKind.Itado, 2),       // 台所↔居間
+            Door(DX(G0, 10.01f, 1.82f, 0.9f, 2f), DoorKind.Itado, 1),   // 勝手口（去后院）
+            DX(G0, 10.01f, 4.54f, 1.4f, 2.85f),                          // 台所↔裏階段：无门
+            Door(DZ(G0, 12.74f, 3.185f, 3.4f), DoorKind.Fusuma, 4),     // 仏間↔座敷
+            Door(DX(G0, 1.365f, 7.28f, 3.4f), DoorKind.Shoji, 4),       // 次の間↔縁側
+            Door(DX(G0, 1.365f, 10.92f, 3.4f), DoorKind.Shoji, 4),      // 仏間↔縁側
+            Door(DX(G0, 1.365f, 15f, 4.3f), DoorKind.Shoji, 4),         // 座敷↔縁側
+            Door(DZ(G0, 17.29f, 6.825f, 1.8f), DoorKind.Shoji, 2),      // 奥の間↔東縁側
+            Door(DX(G0, 8.645f, 7.28f, 0.9f), DoorKind.Fusuma, 1),      // 居間↔廊下
+            Door(DX(G0, 8.645f, 10.92f, 0.9f), DoorKind.Itado, 1),      // 納戸↔廊下
+            Door(DX(G0, 8.645f, 15f, 0.9f), DoorKind.Fusuma, 1),        // 奥の間↔廊下
+            DZ(G0, 17.29f, 9.33f, 1.2f),                                 // 廊下↔東縁側：无门
+            DZP(G0, 17.29f, 0.6825f, 1.365f),                            // 縁側转角：无门
+            Door(DX(G0, 10.01f, 6.37f, 0.8f), DoorKind.Itado, 1),       // 廊下↔便所
+            Door(DX(G0, 10.01f, 10f, 0.9f), DoorKind.Itado, 1),         // 廊下↔風呂
+            DX(G0, 10.01f, 13.65f, 1.4f, 2.85f),                         // 廊下↔階段：无门
             // 縁側朝院子的开口全部是关着的玻璃拉门：只有玄関正门和台所后门能到室外
             GX(G0, 0f, 9f, 2.7f),
             GX(G0, 0f, 15f, 2.7f),
             GZ(G0, 18.655f, 4.5f, 2.7f),
             GX(G0, 10.01f, 17.97f, 1.2f),
-            DX(GKura, 17.29f, 8.19f, 1.4f),
-            DZ(GKura, 10.92f, 19.6f, 0.9f),
-            DX(GFence, -5.46f, 2.73f, 2.4f, 2.4f),
-            DX(G1, 8.645f, 6.37f, 0.9f),
-            DX(G1, 8.645f, 11.8f, 1.8f),
-            DZ(G1, 9.1f, 6.825f, 1.8f),
-            DX(G1, 10.01f, 6.8f, 0.9f),
-            DX(G1, 10.01f, 10.5f, 0.9f),
-            DZ(G1, 8.19f, 11.6f, 0.9f),
-            DX(G1, 13.195f, 6.8f, 0.9f),
-            DX(G1, 13.195f, 10.5f, 0.9f),
+            Door(DX(GKura, 17.29f, 8.19f, 1.4f), DoorKind.Kura, 2),     // 土蔵正门
+            Door(DZ(GKura, 10.92f, 19.6f, 0.9f), DoorKind.Itado, 1),    // 土蔵侧门
+            DX(GFence, -5.46f, 2.73f, 2.4f, 2.4f),                       // 围墙大门（玩法：路线二出口，不归这里管）
+            Door(DX(G1, 8.645f, 6.37f, 0.9f), DoorKind.Fusuma, 1),      // 寝室↔二階中廊下
+            Door(DX(G1, 8.645f, 11.8f, 1.8f), DoorKind.Fusuma, 2),      // 二階和室↔二階中廊下
+            Door(DZ(G1, 9.1f, 6.825f, 1.8f), DoorKind.Fusuma, 2),       // 寝室↔二階和室
+            Door(DX(G1, 10.01f, 6.8f, 0.9f), DoorKind.Itado, 1),        // 物置↔二階中廊下
+            Door(DX(G1, 10.01f, 10.5f, 0.9f), DoorKind.Fusuma, 1),      // 子供部屋↔二階中廊下
+            Door(DX(G1, 13.195f, 6.8f, 0.9f), DoorKind.Itado, 1),       // 物置↔二階北廊下
+            Door(DX(G1, 13.195f, 10.5f, 0.9f), DoorKind.Fusuma, 1),     // 子供部屋↔二階北廊下
             DXP(G1, 13.195f, 4.55f, 1.82f),
             DXP(G1, 13.195f, 13.65f, 1.82f),
             WZ(G0, 0, 3.5f, 1.0f, .8f, 1.65f),
@@ -387,21 +384,7 @@ namespace HakoOnna.Art.EditorTools
                 }
                 if (!o.window && o.sill == 0 && top + .075f < lv.wallTop && room.group != GFence)
                 {
-                    // 展示收在墙边的门扇，中央净宽保持可通行。
-                    bool paperDoor = room.floor == pal.Tatami;
-                    bool entrance = room.id == "Genkan" && alongX && line == 0;
-                    if (paperDoor || entrance)
-                    {
-                        float leaf = Mathf.Min((b - a) / 2, .84f * OpeningWidthScale, a - cursor - .08f);
-                        if (leaf > .24f)
-                        {
-                            float skin = wallLine + inward * .012f;
-                            WallPiece(parent, "ParkedSlidingPanel", alongX, skin, a - leaf, a - .055f,
-                                lv.floorTop + .05f, top - .04f, paperDoor ? pal.Paper : pal.WoodDarkA);
-                            WallPiece(parent, "PanelRail", alongX, skin + inward * .008f, a - leaf, a - .055f,
-                                lv.floorTop + .78f, lv.floorTop + .81f, pal.WoodMidA);
-                        }
-                    }
+                    // 门扇是能开关的独立物体（Doors.cs），这里只做门框：鴨居 + 两侧门柱
                     float face = wallLine + inward * .025f;
                     WallPiece(parent, "Kamoi", alongX, face, a, b, top, top + .075f, pal.WoodDarkA);
                     if (a - from > .06f)
@@ -448,8 +431,10 @@ namespace HakoOnna.Art.EditorTools
             BuildFlight(t, "Stair_Main", 13.65f, .55f, 18, pal.WoodDarkA);
             BuildFlight(t, "Stair_Kitchen", 4.54f, 0, 21, pal.WoodDarkB);
             const float W = OpeningWidthScale;
-            foreach (float z in new[] { .68f, 3.185f, 6.825f, 9.33f })
-                Threshold(t, Plan(5.46f,.55f,z), Vector3.right, (z == .68f || z == 9.33f ? .9f : 1.8f) * W, pal.WoodMidA);
+            foreach (float z in new[] { 3.185f, 6.825f })
+                Threshold(t, Plan(5.46f,.55f,z), Vector3.right, 1.8f * W, pal.WoodMidA);
+            // 玄関↔縁側的门已经钉死：只剩当年的式台踏板（没有坡道，走不上去）
+            ThresholdStepOnly(t, Plan(5.46f,.55f,.68f), Vector3.right, .9f * W, pal.WoodMidA);
             // 縁側的玻璃拉门关着：门外只放一块沓脱石（不再有坡道），西边那块上面摆着下駄
             ShoeStone(t, Plan(9f,.55f,0), Vector3.forward, .4f, pal.Stone);
             ShoeStone(t, Plan(15f,.55f,0), Vector3.forward, -.2f, pal.Stone);
@@ -467,6 +452,16 @@ namespace HakoOnna.Art.EditorTools
                 new Vector3(width, end.y / 2, .78f), mat, false);
             step.transform.rotation = Quaternion.LookRotation(direction);
             Ramp(parent, start, end, width);
+        }
+
+        /// <summary>只有踏板、没有坡道碰撞（门洞已封，踏板只是遗留的样子）。</summary>
+        static void ThresholdStepOnly(Transform parent, Vector3 end, Vector3 direction, float width, Material mat)
+        {
+            Vector3 start = end - direction * .8f;
+            start.y = 0;
+            var step = ArtKit.Box(parent, "ThresholdStep_Sealed", (start + end) / 2 - Vector3.up * end.y / 4,
+                new Vector3(width, end.y / 2, .78f), mat, false);
+            step.transform.rotation = Quaternion.LookRotation(direction);
         }
 
         /// <summary>

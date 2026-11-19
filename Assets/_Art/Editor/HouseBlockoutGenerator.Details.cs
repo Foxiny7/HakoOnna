@@ -24,6 +24,7 @@ namespace HakoOnna.Art.EditorTools
         {
             MeshBatch.Created.Clear();
             D = DetailMats.Load();
+            DM.Load();
             P = pal; DRooms = rooms; DOps = openings;
             var dressing = ArtKit.Empty(root, "Dressing", Vector3.zero);
             var arch = ArtKit.Empty(dressing, "Architecture", Vector3.zero);
@@ -32,14 +33,18 @@ namespace HakoOnna.Art.EditorTools
             var furn = ArtKit.Empty(dressing, "Furnishings", Vector3.zero);
             BlockerRoot = ArtKit.Empty(props, "Dressing_Blockers", Vector3.zero);
 
+            PlanDoors();
+            GlassSpecs.Clear();
             foreach (var room in rooms)
                 if (room.hasFloor && room.group != GFence) InteriorArchitecture(arch, room);
-            DecorateSlidingPanels(arch, structure);
             ExteriorWalls(ext);
             BuildRoofs(ext);
             FenceAndGate(ext);
             BuildGarden(garden, structure);
             FurnishRooms(furn, root);
+            // 门扇在家具之后建：停靠的一面在家具搬家时选好（ChooseDoorParking）
+            BuildDoors(root, structure);
+            BuildSealedDoorways(arch);
             SaveDetailMeshes();
         }
 
@@ -391,6 +396,9 @@ namespace HakoOnna.Art.EditorTools
             bool tatami = IsTatami(room), doma = IsDoma(room), kura = room.group == GKura, tile = IsTileRoom(room);
             var doorCuts = new List<Vector2>();
             foreach (var g in gaps) if (g.door) doorCuts.Add(new Vector2(g.a, g.b));
+            // 钉死的旧门：墙是实的，但这一段按门处理（不做腰板、不立柱，门框和门板在 BuildSealedDoorways 里做）
+            var sealedCuts = SealedSpansOn(room, e);
+            foreach (var sc in sealedCuts) doorCuts.Add(new Vector2(sc.x - .06f, sc.y + .06f));
 
             // 敷居（土间一侧有踏步，不放）
             if (!doma)
@@ -438,6 +446,8 @@ namespace HakoOnna.Art.EditorTools
                         float pad = g.door ? .07f : 0f;
                         if (s + pw / 2 > g.a - pad + .002f && s - pw / 2 < g.b + pad - .002f) blocked = true;
                     }
+                    foreach (var sc in sealedCuts)
+                        if (s + pw / 2 > sc.x - .07f && s - pw / 2 < sc.y + .07f) blocked = true;
                     if (blocked) continue;
                     WallBox(mb, doma ? D.BeamDark : D.Post, e, s - pw / 2, s + pw / 2, fl, cy, T - .005f, T + pp);
                     last = s;
@@ -461,7 +471,7 @@ namespace HakoOnna.Art.EditorTools
 
             foreach (var g in gaps)
             {
-                if (g.glass) GlassDoors(mb, e, g);
+                if (g.glass) { GlassDoorFrame(mb, e, g); GlassSpecs.Add((room, e, g)); }
                 else if (g.window)
                 {
                     float y0 = g.bottom, y1 = g.top;
@@ -480,50 +490,21 @@ namespace HakoOnna.Art.EditorTools
 
         static MeshBatch GlassMB;
 
+        /// <summary>縁側的玻璃拉门要单独做成锁着的门（DoorVisual），先记下来，门扇在 BuildDoors 里做。</summary>
+        static readonly List<(Room room, Edge e, Gap g)> GlassSpecs = new List<(Room, Edge, Gap)>();
+
         /// <summary>
-        /// 縁側朝院子的落地玻璃拉门（ガラス戸），关着：鴨居 + 敷居，门扇在两条轨道上交错排，
-        /// 木框、下部腰板、上面 3×2 格玻璃，中间两扇的交接处有一个黄铜螺丝锁。
+        /// 縁側朝院子的落地玻璃拉门（ガラス戸）的门框：室内侧门框（凸出墙面 3 cm）、鴨居、敷居横穿整个墙厚。
+        /// 门扇（木框、下部腰板、3×2 格玻璃、螺丝锁）是能晃的独立物体，见 Doors.cs 的 BuildGlassDoor。
         /// </summary>
-        static void GlassDoors(MeshBatch mb, Edge e, Gap g)
+        static void GlassDoorFrame(MeshBatch mb, Edge e, Gap g)
         {
-            var gm = GlassMB ?? mb;
             float y0 = g.bottom, y1 = g.top;
-            // 室内侧的门框（和窗框一样凸出墙面 3 cm），鴨居、敷居横穿整个墙厚
             WallBox(mb, D.TrimMid, e, g.a - .04f, g.a, y0, y1 + .05f, T - .005f, T + .03f);
             WallBox(mb, D.TrimMid, e, g.b, g.b + .04f, y0, y1 + .05f, T - .005f, T + .03f);
             WallBox(mb, D.TrimMid, e, g.a - .04f, g.b + .04f, y1, y1 + .05f, T - .005f, T + .03f);
             WallBox(mb, D.TrimMid, e, g.a, g.b, y1 - .045f, y1, -.005f, T + .005f);
             WallBox(mb, D.TrimLight, e, g.a - .04f, g.b + .04f, y0 - .02f, y0 + .015f, -.005f, T + .03f);
-            int n = Mathf.Max(2, Mathf.RoundToInt((g.b - g.a) / .85f));
-            float w = (g.b - g.a) / n, p0 = y0 + .015f, p1 = y1 - .03f;
-            const float st = .045f;
-            for (int i = 0; i < n; i++)
-            {
-                // 相邻门扇在不同轨道上，交接处各压 2.5 cm；两端插进门框
-                float s0 = g.a + i * w - (i == 0 ? .015f : .025f), s1 = g.a + (i + 1) * w + (i == n - 1 ? .015f : .025f);
-                float d0 = i % 2 == 0 ? .012f : .045f, d1 = d0 + .03f;
-                WallBox(mb, D.TrimMid, e, s0, s0 + st, p0, p1, d0, d1);
-                WallBox(mb, D.TrimMid, e, s1 - st, s1, p0, p1, d0, d1);
-                WallBox(mb, D.TrimMid, e, s0 + st, s1 - st, p1 - .06f, p1, d0, d1);
-                WallBox(mb, D.TrimMid, e, s0 + st, s1 - st, p0, p0 + .08f, d0, d1);
-                WallBox(mb, D.Wainscot, e, s0 + st, s1 - st, p0 + .08f, p0 + .3f, d0 + .009f, d1 - .009f);
-                WallBox(mb, D.TrimMid, e, s0 + st, s1 - st, p0 + .3f, p0 + .335f, d0, d1);
-                float g0 = p0 + .335f, g1 = p1 - .06f, sm = (s0 + s1) / 2;
-                for (int k = 1; k < 3; k++)
-                {
-                    float y = Mathf.Lerp(g0, g1, k / 3f);
-                    WallBox(mb, D.TrimMid, e, s0 + st, s1 - st, y - .011f, y + .011f, d0 + .006f, d1 - .006f);
-                }
-                WallBox(mb, D.TrimMid, e, sm - .01f, sm + .01f, g0, g1, d0 + .006f, d1 - .006f);
-                float dm = (d0 + d1) / 2;
-                WallBox(gm, D.WindowGlass, e, s0 + st, s1 - st, g0, g1, dm - .002f, dm + .002f);
-                // 引手：门扇外端的竖框上一小块铁片
-                float hx = i % 2 == 0 ? s0 + .022f : s1 - .022f;
-                WallBox(mb, D.Iron, e, hx - .01f, hx + .01f, y0 + .9f, y0 + 1.02f, d1, d1 + .003f);
-            }
-            // 中间两扇交接处的螺丝锁（ネジ締り錠）
-            float mid = g.a + (n / 2) * w;
-            WallBox(mb, D.Brass, e, mid - .03f, mid + .03f, y0 + .98f, y0 + 1.02f, .045f + .03f, .045f + .046f);
         }
 
         static void Ranma(MeshBatch mb, Edge e, float a, float b, float y0, float y1)
@@ -541,87 +522,5 @@ namespace HakoOnna.Art.EditorTools
             WallBox(mb, D.TrimLight, e, a, b, m2 - .008f, m2 + .008f, T, T + .022f);
         }
 
-        // =====================================================================
-        // 收在墙里的推拉门：和室之间 = 襖，朝縁側 = 障子，玄関 = 格子门
-        // =====================================================================
-        static void DecorateSlidingPanels(Transform parent, Transform structure)
-        {
-            var mb = new MeshBatch();
-            foreach (var mr in structure.GetComponentsInChildren<MeshRenderer>())
-            {
-                if (mr.name != "ParkedSlidingPanel") continue;
-                var roomT = mr.transform.parent;
-                Room room = null;
-                foreach (var r in DRooms) if (roomT.name.StartsWith($"Room_{r.id}_")) room = r;
-                if (room == null) continue;
-                var b = mr.bounds;
-                bool alongX = b.size.x > b.size.z;
-                Edge e = default;
-                float best = 999f;
-                foreach (var ed in EdgesOf(room))
-                {
-                    if (ed.alongX != alongX) continue;
-                    float dist = Mathf.Abs((alongX ? b.center.z : b.center.x) - ed.line);
-                    if (dist < best) { best = dist; e = ed; }
-                }
-                float s0 = alongX ? b.min.x : b.min.z, s1 = alongX ? b.max.x : b.max.z;
-                float y0 = b.min.y, y1 = b.max.y, face = T + .012f;
-                if (mr.sharedMaterial == P.WoodDarkA) { KoshiDoor(mb, e, s0, s1, y0, y1, face); continue; }
-                var other = RoomAt(OnWall(e, (s0 + s1) / 2, y0 + 1f, -.1f), room.group);
-                if (other != null && other.id.StartsWith("Engawa")) ShojiPanel(mb, e, s0, s1, y0, y1, face);
-                else
-                {
-                    mr.sharedMaterial = D.Fusuma;
-                    FusumaPanel(mb, e, s0, s1, y0, y1, face);
-                }
-            }
-            mb.Build(parent, "SlidingPanels_Detail");
-        }
-
-        static void FusumaPanel(MeshBatch mb, Edge e, float s0, float s1, float y0, float y1, float f)
-        {
-            const float w = .022f;
-            WallBox(mb, D.Lacquer, e, s0, s1, y0, y0 + w, f - .004f, f + .006f);
-            WallBox(mb, D.Lacquer, e, s0, s1, y1 - w, y1, f - .004f, f + .006f);
-            WallBox(mb, D.Lacquer, e, s0, s0 + w, y0, y1, f - .004f, f + .006f);
-            WallBox(mb, D.Lacquer, e, s1 - w, s1, y0, y1, f - .004f, f + .006f);
-            var n = Inward(e);
-            var rot = Quaternion.FromToRotation(Vector3.up, n);
-            var c = OnWall(e, s1 - .09f, y0 + .82f, f - .002f);
-            mb.Cyl(D.Brass, c, .036f, .036f, .007f, 14, true, rot);
-            mb.Cyl(D.Black, c + n * .005f, .024f, .024f, .004f, 12, true, rot);
-        }
-
-        static void ShojiPanel(MeshBatch mb, Edge e, float s0, float s1, float y0, float y1, float f)
-        {
-            const float w = .03f, koshi = .28f;
-            var m = D.TrimLight;
-            WallBox(mb, m, e, s0, s1, y0, y0 + koshi, f - .004f, f + .004f);
-            WallBox(mb, m, e, s0, s1, y0 + koshi, y0 + koshi + w, f - .004f, f + .01f);
-            WallBox(mb, m, e, s0, s1, y1 - w, y1, f - .004f, f + .01f);
-            WallBox(mb, m, e, s0, s0 + w, y0, y1, f - .004f, f + .01f);
-            WallBox(mb, m, e, s1 - w, s1, y0, y1, f - .004f, f + .01f);
-            float n = Mathf.Max(1f, Mathf.Round((s1 - s0 - 2 * w) / .19f));
-            for (int i = 1; i < n; i++)
-            {
-                float s = Mathf.Lerp(s0 + w, s1 - w, i / n);
-                WallBox(mb, m, e, s - .006f, s + .006f, y0 + koshi + w, y1 - w, f - .002f, f + .008f);
-            }
-            for (float y = y0 + koshi + w + .24f; y < y1 - w - .05f; y += .24f)
-                WallBox(mb, m, e, s0 + w, s1 - w, y - .006f, y + .006f, f - .002f, f + .008f);
-        }
-
-        static void KoshiDoor(MeshBatch mb, Edge e, float s0, float s1, float y0, float y1, float f)
-        {
-            const float w = .045f;
-            var m = D.Post;
-            WallBox(mb, m, e, s0, s1, y0, y0 + .12f, f - .004f, f + .01f);
-            WallBox(mb, m, e, s0, s1, y1 - w, y1, f - .004f, f + .01f);
-            WallBox(mb, m, e, s0, s0 + w, y0, y1, f - .004f, f + .01f);
-            WallBox(mb, m, e, s1 - w, s1, y0, y1, f - .004f, f + .01f);
-            WallBox(mb, m, e, s0, s1, y0 + .9f, y0 + .93f, f - .004f, f + .012f);
-            for (float s = s0 + w + .03f; s < s1 - w - .01f; s += .05f)
-                WallBox(mb, m, e, s - .01f, s + .01f, y0 + .12f, y1 - w, f - .002f, f + .008f);
-        }
     }
 }

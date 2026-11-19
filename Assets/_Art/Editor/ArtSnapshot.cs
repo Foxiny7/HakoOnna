@@ -16,7 +16,8 @@ namespace HakoOnna.Art.EditorTools
     {
         const string OutDir = "Docs/screenshots/detail";
 
-        enum Mode { Day, Interior, Mood, Plan1F, Plan2F }
+        /// <summary>Detail：室内灯光，机位直接用新坐标书写（不搬家映射，也不参与“机位前方不放家具”）。</summary>
+        enum Mode { Day, Interior, Mood, Plan1F, Plan2F, Detail }
 
         /// <summary>室外机位：平面和高度一起放大，构图和旧版一致。</summary>
         static float ExteriorScale => HouseBlockoutGenerator.PlanStretch;
@@ -80,6 +81,13 @@ namespace HakoOnna.Art.EditorTools
             yield return new Shot("monooki", Mode.Interior, new Vector3(8.2f, 4.6f, 18.2f), new Vector3(11.4f, 3.8f, 15.0f));
             yield return new Shot("mood_zashiki", Mode.Mood, new Vector3(22.8f, 2.1f, 3.0f), new Vector3(19.5f, 1.2f, 6.8f));
             yield return new Shot("mood_rouka", Mode.Mood, new Vector3(24.0f, 2.1f, 13.2f), new Vector3(8f, 1.3f, 13.2f));
+            // 门（2026-11-19）：钉死的旧门四面、居間的板戸和茶箪笥、座敷的箪笥（新坐标）
+            yield return new Shot("sealed_genkan", Mode.Detail, new Vector3(7.6f, 1.6f, 2.9f), new Vector3(10.84f, 1.25f, 1.36f));
+            yield return new Shot("sealed_butsuma", Mode.Detail, new Vector3(21.9f, 2.05f, 6.4f), new Vector3(20f, 1.75f, 9.93f));
+            yield return new Shot("sealed_oku", Mode.Detail, new Vector3(29.2f, 2.05f, 13f), new Vector3(25.56f, 1.75f, 13.65f));
+            yield return new Shot("sealed_nando", Mode.Detail, new Vector3(21.6f, 2.05f, 15.6f), new Vector3(25.4f, 1.35f, 13.65f));
+            yield return new Shot("doors_ima", Mode.Detail, new Vector3(16.5f, 2.05f, 15.5f), new Vector3(11f, 1.2f, 12f));
+            yield return new Shot("doors_zashiki", Mode.Detail, new Vector3(30.5f, 2.05f, 8.8f), new Vector3(26f, 1.2f, 4.5f));
         }
 
         [MenuItem("Hako/Art/9 场景截图检查", priority = 90)]
@@ -119,7 +127,7 @@ namespace HakoOnna.Art.EditorTools
                     bool plan = s.mode == Mode.Plan1F || s.mode == Mode.Plan2F;
                     cam.orthographic = plan;
                     data.renderPostProcessing = !plan;
-                    spot.enabled = s.mode == Mode.Interior || s.mode == Mode.Mood;
+                    spot.enabled = s.mode == Mode.Interior || s.mode == Mode.Mood || s.mode == Mode.Detail;
                     spot.intensity = s.mode == Mode.Mood ? 4f : 3f;
                     RenderSettings.fog = s.mode == Mode.Mood && fog;
                     if (moon)
@@ -130,7 +138,7 @@ namespace HakoOnna.Art.EditorTools
                     }
                     Color amb = s.mode == Mode.Day ? new Color(.36f, .38f, .42f)
                         : plan ? new Color(.6f, .6f, .6f)
-                        : s.mode == Mode.Interior ? new Color(.36f, .34f, .32f) : ambColor;
+                        : s.mode == Mode.Interior || s.mode == Mode.Detail ? new Color(.36f, .34f, .32f) : ambColor;
                     SetAmbient(amb);
                     cam.backgroundColor = s.mode == Mode.Day ? new Color(.45f, .52f, .62f) : new Color(.01f, .012f, .02f);
 
@@ -156,6 +164,7 @@ namespace HakoOnna.Art.EditorTools
                             float k = ExteriorScale;
                             pos = s.pos * k; look = s.look * k;
                         }
+                        else if (s.mode == Mode.Detail) { pos = s.pos; look = s.look; }
                         else { pos = HouseBlockoutGenerator.MapOldPoint(s.pos); look = HouseBlockoutGenerator.MapOldPoint(s.look); }
                         camGo.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(look - pos, Vector3.up));
                     }

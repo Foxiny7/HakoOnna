@@ -291,8 +291,13 @@ namespace HakoOnna.Art.EditorTools
                 else // 门：两侧各 1.25 m 留空，门楣上的欄間也不挂东西
                     Hard(LineBox(o.alongX, o.line, lo - .35f, hi + .35f, c.fl - .3f, c.ceil + .1f, 1.25f));
             }
-            foreach (var e in EdgesOf(room))
-                foreach (var z in ParkedLeafZones(room, e)) Hard(z);
+            // 推拉门开着时门扇停靠的墙面（Doors.cs 选好的），前面不能放东西
+            foreach (var z in ParkZones)
+            {
+                var x = z;
+                x.Expand(new Vector3(.04f, 0f, .04f));
+                Hard(x);
+            }
             c.hardFixed = c.hard.Count;
             foreach (var b in KeepOut)
             {
@@ -317,25 +322,6 @@ namespace HakoOnna.Art.EditorTools
                     c.occSoft.Add(OccupiedSoft != null && i < OccupiedSoft.Count && OccupiedSoft[i]);
                 }
             return c;
-        }
-
-        /// <summary>和 BuildEdge 同样的规则算出收在墙边的门扇（和室的襖 / 障子、玄関的格子门），前面不能放东西。</summary>
-        static IEnumerable<Bounds> ParkedLeafZones(Room room, Edge e)
-        {
-            if (!HasWall(room, e)) yield break;
-            bool entrance = room.id == "Genkan" && e.alongX && Mathf.Abs(e.line) < .01f;
-            if (!IsTatami(room) && !entrance) yield break;
-            // 起点取房间边缘（比 BuildEdge 的起点更靠外，算出的门扇只会更宽，偏保守）
-            float cursor = e.alongX ? room.r.xMin : room.r.yMin, fl = FloorY(room), ceil = CeilY(room);
-            foreach (var g in GapsOn(room, e))
-            {
-                if (g.door && g.top + .075f < ceil)
-                {
-                    float leaf = Mathf.Min((g.b - g.a) / 2, .84f * OpeningWidthScale, g.a - cursor - .08f);
-                    if (leaf > .24f) yield return BoxOnWall(e, g.a - leaf - .05f, g.a + .02f, fl - .3f, ceil + .1f, -.2f, .75f);
-                }
-                cursor = Mathf.Max(cursor, g.b);
-            }
         }
 
         static Bounds BoxOnWall(Edge e, float s0, float s1, float y0, float y1, float d0, float d1)
