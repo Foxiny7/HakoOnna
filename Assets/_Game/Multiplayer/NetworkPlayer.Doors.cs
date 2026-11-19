@@ -5,6 +5,23 @@ namespace HakoOnna.Multiplayer
 {
     public sealed partial class NetworkPlayer
     {
+        internal static int FindDoorAtFrame(HakoOnna.Art.DoorVisual[] doors, Ray ray, float reach, RaycastHit hit)
+        {
+            var hitDoor = HakoOnna.Art.DoorVisual.FromCollider(hit.collider);
+            int nearest = -1;
+            for (int i = 0; i < doors.Length; i++)
+            {
+                var frame = doors[i].WorldOpening;
+                // Keep the target at eye level within the middle of the opening.
+                frame.size = Vector3.Min(frame.size, new Vector3(.9f, 1.6f, .9f));
+                if (!frame.IntersectRay(ray, out float distance) || distance < 0f || distance > reach) continue;
+                if (hit.collider && hitDoor != doors[i] && hit.distance < distance) continue;
+                nearest = i;
+                reach = distance;
+            }
+            return nearest;
+        }
+
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
         private void UseDoorRpc(int id, Vector3 direction)
         {
@@ -43,8 +60,7 @@ namespace HakoOnna.Multiplayer
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         internal void TryTestDoor(HakoOnna.Art.DoorVisual door)
         {
-            var leaf = door.GetComponentInChildren<BoxCollider>();
-            var direction = (leaf.bounds.center - transform.position - Vector3.up * config.EyeHeight).normalized;
+            var direction = (door.WorldOpening.center - transform.position - Vector3.up * config.EyeHeight).normalized;
             LookTarget(direction, out int id);
             if (id >= 0 && session.Doors[id] == door && door.IsOpen)
                 UseDoorRpc(id, direction);

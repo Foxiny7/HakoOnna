@@ -61,14 +61,13 @@ namespace HakoOnna.Multiplayer
 
         private int LookTarget(Vector3 direction, out int door)
         {
-            door = -1;
             var eye = transform.position + Vector3.up * config.EyeHeight;
-            if (!Physics.Raycast(eye, direction, out var hit, config.SearchReach,
-                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
-                return -1;
+            var ray = new Ray(eye, direction);
+            Physics.Raycast(ray, out var hit, config.SearchReach,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            door = FindDoorAtFrame(session.Doors, ray, config.SearchReach, hit);
+            if (door >= 0 || !hit.collider) return -1;
             var visual = hit.collider.GetComponentInParent<HakoOnna.Art.ContainerVisual>();
-            var leaf = HakoOnna.Art.DoorVisual.FromCollider(hit.collider);
-            if (leaf) door = System.Array.IndexOf(session.Doors, leaf);
             return visual ? System.Array.IndexOf(session.Containers, visual) : -1;
         }
 

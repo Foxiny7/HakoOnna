@@ -124,14 +124,12 @@ namespace HakoOnna.Multiplayer
                 var door = FindFirstObjectByType<LocalSession>().Doors.First(d => d.name == "Door_Outside_Genkan");
                 if (manager.IsServer && sawClose && !nearDoor)
                 {
-                    var leaf = door.GetComponentInChildren<BoxCollider>().bounds;
-                    var outward = (leaf.size.z < leaf.size.x ? Vector3.forward : Vector3.right);
-                    var foot = new Vector3(leaf.center.x, leaf.min.y + .05f, leaf.center.z);
-                    if (Physics.Linecast(foot + Vector3.up + outward, leaf.center, out var hit) &&
-                        HakoOnna.Art.DoorVisual.FromCollider(hit.collider) != door) outward = -outward;
+                    var frame = door.WorldOpening;
+                    var outward = frame.size.z < frame.size.x ? Vector3.forward : Vector3.right;
+                    var foot = new Vector3(frame.center.x, frame.min.y + .05f, frame.center.z);
                     var character = searcher.GetComponent<CharacterController>();
                     character.enabled = false;
-                    searcher.transform.position = foot + outward;
+                    searcher.transform.position = manager.IsHost ? foot + outward : foot - outward;
                     character.enabled = true;
                     nearDoor = true;
                 }

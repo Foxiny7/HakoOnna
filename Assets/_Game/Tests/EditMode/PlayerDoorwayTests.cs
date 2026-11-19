@@ -24,6 +24,37 @@ namespace HakoOnna.Tests
             EditorSceneManager.ClosePreviewScene(house);
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void CanTargetEntranceFrameFromEitherSide(bool open)
+        {
+            var doors = house.GetRootGameObjects().SelectMany(root =>
+                root.GetComponentsInChildren<HakoOnna.Art.DoorVisual>()).ToArray();
+            int entrance = System.Array.FindIndex(doors, d => d.name == "Door_Outside_Genkan");
+            Assert.That(entrance, Is.GreaterThanOrEqualTo(0));
+            var door = doors[entrance];
+            try
+            {
+                door.SetOpenImmediate(open);
+                Physics.SyncTransforms();
+                var frame = door.WorldOpening;
+                var normal = frame.size.x > frame.size.z ? Vector3.forward : Vector3.right;
+                foreach (int side in new[] { -1, 1 })
+                {
+                    var ray = new Ray(frame.center + normal * side, -normal * side);
+                    house.GetPhysicsScene().Raycast(ray.origin, ray.direction, out var hit, 2f,
+                        Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                    Assert.That(HakoOnna.Multiplayer.NetworkPlayer.FindDoorAtFrame(doors, ray, 2f, hit),
+                        Is.EqualTo(entrance), $"side {side}, open {open}");
+                }
+            }
+            finally
+            {
+                door.SetOpenImmediate(door.StartsOpen);
+                Physics.SyncTransforms();
+            }
+        }
+
         [TestCase(5.46f, 0f, -1.3999f, 5.46f, 0f, 0.9899f, TestName = "Door_0")]
         [TestCase(5.46f, 0f, 9.0201f, 5.46f, 0f, 11f, TestName = "Door_1")]
         [TestCase(9.1054f, 0f, 6.37f, 12.8018f, 0.55f, 6.37f, TestName = "Door_2")]
