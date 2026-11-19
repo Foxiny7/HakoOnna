@@ -6,6 +6,12 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/_Game/Scenes/LocalMultiplayer.unity
+    guid: 0ab1d0e2eea4bcc448569910ed207cc0
+  - enabled: 1
+    path: Assets/_Art/Scenes/House_Blockout.unity
+    guid: dd79f0969f766124c81dfee4c3e05b5f
+  - enabled: 1
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
   m_configObjects:

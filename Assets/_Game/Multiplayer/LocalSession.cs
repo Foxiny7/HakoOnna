@@ -1,0 +1,186 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+namespace HakoOnna.Multiplayer
+{
+    [RequireComponent(typeof(NetworkManager), typeof(UnityTransport))]
+    public sealed class LocalSession : MonoBehaviour
+    {
+        public const string HouseScene = "Assets/_Art/Scenes/House_Blockout.unity";
+        public const ushort Port = 7777;
+
+        private readonly Dictionary<ulong, int> spawnSlots = new Dictionary<ulong, int>();
+        private NetworkManager manager;
+        private Transform[] spawnPoints;
+        private Camera previewCamera;
+        private bool ready;
+        private string status = "Loading house...";
+
+        public bool Ready => ready;
+
+        private IEnumerator Start()
+        {
+            Application.runInBackground = true;
+            Application.targetFrameRate = 60;
+            manager = GetComponent<NetworkManager>();
+            manager.ConnectionApprovalCallback = ApproveConnection;
+            manager.OnClientConnectedCallback += OnConnected;
+            manager.OnClientDisconnectCallback += OnDisconnected;
+            manager.OnTransportFailure += OnTransportFailure;
+            manager.OnServerStopped += OnServerStopped;
+            GetComponent<UnityTransport>().SetConnectionData("127.0.0.1", Port, "127.0.0.1");
+
+            yield return SceneManager.LoadSceneAsync(HouseScene, LoadSceneMode.Additive);
+            var house = SceneManager.GetSceneByPath(HouseScene);
+            SceneManager.SetActiveScene(house);
+            // Ambient fill belongs to this graybox playtest so movement remains easy to inspect.
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = Color.gray;
+            var ambient = new UnityEngine.Rendering.SphericalHarmonicsL2();
+            ambient.AddAmbientLight(Color.gray);
+            RenderSettings.ambientProbe = ambient;
+            var spawns = GameObject.Find("House_Blockout/Gameplay/ExplorerSpawnPoints").transform;
+            spawnPoints = new Transform[spawns.childCount];
+            for (var index = 0; index < spawnPoints.Length; index++)
+                spawnPoints[index] = spawns.GetChild(index);
+
+            previewCamera = GameObject.Find("House_Blockout/Lighting/BlockoutPreviewCamera_DeleteLater").GetComponent<Camera>();
+            previewCamera.gameObject.SetActive(false);
+            ready = true;
+            status = "Local server 127.0.0.1:7777";
+            var mode = Argument("-hakoMode");
+            if (!string.IsNullOrEmpty(mode))
+                StartSession(mode);
+        }
+
+        public void StartSession(string mode)
+        {
+            if (!ready || manager.IsListening || manager.ShutdownInProgress)
+                return;
+
+            spawnSlots.Clear();
+            status = mode + " starting...";
+            bool started;
+            switch (mode)
+            {
+                case "host": started = manager.StartHost(); break;
+                case "server": started = manager.StartServer(); break;
+                case "client": started = manager.StartClient(); break;
+                default: throw new ArgumentException("Use host, server or client.", nameof(mode));
+            }
+            if (!started)
+                status = "Could not start " + mode;
+            else if (mode == "server")
+                status = "Local server running";
+        }
+
+        public void Disconnect()
+        {
+            manager.Shutdown();
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            status = "Disconnected";
+        }
+
+        private void ApproveConnection(NetworkManager.ConnectionApprovalRequest request,
+            NetworkManager.ConnectionApprovalResponse response)
+        {
+            var slot = 0;
+            while (slot < spawnPoints.Length && spawnSlots.ContainsValue(slot))
+                slot++;
+
+            response.Approved = slot < spawnPoints.Length;
+            response.CreatePlayerObject = response.Approved;
+            response.Reason = response.Approved ? "" : "All five graybox spawn points are occupied.";
+            if (!response.Approved)
+                return;
+
+            spawnSlots.Add(request.ClientNetworkId, slot);
+            response.Position = spawnPoints[slot].position + Vector3.up * 0.05f;
+            response.Rotation = spawnPoints[slot].rotation;
+        }
+
+        private void OnConnected(ulong clientId)
+        {
+            status = manager.IsHost ? "Host connected" : manager.IsServer ? "Local server running" : "Connected";
+        }
+
+        private void OnDisconnected(ulong clientId)
+        {
+            spawnSlots.Remove(clientId);
+            if (clientId == manager.LocalClientId)
+            {
+                status = string.IsNullOrEmpty(manager.DisconnectReason) ? "Disconnected" : manager.DisconnectReason;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
+        }
+
+        private void OnTransportFailure()
+        {
+            status = "Transport failed. Check that another local server is not using port 7777.";
+        }
+
+        private void OnServerStopped(bool wasHost)
+        {
+            spawnSlots.Clear();
+            status = "Server stopped";
+        }
+
+        private void OnGUI()
+        {
+            if (Application.isBatchMode)
+                return;
+
+            GUILayout.BeginArea(new Rect(16, 16, 380, 250), GUI.skin.box);
+            GUILayout.Label(status);
+            if (manager != null && manager.IsListening)
+            {
+                GUILayout.Label("Players visible: " + FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None).Length);
+                GUILayout.Label("WASD move | Shift run | Mouse look | Esc release cursor");
+                if (Cursor.lockState == CursorLockMode.None && GUILayout.Button("Capture mouse"))
+                {
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                }
+                if (GUILayout.Button("Disconnect"))
+                    Disconnect();
+            }
+            else
+            {
+                GUI.enabled = ready && manager != null && !manager.ShutdownInProgress;
+                if (GUILayout.Button("Host on this PC"))
+                    StartSession("host");
+                if (GUILayout.Button("Join 127.0.0.1"))
+                    StartSession("client");
+                if (GUILayout.Button("Start local server"))
+                    StartSession("server");
+                GUI.enabled = true;
+            }
+            GUILayout.EndArea();
+        }
+
+        private void OnDestroy()
+        {
+            if (manager == null)
+                return;
+            manager.ConnectionApprovalCallback = null;
+            manager.OnClientConnectedCallback -= OnConnected;
+            manager.OnClientDisconnectCallback -= OnDisconnected;
+            manager.OnTransportFailure -= OnTransportFailure;
+            manager.OnServerStopped -= OnServerStopped;
+        }
+
+        public static string Argument(string name)
+        {
+            var args = Environment.GetCommandLineArgs();
+            var index = Array.IndexOf(args, name);
+            return index >= 0 && index + 1 < args.Length ? args[index + 1] : "";
+        }
+    }
+}

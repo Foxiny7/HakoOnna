@@ -1,0 +1,9 @@
+{
+  "name": "HakoOnna.Multiplayer",
+  "references": [
+    "HakoOnna.Config",
+    "Unity.Netcode.Runtime",
+    "Unity.Networking.Transport",
+    "Unity.InputSystem"
+  ]
+}

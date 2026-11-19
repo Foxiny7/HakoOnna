@@ -1,0 +1,12 @@
+{
+  "name": "HakoOnna.Game.Editor",
+  "references": [
+    "HakoOnna.Multiplayer",
+    "HakoOnna.Config",
+    "Unity.Netcode.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
+}

@@ -14,3 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   searchSeconds: 2
   transferCooldownSeconds: 3
+  walkSpeed: 3
+  runSpeed: 5
+  mouseSensitivity: 0.1
+  playerHeight: 1.65
+  playerRadius: 0.22
+  eyeHeight: 1.45
