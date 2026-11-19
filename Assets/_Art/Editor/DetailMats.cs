@@ -20,6 +20,7 @@ namespace HakoOnna.Art.EditorTools
         public Material PaperLamp, Paper, Ink, Candle, Flame, Portrait, Ash, Straw, PlasticRed, Black, Water;
         public Material WindowGlass; // 透明（玻璃拉门）
         public Material BambooDry, MapleLeaf, Moss; // 庭院：晒干的竹篱笆、红叶、苔藓
+        public Material TatamiWorn, StoneWall;       // 第二轮：发黄发黑的旧席子、切石基座（外墙、围墙）
 
         [MenuItem("Hako/Art/2b 重建细节贴图和材质", priority = 21)]
         static void Rebuild()
@@ -131,6 +132,10 @@ namespace HakoOnna.Art.EditorTools
             d.BambooDry = Mat("MD_BambooDry", null, null, C(.50f, .43f, .27f), .38f, one);
             d.MapleLeaf = Mat("MD_MapleLeaf", null, null, C(.40f, .07f, .035f), .25f, one);
             d.Moss = Mat("MD_Moss", null, null, C(.10f, .16f, .055f), .08f, one);
+            d.TatamiWorn = Mat("MD_TatamiWorn", tatami, tatamiN, C(.78f, .7f, .55f), .1f, new Vector2(2, 2), bump: .6f);
+            d.StoneWall = Mat("MX_StoneWall", stone, stoneN, Color.white, .2f, one, bump: .5f);
+            // 第二轮：大部分材质换成 CC0 贴图（只升级一次，见 ExternalMats）
+            ExternalMats.UpgradeDetail(d);
             AssetDatabase.SaveAssets();
             return d;
         }

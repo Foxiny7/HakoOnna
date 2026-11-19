@@ -16,8 +16,15 @@ namespace HakoOnna.Art.EditorTools
     {
         const string OutDir = "Docs/screenshots/detail";
 
-        /// <summary>Detail：室内灯光，机位直接用新坐标书写（不搬家映射，也不参与“机位前方不放家具”）。</summary>
-        enum Mode { Day, Interior, Mood, Plan1F, Plan2F, Detail }
+        /// <summary>游戏光里手电的强度：2026-11-19 用户看了 5 / 12 / 25 的对比后定为 25（Codex 的 NetworkPlayer.Inspection.cs 原来是 5）。</summary>
+        const float GameBeamIntensity = 25f;
+
+        /// <summary>
+        /// Detail：室内灯光，机位直接用新坐标书写（不搬家映射，也不参与“机位前方不放家具”）。
+        /// MoodX：和 Mood 一样是游戏里的光（场景环境光 + 雾 + 手电），但不参与“机位前方不放家具”，
+        /// 加机位不会让家具搬家（第二轮检查暗度用）。
+        /// </summary>
+        enum Mode { Day, Interior, Mood, Plan1F, Plan2F, Detail, MoodX }
 
         /// <summary>室外机位：平面和高度一起放大，构图和旧版一致。</summary>
         static float ExteriorScale => HouseBlockoutGenerator.PlanStretch;
@@ -28,8 +35,11 @@ namespace HakoOnna.Art.EditorTools
             public Vector3 pos, look;
             public float fov;
             public Mode mode;
-            public Shot(string n, Mode m, Vector3 p, Vector3 l, float f = 70f) { name = n; mode = m; pos = p; look = l; fov = f; }
+            public bool raw; // 机位已是新坐标（场景里现找的，比如血字特写）
+            public Shot(string n, Mode m, Vector3 p, Vector3 l, float f = 70f) { name = n; mode = m; pos = p; look = l; fov = f; raw = false; }
         }
+
+        static bool IsMood(Mode m) => m == Mode.Mood || m == Mode.MoodX;
 
         public static void GenerateAndShoot()
         {
@@ -88,6 +98,38 @@ namespace HakoOnna.Art.EditorTools
             yield return new Shot("sealed_nando", Mode.Detail, new Vector3(21.6f, 2.05f, 15.6f), new Vector3(25.4f, 1.35f, 13.65f));
             yield return new Shot("doors_ima", Mode.Detail, new Vector3(16.5f, 2.05f, 15.5f), new Vector3(11f, 1.2f, 12f));
             yield return new Shot("doors_zashiki", Mode.Detail, new Vector3(30.5f, 2.05f, 8.8f), new Vector3(26f, 1.2f, 4.5f));
+            // 第二轮：游戏里的暗度（和同名 Interior 机位一样，只换光）
+            yield return new Shot("moodx_genkan", Mode.MoodX, new Vector3(1.2f, 1.55f, 1.2f), new Vector3(7f, 1.0f, 6f));
+            yield return new Shot("moodx_daidokoro", Mode.MoodX, new Vector3(6.6f, 1.55f, 8.0f), new Vector3(1.0f, 1.0f, 13.0f));
+            yield return new Shot("moodx_ima", Mode.MoodX, new Vector3(12.2f, 2.1f, 7.6f), new Vector3(8.5f, 1.5f, 12.0f));
+            yield return new Shot("moodx_nando", Mode.MoodX, new Vector3(17.5f, 2.1f, 8.0f), new Vector3(14.6f, 1.0f, 11.6f));
+            yield return new Shot("moodx_kura", Mode.MoodX, new Vector3(8.4f, 1.85f, 25.0f), new Vector3(14.5f, 1.0f, 29.8f));
+            yield return new Shot("moodx_kodomo", Mode.MoodX, new Vector3(12.2f, 4.6f, 18.1f), new Vector3(16.6f, 3.6f, 14.7f));
+        }
+
+        /// <summary>
+        /// 血字特写（第二轮）：场景里找 Writing_* 贴花，从正前方 2 m（被家具、墙挡住就近一点）稍微偏一点拍，
+        /// 室内灯光一张看清楚字，游戏光一张看实际效果。
+        /// </summary>
+        static IEnumerable<Shot> DecalShots()
+        {
+            foreach (var mr in Object.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+            {
+                if (!mr.name.StartsWith("Writing_") || !mr.TryGetComponent<MeshFilter>(out var mf) || mf.sharedMesh == null) continue;
+                var normals = mf.sharedMesh.normals;
+                if (normals.Length == 0) continue;
+                var n = mr.transform.TransformDirection(normals[0]).normalized;
+                var c = mr.bounds.center;
+                var side = Vector3.Cross(Vector3.up, n).normalized;
+                var dir = (n + side * .25f + Vector3.up * .12f).normalized;
+                float dist = 2f;
+                if (Physics.Raycast(c + n * .05f, dir, out var hit, 2.3f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                    dist = Mathf.Clamp(hit.distance - .3f, .8f, 2f);
+                var pos = c + dir * dist;
+                string key = mr.name.Substring("Writing_".Length);
+                yield return new Shot("decal_" + key, Mode.Detail, pos, c, 55f) { raw = true };
+                yield return new Shot("decalmood_" + key, Mode.MoodX, pos, c, 55f) { raw = true };
+            }
         }
 
         [MenuItem("Hako/Art/9 场景截图检查", priority = 90)]
@@ -119,17 +161,27 @@ namespace HakoOnna.Art.EditorTools
             spot.range = 16f;
             spot.color = new Color(1f, .93f, .82f);
             spot.shadows = LightShadows.Soft;
+            // 浮尘粒子在编辑器里不会自己播放：先模拟十几秒，截图里才有
+            var dust = Object.FindObjectsByType<ParticleSystem>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            foreach (var ps in dust) ps.Simulate(14f, true, true, true);
+            var shots = new List<Shot>(Shots());
+            shots.AddRange(DecalShots());
             int count = 0;
             try
             {
-                foreach (var s in Shots())
+                foreach (var s in shots)
                 {
                     bool plan = s.mode == Mode.Plan1F || s.mode == Mode.Plan2F;
                     cam.orthographic = plan;
                     data.renderPostProcessing = !plan;
-                    spot.enabled = s.mode == Mode.Interior || s.mode == Mode.Mood || s.mode == Mode.Detail;
-                    spot.intensity = s.mode == Mode.Mood ? 4f : 3f;
-                    RenderSettings.fog = s.mode == Mode.Mood && fog;
+                    spot.enabled = s.mode == Mode.Interior || IsMood(s.mode) || s.mode == Mode.Detail;
+                    // 游戏光：手电 55° / 内 25°、射程 16 m、强度 25（2026-11-19 用户定的 25，Codex 那边原来是 5，待改）；检查光：大角度补光
+                    bool mood = IsMood(s.mode);
+                    spot.spotAngle = mood ? 55f : 80f;
+                    spot.innerSpotAngle = mood ? 25f : 45f;
+                    spot.intensity = mood ? GameBeamIntensity : 3f;
+                    spot.color = mood ? new Color(1f, .95f, .84f) : new Color(1f, .93f, .82f);
+                    RenderSettings.fog = mood && fog;
                     if (moon)
                     {
                         moon.intensity = s.mode == Mode.Day ? 1.5f : plan ? .9f : moonI;
@@ -164,7 +216,7 @@ namespace HakoOnna.Art.EditorTools
                             float k = ExteriorScale;
                             pos = s.pos * k; look = s.look * k;
                         }
-                        else if (s.mode == Mode.Detail) { pos = s.pos; look = s.look; }
+                        else if (s.mode == Mode.Detail || s.raw) { pos = s.pos; look = s.look; }
                         else { pos = HouseBlockoutGenerator.MapOldPoint(s.pos); look = HouseBlockoutGenerator.MapOldPoint(s.look); }
                         camGo.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(look - pos, Vector3.up));
                     }
@@ -185,6 +237,8 @@ namespace HakoOnna.Art.EditorTools
                     moon.shadows = moonS;
                 }
                 Object.DestroyImmediate(camGo);
+                foreach (var ps in dust)
+                    if (ps != null) ps.Clear(true);
             }
             Debug.Log($"[Hako Art] 截图 {count} 张 → {OutDir}");
         }

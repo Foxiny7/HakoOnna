@@ -22,7 +22,7 @@ namespace HakoOnna.Art.EditorTools
             if (group == G0)
                 return new[]
                 {
-                    new Zone(0f, .32f, .035f, D.Stone),
+                    new Zone(0f, .32f, .035f, D.StoneWall),
                     new Zone(.32f, 2.6f, .014f, D.Siding),
                     new Zone(2.6f, 2.66f, .03f, D.Post),
                     new Zone(2.66f, t0 - .05f, .008f, D.PlasterWhite),
@@ -37,7 +37,7 @@ namespace HakoOnna.Art.EditorTools
                 };
             return new[]
             {
-                new Zone(0f, .22f, .04f, D.Stone),
+                new Zone(0f, .22f, .04f, D.StoneWall),
                 new Zone(.22f, 1.75f, .02f, D.Namako),
                 new Zone(1.75f, 1.84f, .06f, D.PlasterWhite),
                 new Zone(1.84f, tk, .008f, D.PlasterWhite),
@@ -686,8 +686,8 @@ namespace HakoOnna.Art.EditorTools
                     foreach (var g in GapsOn(fence, e)) cuts.Add(new Vector2(g.a, g.b));
                     foreach (var run in Minus(s0, s1, cuts))
                     {
-                        WallBox(mb, D.Stone, e, run.x, run.y, 0f, .3f, -.03f, 0f, true);
-                        WallBox(mb, D.Stone, e, run.x, run.y, 0f, .3f, T, T + .03f, true);
+                        WallBox(mb, D.StoneWall, e, run.x, run.y, 0f, .3f, -.03f, 0f, true);
+                        WallBox(mb, D.StoneWall, e, run.x, run.y, 0f, .3f, T, T + .03f, true);
                         FenceCoping(mb, e, run.x, run.y);
                     }
                 }

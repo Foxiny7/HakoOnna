@@ -45,6 +45,13 @@ namespace HakoOnna.Art.EditorTools
             // 门扇在家具之后建：停靠的一面在家具搬家时选好（ChooseDoorParking）
             BuildDoors(root, structure);
             BuildSealedDoorways(arch);
+            // 污渍、血字要等家具、门扇都到位了再找地方（Grime.cs）
+            BuildGrime(dressing, root);
+            // 灰盒立方体（墙、楼板、门框、代码生成的家具）换成按米铺 UV 的同形网格，贴图不再被拉伸；
+            // 座敷床の間交给 ZashikiArt（运行时换模型），容器是预制体，都不动
+            var wallMats = new HashSet<Material> { P.Plaster, P.WallPlaster, P.WallSoot, P.WallKura, P.Fence, P.Ground };
+            int reUV = PrimitiveUV.Apply(root, wallMats, t => UnderName(t, "Zashiki_Tokonoma"));
+            Debug.Log($"[Hako Art] 立方体换成按米铺 UV：{reUV} 个");
             SaveDetailMeshes();
         }
 
@@ -238,12 +245,13 @@ namespace HakoOnna.Art.EditorTools
             if (room.id == "Ima" || room.id == "Zashiki" || room.id == "Nando" || room.id == "Kura")
                 hole = new Rect(r.center.x - 1f, r.center.y - .75f, 2f, 1.5f);
 
-            if (IsTatami(room)) TatamiFloor(mb, inner, fl, hole);
+            if (IsTatami(room)) TatamiFloor(mb, inner, fl, hole, StableHash(room.id));
             else
             {
                 var fm = IsDoma(room) ? D.Tataki : IsTileRoom(room) ? D.BathTile : room.group == GKura ? D.KuraFloor : D.FloorWood;
-                bool planks = fm == D.FloorWood || fm == D.KuraFloor;
-                FloorRect(mb, fm, inner, fl + .002f, planks && inner.height > inner.width, hole);
+                // 地板顺着房间长边铺：走廊地板贴图的板沿 u，土蔵的风化木板沿 v
+                bool uz = (fm == D.FloorWood && inner.height > inner.width) || (fm == D.KuraFloor && inner.height <= inner.width);
+                FloorRect(mb, fm, inner, fl + .002f, uz, hole);
             }
             Ceiling(mb, room, inner);
             GlassMB = new MeshBatch();
@@ -254,7 +262,12 @@ namespace HakoOnna.Art.EditorTools
             GlassMB = null;
         }
 
-        static void TatamiFloor(MeshBatch mb, Rect a, float fl, Rect? hole)
+        /// <summary>
+        /// 榻榻米：贴图（Poly Haven tatami_mat，1.8 m 见方）里上下两张席子，每张 0.9 m × 1.8 m、长边带縁。
+        /// 每张席子单独算 UV：随机取上面或下面那张、随机翻转，约三成用发黑的旧席材质，縁取贴图里的縁带。
+        /// 贴图里的行号见 Tools~/make_textures.py 的说明：下面那张席面 v 0.017–0.483，縁 0.483–0.500；上面那张席面 0.519–0.981，縁 0.500–0.518。
+        /// </summary>
+        static void TatamiFloor(MeshBatch mb, Rect a, float fl, Rect? hole, int seed)
         {
             int nx = Mathf.Max(1, Mathf.RoundToInt(a.width / .955f));
             int nz = Mathf.Max(1, Mathf.RoundToInt(a.height / .955f));
@@ -262,20 +275,48 @@ namespace HakoOnna.Art.EditorTools
             FloorRect(mb, D.TatamiSeam, a, fl + .003f, false, hole);
             const float inset = .0025f, heri = .028f;
             float y = fl + .0065f;
+            var rnd = new System.Random(seed);
             foreach (var m in SolveTatami(nx, nz))
             {
                 var r = Rect.MinMaxRect(a.xMin + m.xMin * cw + inset, a.yMin + m.yMin * cd + inset,
                     a.xMin + m.xMax * cw - inset, a.yMin + m.yMax * cd - inset);
                 bool longX = r.width >= r.height;
+                var mat = R01(rnd) < .3f ? D.TatamiWorn : D.Tatami;
+                bool upper = R01(rnd) < .5f, flipU = R01(rnd) < .5f, flipV = R01(rnd) < .5f;
+                float b0 = upper ? .524f : .022f, b1 = upper ? .976f : .478f;
+                float hIn = upper ? .517f : .484f, hOut = upper ? .502f : .499f;
+                if (flipV) (b0, b1) = (b1, b0);
+                float len = longX ? r.width : r.height, s0 = longX ? r.xMin : r.yMin;
+                float t0 = longX ? r.yMin : r.xMin, t1 = longX ? r.yMax : r.xMax;
+                float U(float s)
+                {
+                    float k = .003f + (s - s0) * .994f / Mathf.Max(len, 1.8f);
+                    return flipU ? 1f - k : k;
+                }
                 var body = longX
                     ? Rect.MinMaxRect(r.xMin, r.yMin + heri, r.xMax, r.yMax - heri)
                     : Rect.MinMaxRect(r.xMin + heri, r.yMin, r.xMax - heri, r.yMax);
-                // 草席纹理 v 沿榻榻米长边
-                FloorRect(mb, D.Tatami, body, y, longX, hole);
+                TatamiPiece(mb, mat, body, y, longX, hole, (s, t) => new Vector2(U(s), Mathf.Lerp(b0, b1, (t - t0 - heri) / (t1 - t0 - 2 * heri))));
                 var h1 = longX ? Rect.MinMaxRect(r.xMin, r.yMin, r.xMax, r.yMin + heri) : Rect.MinMaxRect(r.xMin, r.yMin, r.xMin + heri, r.yMax);
                 var h2 = longX ? Rect.MinMaxRect(r.xMin, r.yMax - heri, r.xMax, r.yMax) : Rect.MinMaxRect(r.xMax - heri, r.yMin, r.xMax, r.yMax);
-                FloorRect(mb, D.Heri, h1, y + .0005f, !longX, hole);
-                FloorRect(mb, D.Heri, h2, y + .0005f, !longX, hole);
+                TatamiPiece(mb, mat, h1, y + .0005f, longX, hole, (s, t) => new Vector2(U(s), Mathf.Lerp(hOut, hIn, (t - t0) / heri)));
+                TatamiPiece(mb, mat, h2, y + .0005f, longX, hole, (s, t) => new Vector2(U(s), Mathf.Lerp(hIn, hOut, (t - t1 + heri) / heri)));
+            }
+        }
+
+        /// <summary>席子的一块（扣掉暗门洞），UV 按 (s 沿长边, t 横穿) 算。</summary>
+        static void TatamiPiece(MeshBatch mb, Material m, Rect r, float y, bool longX, Rect? hole, System.Func<float, float, Vector2> uvf)
+        {
+            foreach (var p in CutHole(r, hole))
+            {
+                var pts = new[]
+                {
+                    new Vector3(p.xMin, y, p.yMin), new Vector3(p.xMin, y, p.yMax),
+                    new Vector3(p.xMax, y, p.yMax), new Vector3(p.xMax, y, p.yMin),
+                };
+                var uv = new Vector2[4];
+                for (int i = 0; i < 4; i++) uv[i] = longX ? uvf(pts[i].x, pts[i].z) : uvf(pts[i].z, pts[i].x);
+                mb.Poly(m, pts, uv, Vector3.up);
             }
         }
 
@@ -422,7 +463,7 @@ namespace HakoOnna.Art.EditorTools
                     float mid = (s0 + s1) / 2, h = wain;
                     foreach (var g in gaps) if (!g.door && mid > g.a && mid < g.b) h = Mathf.Min(h, g.bottom - fl);
                     if (h < .05f) continue;
-                    WallBox(mb, wm, e, s0, s1, fl, fl + h, T - .002f, T + .012f);
+                    WallBox(mb, wm, e, s0, s1, fl, fl + h, T - .002f, T + .012f, true); // 竖铺的腰板：u 沿墙
                     if (!tile) WallBox(mb, doma ? D.BeamDark : D.TrimMid, e, s0, s1, fl + h - .03f, fl + h, T - .002f, T + .022f);
                 }
             }

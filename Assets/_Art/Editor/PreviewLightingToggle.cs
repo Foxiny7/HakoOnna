@@ -11,7 +11,7 @@ namespace HakoOnna.Art.EditorTools
     /// </summary>
     internal static class PreviewLightingToggle
     {
-        static readonly Color NightAmbient = new Color(0.025f, 0.03f, 0.045f);
+        static readonly Color NightAmbient = new Color(0.011f, 0.013f, 0.02f); // 和 AtmosphereBuilder 一致（第二轮压暗）
         static readonly Color PreviewAmbient = new Color(0.6f, 0.6f, 0.6f);
 
         [MenuItem("Hako/Art/3 切换预览照明（明亮 ↔ 真实夜晚）", priority = 40)]

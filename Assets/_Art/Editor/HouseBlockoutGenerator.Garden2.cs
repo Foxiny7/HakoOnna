@@ -33,7 +33,7 @@ namespace HakoOnna.Art.EditorTools
                 foreach (float d in new[] { -1f, 1f })
                 {
                     float h = FenceH - .02f - (float)rng.NextDouble() * .03f;
-                    mb.Box(D.BambooDry, P(s, h / 2, d * .021f), new Vector3(.012f, h, .04f), q);
+                    mb.Box(D.BambooDry, P(s, h / 2, d * .021f), new Vector3(.012f, h, .04f), q, 2, new Vector2(s * 1.07f + d * .5f, 0));
                 }
             // 押縁：横向的细竹
             foreach (float y in FenceRails)

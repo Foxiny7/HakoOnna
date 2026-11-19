@@ -5,7 +5,11 @@ using UnityEngine.Rendering.Universal;
 
 namespace HakoOnna.Art.EditorTools
 {
-    /// <summary>月光、环境光、雾、常态与猎杀两套后处理 Volume。</summary>
+    /// <summary>
+    /// 月光、环境光、雾、常态与猎杀两套后处理 Volume。
+    /// 第二轮（2026-11-19）整体压暗：没有手电时只看得清月光照到的地方。
+    /// 雾用指数平方（用户定的，美术圣经已改）：密度 0.17，2.5 m 内基本清楚、5 m 一半、7.5 m 以外看不清。
+    /// </summary>
     internal static class AtmosphereBuilder
     {
         const string ProfileDir = "Assets/_Art/Settings";
@@ -20,23 +24,23 @@ namespace HakoOnna.Art.EditorTools
             moonGo.transform.rotation = Quaternion.Euler(28f, -35f, 0f);
             var moon = moonGo.AddComponent<Light>();
             moon.type = LightType.Directional;
-            moon.color = new Color(0.55f, 0.64f, 0.90f);
-            moon.intensity = 0.35f;
+            moon.color = new Color(0.50f, 0.60f, 0.92f);
+            moon.intensity = 0.22f;
             moon.shadows = LightShadows.Soft;
             RenderSettings.sun = moon;
 
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.025f, 0.03f, 0.045f);
+            RenderSettings.ambientLight = new Color(0.011f, 0.013f, 0.02f);
             RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.02f, 0.025f, 0.035f);
-            RenderSettings.fogStartDistance = 4f;
-            RenderSettings.fogEndDistance = 30f;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogColor = new Color(0.012f, 0.015f, 0.022f);
+            RenderSettings.fogDensity = 0.17f; // 0.085 时游戏里还是看得太清楚，用户要求距离缩短一半
 
             ArtKit.EnsureFolder(ProfileDir);
             var normal = LoadOrCreate(NormalPath, FillNormal);
             var hunt = LoadOrCreate(HuntPath, FillHunt);
+            UpgradeNormalR2(normal);
             EnsureBloomGuard(normal);
 
             var globalGo = new GameObject("PostFX_Normal");
@@ -120,19 +124,61 @@ namespace HakoOnna.Art.EditorTools
             p.Add<Tonemapping>().mode.Override(TonemappingMode.ACES);
 
             var ca = p.Add<ColorAdjustments>();
-            ca.postExposure.Override(0.3f);
-            ca.contrast.Override(10f);
-            ca.saturation.Override(-20f);
+            ca.postExposure.Override(0.1f);
+            ca.contrast.Override(14f);
+            ca.saturation.Override(-28f);
 
-            p.Add<WhiteBalance>().temperature.Override(-8f);
+            p.Add<WhiteBalance>().temperature.Override(-12f);
 
             var vg = p.Add<Vignette>();
-            vg.intensity.Override(0.32f);
-            vg.smoothness.Override(0.45f);
+            vg.intensity.Override(0.4f);
+            vg.smoothness.Override(0.5f);
 
             var fg = p.Add<FilmGrain>();
-            fg.type.Override(FilmGrainLookup.Medium2);
-            fg.intensity.Override(0.3f);
+            fg.type.Override(FilmGrainLookup.Medium3);
+            fg.intensity.Override(0.38f);
+
+            p.Add<ShadowsMidtonesHighlights>().shadows.Override(ShadowTint);
+        }
+
+        /// <summary>阴影偏冷的蓝灰（美术圣经 §2）：xyz 为颜色倍数，w 为亮度偏移。</summary>
+        static readonly Vector4 ShadowTint = new Vector4(0.92f, 0.97f, 1.10f, 0f);
+
+        /// <summary>
+        /// 第二轮：已有的 VP_Normal 升级一次（压暗、降饱和、颗粒更粗、阴影偏冷）。
+        /// 以“还没有 ShadowsMidtonesHighlights”为准，升级过以后手调的参数不再覆盖。
+        /// </summary>
+        static void UpgradeNormalR2(VolumeProfile p)
+        {
+            if (p.Has<ShadowsMidtonesHighlights>()) return;
+            if (p.TryGet(out ColorAdjustments ca))
+            {
+                ca.postExposure.Override(0.1f);
+                ca.contrast.Override(14f);
+                ca.saturation.Override(-28f);
+                EditorUtility.SetDirty(ca);
+            }
+            if (p.TryGet(out WhiteBalance wb)) { wb.temperature.Override(-12f); EditorUtility.SetDirty(wb); }
+            if (p.TryGet(out Vignette vg))
+            {
+                vg.intensity.Override(0.4f);
+                vg.smoothness.Override(0.5f);
+                EditorUtility.SetDirty(vg);
+            }
+            if (p.TryGet(out FilmGrain fg))
+            {
+                fg.type.Override(FilmGrainLookup.Medium3);
+                fg.intensity.Override(0.38f);
+                EditorUtility.SetDirty(fg);
+            }
+            var smh = p.Add<ShadowsMidtonesHighlights>();
+            smh.hideFlags = HideFlags.HideInInspector | HideFlags.HideInHierarchy;
+            smh.shadows.Override(ShadowTint);
+            AssetDatabase.AddObjectToAsset(smh, p);
+            EditorUtility.SetDirty(smh);
+            EditorUtility.SetDirty(p);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[Hako Art] VP_Normal 升级到第二轮（更暗、更冷）");
         }
 
         static void FillHunt(VolumeProfile p)

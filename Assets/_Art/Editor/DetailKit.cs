@@ -97,8 +97,9 @@ namespace HakoOnna.Art.EditorTools
         /// <summary>
         /// 立方体，c 为中心，size 为尺寸，rot 为局部旋转。每个面的 u 沿较长边（木纹方向）；
         /// uAxis（0=x 1=y 2=z）指定时，含该轴的面 u 固定沿该轴（外墙板、瓦这种有方向的贴图用）。
+        /// uvOffset 加在所有 UV 上（一排同样的竹片各取贴图的不同位置）。
         /// </summary>
-        public void Box(Material m, Vector3 c, Vector3 size, Quaternion? rot = null, int uAxis = -1)
+        public void Box(Material m, Vector3 c, Vector3 size, Quaternion? rot = null, int uAxis = -1, Vector2 uvOffset = default)
         {
             if (m == null) return;
             var q = rot ?? Quaternion.identity;
@@ -120,7 +121,7 @@ namespace HakoOnna.Art.EditorTools
                         lp[a2] = S2[i] * h[a2];
                         corners[i] = c + q * lp;
                         float cu = lp[a1] + c[a1], cv = lp[a2] + c[a2];
-                        uvs[i] = uFirst ? new Vector2(cu, cv) : new Vector2(cv, cu);
+                        uvs[i] = (uFirst ? new Vector2(cu, cv) : new Vector2(cv, cu)) + uvOffset;
                     }
                     Poly(m, corners, uvs, q * n);
                 }

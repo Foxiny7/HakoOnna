@@ -41,7 +41,57 @@ namespace HakoOnna.Art.EditorTools
             Blood = Cutout("MH_BloodHand", hand, .5f, .28f);
             Scratch = Cutout("MH_Scratches", scratch, .5f, .12f);
             Rope = Lit("MH_StrawRope", rope, Color.white, .04f, new Vector2(7f, 7f));
+            LoadGrime();
+            ExternalMats.UpgradeHorror();
             AssetDatabase.SaveAssets();
+        }
+
+        // =====================================================================
+        // 第二轮：墙面污渍、血字、烟熏、香灰（贴图：ambientCG 漏水痕 + Tools~/make_textures.py 生成的贴花）
+        // =====================================================================
+        public static Material[] Leaks;
+        public static Material CeilingStain, SootPlume, SootCeiling, Ash, BloodDrag;
+        public static Material WriteDeteSoto, WriteAkeruna, WriteMitsuketa, WriteMadairu;
+
+        static Texture2D Tex(string path)
+        {
+            var t = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (t == null) Debug.LogWarning($"[Hako Art] 缺少贴花贴图：{path}");
+            return t;
+        }
+
+        static void LoadGrime()
+        {
+            ExternalMats.EnsureImportSettings();
+            string acg = ExternalMats.Root + "/ambientCG/", dec = ExternalMats.DecalDir + "/";
+            // 漏水痕原图是灰绿色的霉斑，乘一点褐色更像渗下来的脏水
+            Leaks = new[]
+            {
+                FadeTint("MH_Leak001", Tex(acg + "Leaking001/Leaking001_decal.png"), C(.78f, .62f, .44f), .06f),
+                FadeTint("MH_Leak003", Tex(acg + "Leaking003/Leaking003_decal.png"), C(.66f, .56f, .42f), .06f),
+                FadeTint("MH_Leak005", Tex(acg + "Leaking005/Leaking005_decal.png"), C(.62f, .52f, .40f), .06f),
+            };
+            CeilingStain = FadeTint("MH_CeilingStain", Tex(dec + "T_CeilingStain.png"), Color.white, .05f);
+            SootPlume = FadeTint("MH_SootPlume", Tex(dec + "T_SootPlume.png"), Color.white, .02f);
+            SootCeiling = FadeTint("MH_SootCeiling", Tex(dec + "T_CeilingStain.png"), C(.12f, .11f, .10f), .02f);
+            Ash = FadeTint("MH_AshPatch", Tex(dec + "T_AshPatch.png"), Color.white, .02f);
+            BloodDrag = FadeTint("MH_BloodDrag", Tex(dec + "T_BloodDrag.png"), Color.white, .3f);
+            WriteDeteSoto = Cutout("MH_BloodWriting_DeteSoto", Tex(dec + "T_BloodWriting_DeteSoto.png"), .4f, .3f);
+            WriteAkeruna = Cutout("MH_BloodWriting_Akeruna", Tex(dec + "T_BloodWriting_Akeruna.png"), .4f, .3f);
+            WriteMitsuketa = Cutout("MH_BloodWriting_Mitsuketa", Tex(dec + "T_BloodWriting_Mitsuketa.png"), .4f, .3f);
+            WriteMadairu = Cutout("MH_BloodWriting_Madairu", Tex(dec + "T_BloodWriting_Madairu.png"), .4f, .3f);
+        }
+
+        /// <summary>半透明贴花（UV 0..1，Clamp），可带颜色。</summary>
+        static Material FadeTint(string name, Texture2D tex, Color tint, float smooth)
+        {
+            var existing = Existing(name, out _);
+            if (existing != null) return existing;
+            var m = Fade(name, tex, Vector2.one);
+            m.SetColor("_BaseColor", tint);
+            m.SetFloat("_Smoothness", smooth);
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         // =====================================================================

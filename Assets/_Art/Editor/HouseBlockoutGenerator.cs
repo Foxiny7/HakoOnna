@@ -151,6 +151,7 @@ namespace HakoOnna.Art.EditorTools
             BuildProps(props, pal);
             BuildDetails(root, structure, props, rooms, openings, pal);
             AtmosphereBuilder.Build(lighting);
+            BuildDust(lighting);
 
             ArtKit.EnsureFolder("Assets/_Art/Scenes");
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -310,7 +311,7 @@ namespace HakoOnna.Art.EditorTools
             lv.floorTop = FloorHeight(room);
             var t = ArtKit.Empty(parent, $"Room_{room.id}_{room.label}", Vector3.zero);
             var r = room.r;
-            var wallMat = room.group == GFence ? pal.Fence : pal.Plaster;
+            var wallMat = WallMatFor(room, pal);
 
             if (room.hasFloor && room.floor != null)
             {
@@ -333,6 +334,26 @@ namespace HakoOnna.Art.EditorTools
             BuildEdge(t, room, lv, true, r.yMax, r.xMin, r.xMax, -1f, wallMat, openings, pal);
             BuildEdge(t, room, lv, false, r.xMin, r.yMin + T, r.yMax - T, +1f, wallMat, openings, pal);
             BuildEdge(t, room, lv, false, r.xMax, r.yMin + T, r.yMax - T, -1f, wallMat, openings, pal);
+        }
+
+        /// <summary>
+        /// 按房间选墙面：土壁（和室、玄関、縁側）、发黄的漆喰（走廊、楼梯、納戸、物置、浴室厕所）、
+        /// 熏黑的台所、土蔵的白漆喰。每个房间的墙在自己这一侧，所以隔墙两面可以不同。
+        /// </summary>
+        static Material WallMatFor(Room room, Palette pal)
+        {
+            if (room.group == GFence) return pal.Fence;
+            if (room.group == GKura) return pal.WallKura;
+            switch (room.id)
+            {
+                case "Daidokoro":
+                    return pal.WallSoot;
+                case "Rouka": case "Rouka2F": case "Rouka2FN": case "Kaidan": case "UraKaidan":
+                case "StairW2F": case "StairE2F": case "Nando": case "Monooki": case "Furo": case "Benjo":
+                    return pal.WallPlaster;
+                default:
+                    return pal.Plaster;
+            }
         }
 
         /// <summary>沿房间一条边建墙，在门窗处留洞。墙体向房间内侧偏移半个厚度。</summary>

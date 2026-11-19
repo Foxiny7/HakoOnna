@@ -67,12 +67,15 @@ namespace HakoOnna.Art.EditorTools
     /// <summary>
     /// 灰盒占位材质。只在材质不存在时创建并设置颜色；
     /// 之后你在 Unity 里替换贴图或改颜色，重新生成场景不会覆盖。
+    /// 第二轮起墙、木料、藤编等接上了 CC0 贴图（ExternalMats.UpgradePalette，每个材质只升级一次）。
     /// </summary>
     internal sealed class Palette
     {
         const string Dir = "Assets/_Art/Materials/Placeholder";
 
         public Material Plaster, WoodFloor, Ceiling, Roof, Tatami, Stone, Tile, Ground, Fence;
+        /// <summary>按房间换的墙：Plaster = 土壁（和室、玄関、縁側），其余见 HouseBlockoutGenerator.WallMatFor。</summary>
+        public Material WallPlaster, WallSoot, WallKura;
         public Material WoodDarkA, WoodDarkB, WoodMidA, WoodMidB, WoodLightA, WoodLightB;
         public Material WickerA, WickerB, FusumaA, FusumaB, Paper, Interior;
         public Material Metal, Rust, Carpet, Lacquer;
@@ -107,7 +110,11 @@ namespace HakoOnna.Art.EditorTools
                 Rust = M("M_Metal_Rust", 0.35f, 0.20f, 0.12f, 0.2f, 0.5f),
                 Carpet = M("M_Carpet_Old", 0.36f, 0.12f, 0.10f, 0.05f),
                 Lacquer = M("M_Lacquer_Black", 0.08f, 0.03f, 0.03f, 0.6f),
+                WallPlaster = M("M_Wall_Plaster", 0.55f, 0.52f, 0.46f, 0.1f),
+                WallSoot = M("M_Wall_Sooty", 0.20f, 0.18f, 0.16f, 0.05f),
+                WallKura = M("M_Wall_KuraPlaster", 0.62f, 0.61f, 0.57f, 0.1f),
             };
+            ExternalMats.UpgradePalette(p);
             return p;
         }
 
