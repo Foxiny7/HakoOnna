@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('host','server')]
-    [string]$Mode
+    [string]$Mode,
+    [switch]$Containers
 )
 $ErrorActionPreference = 'Stop'
 $project = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../..')).ProviderPath
@@ -16,6 +17,7 @@ function Start-Peer([string]$Role, [int]$Index) {
     $arguments = @('-batchmode', '-nographics', '-hakoMode', $Role,
         '-hakoSmoke', ('"{0}"' -f $report), '-hakoSmokePlayers', '2',
         '-logFile', ('"{0}"' -f $log))
+    if ($Containers) { $arguments += '-hakoContainerSmoke' }
     $process = Start-Process -FilePath $executable -ArgumentList $arguments -WindowStyle Hidden -PassThru
     return [pscustomobject]@{ Process = $process; Report = $report; Role = $Role }
 }
@@ -35,12 +37,18 @@ try {
         $report = Get-Content -Raw -LiteralPath $peer.Report | ConvertFrom-Json
         if ($report.errors.Count -ne 0) { throw ($report.errors -join [Environment]::NewLine) }
         if ($report.peakPlayers -ne 2) { throw "$($peer.Role): expected two players." }
-        if ($report.client -and $report.localDistance -lt 0.5) { throw "$($peer.Role): local movement was not observed." }
+        if ($Containers) {
+            if (!$report.sawOpen -or !$report.sawClose -or !$report.doorClosed -or ($report.actor -and !$report.exchanged)) {
+                throw "Container interaction failed on $($peer.Role). See $($peer.Report)"
+            }
+        } elseif ($report.client -and ($report.localDistance -lt 0.5 -or !$report.jumped -or !$report.tired -or !$report.recovered)) {
+            throw "$($peer.Role): jump, movement or stamina check failed. See $($peer.Report)"
+        }
         foreach ($player in $report.players) {
             if ($player.serverController -ne $report.server) { throw 'CharacterController authority mismatch.' }
-            if ($player.position.x -lt 0.2 -or $player.position.x -gt 3.7 -or
-                $player.position.z -lt 2 -or $player.position.z -gt 7.5 -or
-                [math]::Abs($player.position.y) -gt 0.2) {
+            if (!$Containers -and ($player.position.x -lt 0 -or $player.position.x -gt 10.92 -or
+                $player.position.z -lt 0 -or $player.position.z -gt 10.01 -or
+                [math]::Abs($player.position.y) -gt 0.2)) {
                 throw "Player left the expected room or crossed a floor/wall: $($player | ConvertTo-Json -Compress)"
             }
         }
@@ -57,7 +65,8 @@ try {
             if ($distance -gt 0.15) { throw "Player $($player.owner) observer differs by $distance metres." }
         }
     }
-    "PASS $Mode with 2 players: owner input, server movement, room collision, replicated positions."
+    if ($Containers) { "PASS $Mode with 2 players: container opened, exchanged item, closed on all peers." }
+    else { "PASS $Mode with 2 players: owner input, server movement, room collision, replicated positions." }
     "Reports: $runDirectory"
 } finally {
     foreach ($process in $processes) {

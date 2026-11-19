@@ -2,6 +2,8 @@
   "name": "HakoOnna.Multiplayer",
   "references": [
     "HakoOnna.Config",
+    "HakoOnna.RulesCore",
+    "HakoOnna.Art",
     "Unity.Netcode.Runtime",
     "Unity.Networking.Transport",
     "Unity.InputSystem"

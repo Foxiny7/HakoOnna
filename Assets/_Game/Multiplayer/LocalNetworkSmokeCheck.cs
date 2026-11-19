@@ -1,6 +1,7 @@
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -27,6 +28,8 @@ namespace HakoOnna.Multiplayer
             public int peakPlayers;
             public float localDistance;
             public int activeCameras;
+            public bool actor, sawOpen, sawClose, exchanged;
+            public bool jumped, tired, recovered, doorClosed;
             public List<string> errors;
             public List<PlayerSnapshot> players = new List<PlayerSnapshot>();
         }
@@ -38,6 +41,9 @@ namespace HakoOnna.Multiplayer
         private Vector3 localStart;
         private bool recordedStart;
         private bool reported;
+        private bool containerCheck, positioned, actor, sawOpen, sawClose, exchanged;
+        private int searchStep;
+        private bool jumped, tired, recovered, doorClosed, nearDoor, jumpSent;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Initialize()
@@ -48,6 +54,7 @@ namespace HakoOnna.Multiplayer
 
             var check = new GameObject("LocalNetworkSmokeCheck").AddComponent<LocalNetworkSmokeCheck>();
             check.reportPath = path;
+            check.containerCheck = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-hakoContainerSmoke") >= 0;
             check.expectedPlayers = int.Parse(LocalSession.Argument("-hakoSmokePlayers"));
             DontDestroyOnLoad(check);
         }
@@ -87,6 +94,52 @@ namespace HakoOnna.Multiplayer
 
             var elapsed = Time.unscaledTime - allConnectedAt;
             var local = manager.LocalClient?.PlayerObject?.GetComponent<NetworkPlayer>();
+            if (containerCheck)
+            {
+                var containers = FindFirstObjectByType<LocalSession>().Containers;
+                var drawerId = System.Array.FindIndex(containers, box => box.transform.parent.name == "Zashiki_Tansu_02");
+                var visual = containers[drawerId];
+                var searcher = players.OrderByDescending(player => player.OwnerClientId).First();
+                actor = local == searcher;
+                if (manager.IsServer && !positioned)
+                {
+                    var character = searcher.GetComponent<CharacterController>();
+                    character.enabled = false;
+                    var marker = visual.transform.parent.Find("InteractPoint");
+                    searcher.transform.position = marker.position + marker.forward * .35f + marker.right * .25f + Vector3.up * .05f;
+                    character.enabled = true;
+                    positioned = true;
+                }
+                if (visual.IsOpen)
+                {
+                    var marker = visual.transform.parent.Find("InteractPoint");
+                    var delta = Vector3.ProjectOnPlane(searcher.transform.position - marker.position, Vector3.up);
+                    var bottom = visual.transform.Find("Drawer_2");
+                    var top = visual.transform.Find("Drawer_0");
+                    sawOpen |= delta.magnitude < .07f && bottom.localPosition.z > top.localPosition.z + .01f;
+                }
+                if (sawOpen && !visual.IsOpen) sawClose = true;
+                if (actor && elapsed > 2)
+                    searcher.CheckContainerExchange(visual, drawerId, ref searchStep, ref exchanged);
+                var door = FindFirstObjectByType<LocalSession>().Doors.First(d => d.name == "Door_Outside_Genkan");
+                if (manager.IsServer && sawClose && !nearDoor)
+                {
+                    var leaf = door.GetComponentInChildren<BoxCollider>().bounds;
+                    var outward = (leaf.size.z < leaf.size.x ? Vector3.forward : Vector3.right);
+                    var foot = new Vector3(leaf.center.x, leaf.min.y + .05f, leaf.center.z);
+                    if (Physics.Linecast(foot + Vector3.up + outward, leaf.center, out var hit) &&
+                        HakoOnna.Art.DoorVisual.FromCollider(hit.collider) != door) outward = -outward;
+                    var character = searcher.GetComponent<CharacterController>();
+                    character.enabled = false;
+                    searcher.transform.position = foot + outward;
+                    character.enabled = true;
+                    nearDoor = true;
+                }
+                if (actor && exchanged && sawClose) searcher.TryTestDoor(door);
+                doorClosed |= !door.IsOpen && !door.IsMoving;
+                if (elapsed > 12) WriteReport(manager, players);
+                return;
+            }
             if (local != null)
             {
                 if (!recordedStart)
@@ -98,9 +151,17 @@ namespace HakoOnna.Multiplayer
                 // Both steps enter through normal owner input and server collision.
                 var direction = elapsed >= 1 && elapsed < 2 ? Vector2.up :
                     elapsed >= 3 && elapsed < 5 ? Vector2.left : Vector2.zero;
-                local.SupplyTestInput(direction, 0, false);
+                bool running = elapsed >= 7 && elapsed < 16;
+                if (running)
+                    direction = Mathf.Repeat(elapsed - 7, 1f) < .5f ? Vector2.right : Vector2.left;
+                bool jump = elapsed > 1 && !jumpSent;
+                jumpSent |= jump;
+                local.SupplyTestInput(direction, 0, running, jump);
+                jumped |= local.transform.position.y - localStart.y > .35f;
+                tired |= local.IsExhausted;
+                recovered |= tired && !local.IsExhausted;
             }
-            if (elapsed >= 7)
+            if (elapsed >= 21)
                 WriteReport(manager, players);
         }
 
@@ -114,7 +175,9 @@ namespace HakoOnna.Multiplayer
                 localClient = manager != null ? manager.LocalClientId : 0,
                 peakPlayers = players.Length,
                 activeCameras = FindObjectsByType<Camera>(FindObjectsSortMode.None).Length,
-                errors = errors
+                errors = errors,
+                actor = actor, sawOpen = sawOpen, sawClose = sawClose, exchanged = exchanged,
+                jumped = jumped, tired = tired, recovered = recovered, doorClosed = doorClosed
             };
             var local = manager?.LocalClient?.PlayerObject;
             if (local != null)

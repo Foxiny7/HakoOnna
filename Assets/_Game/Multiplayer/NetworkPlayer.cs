@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 namespace HakoOnna.Multiplayer
 {
     [RequireComponent(typeof(CharacterController))]
-    public sealed class NetworkPlayer : NetworkBehaviour
+    public sealed partial class NetworkPlayer : NetworkBehaviour
     {
         [SerializeField] private GameConfig config;
         [SerializeField] private Camera playerCamera;
@@ -22,7 +22,12 @@ namespace HakoOnna.Multiplayer
         private float lastInputAt;
         private Vector2 serverMove;
         private bool serverSprint;
+        private bool jumpQueued, serverJump;
+        private readonly NetworkVariable<float> stamina = new(1, NetworkVariableReadPermission.Owner);
+        private readonly NetworkVariable<bool> exhausted = new(false, NetworkVariableReadPermission.Owner);
+        private float recoveryAt;
         private float serverYaw;
+        internal GameConfig Config => config;
 
         public override void OnNetworkSpawn()
         {
@@ -34,6 +39,9 @@ namespace HakoOnna.Multiplayer
             body.shadowCastingMode = IsOwner ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
             yaw = transform.eulerAngles.y;
             serverYaw = yaw;
+            InitializeSearch();
+            InitializeEquipment();
+            if (IsOwner && !IsServer) RequestDoorsRpc();
             if (IsOwner && !Application.isBatchMode)
             {
                 Cursor.lockState = CursorLockMode.Locked;
@@ -71,7 +79,8 @@ namespace HakoOnna.Multiplayer
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
             }
-            if (Cursor.lockState != CursorLockMode.Locked || !Application.isFocused)
+            UpdateSearchInput(keyboard);
+            if (requested >= 0 || Cursor.lockState != CursorLockMode.Locked || !Application.isFocused)
                 return;
 
             if (keyboard != null)
@@ -80,6 +89,7 @@ namespace HakoOnna.Multiplayer
                     (keyboard.dKey.isPressed ? 1 : 0) - (keyboard.aKey.isPressed ? 1 : 0),
                     (keyboard.wKey.isPressed ? 1 : 0) - (keyboard.sKey.isPressed ? 1 : 0));
                 sprint = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed;
+                jumpQueued |= keyboard.spaceKey.wasPressedThisFrame;
             }
             if (Mouse.current != null)
             {
@@ -95,49 +105,81 @@ namespace HakoOnna.Multiplayer
                 return;
 
             if (IsOwner)
-                SubmitInputRpc(move, yaw, sprint);
+            {
+                SubmitInputRpc(move, yaw, sprint, new Vector2(playerCamera.transform.eulerAngles.x, playerCamera.transform.eulerAngles.y), jumpQueued);
+                jumpQueued = false;
+            }
 
             if (!IsServer)
                 return;
 
-            var input = Time.unscaledTime - lastInputAt <= 0.25f ? serverMove : Vector2.zero;
-            transform.rotation = Quaternion.Euler(0, serverYaw, 0);
+            var input = searching < 0 && Time.unscaledTime - lastInputAt <= 0.25f ? serverMove : Vector2.zero;
+            var facing = Quaternion.Euler(0, serverYaw, 0);
+            if (searching >= 0)
+                facing = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(-standPoint.forward),
+                    360 * Time.fixedDeltaTime);
+            transform.rotation = facing;
             var direction = transform.right * input.x + transform.forward * input.y;
-            var speed = serverSprint ? config.RunSpeed : config.WalkSpeed;
+            bool running = serverSprint && input.sqrMagnitude > .01f && !exhausted.Value;
+            var speed = running ? config.RunSpeed : config.WalkSpeed;
             verticalSpeed = controller.isGrounded ? -2f : verticalSpeed + Physics.gravity.y * Time.fixedDeltaTime;
-            controller.Move((direction * speed + Vector3.up * verticalSpeed) * Time.fixedDeltaTime);
+            if (serverJump && searching < 0 && controller.isGrounded)
+                verticalSpeed = Mathf.Sqrt(-2 * Physics.gravity.y * config.JumpHeight);
+            serverJump = false;
+            var previous = transform.position;
+            var flags = controller.Move((direction * speed + Vector3.up * verticalSpeed) * Time.fixedDeltaTime);
+            if ((flags & CollisionFlags.Above) != 0 && verticalSpeed > 0) verticalSpeed = 0;
+            if (running && Vector3.ProjectOnPlane(transform.position - previous, Vector3.up).sqrMagnitude > .000001f)
+            {
+                stamina.Value = Mathf.Max(0, stamina.Value - Time.fixedDeltaTime / config.SprintSeconds);
+                exhausted.Value = stamina.Value <= 0;
+                recoveryAt = Time.fixedTime + config.RecoveryDelay;
+            }
+            else if (Time.fixedTime >= recoveryAt && stamina.Value < 1)
+            {
+                stamina.Value = Mathf.Min(1, stamina.Value + Time.fixedDeltaTime / config.RecoverySeconds);
+                if (stamina.Value >= config.ResumeStamina) exhausted.Value = false;
+            }
+            TickSearch();
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
-        private void SubmitInputRpc(Vector2 direction, float facingYaw, bool running)
+        private void SubmitInputRpc(Vector2 direction, float facingYaw, bool running, Vector2 viewAngles, bool jump)
         {
             if (!float.IsFinite(direction.x) || !float.IsFinite(direction.y) || !float.IsFinite(facingYaw))
                 return;
 
             serverMove = Vector2.ClampMagnitude(direction, 1);
+            if (lampOn.Value && float.IsFinite(viewAngles.x) && float.IsFinite(viewAngles.y))
+                lampAngles.Value = viewAngles;
             serverYaw = Mathf.Repeat(facingYaw, 360f);
             serverSprint = running;
+            serverJump |= jump && searching < 0;
             lastInputAt = Time.unscaledTime;
         }
 
         private void LateUpdate()
         {
-            if (IsSpawned && IsOwner)
-                playerCamera.transform.rotation = Quaternion.Euler(pitch, yaw, 0);
+            if (!IsSpawned) return;
+            if (IsOwner) UpdateInspectionPose();
+            UpdateEquipmentPose();
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         // Used by the multi-process smoke check through the same owner RPC as keyboard input.
-        internal void SupplyTestInput(Vector2 direction, float facingYaw, bool running)
+        internal bool IsExhausted => exhausted.Value;
+        internal void SupplyTestInput(Vector2 direction, float facingYaw, bool running, bool jump = false)
         {
             move = direction;
             yaw = facingYaw;
             sprint = running;
+            jumpQueued |= jump;
         }
 #endif
 
         public override void OnNetworkDespawn()
         {
+            ReleaseSearch();
             playerCamera.gameObject.SetActive(false);
             if (IsOwner)
             {

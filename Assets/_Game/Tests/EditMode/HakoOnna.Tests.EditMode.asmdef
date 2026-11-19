@@ -1,6 +1,6 @@
 {
   "name": "HakoOnna.Tests.EditMode",
-  "references": ["HakoOnna.RulesCore", "HakoOnna.Config", "HakoOnna.Multiplayer", "Unity.Netcode.Runtime"],
+  "references": ["HakoOnna.RulesCore", "HakoOnna.Config", "HakoOnna.Multiplayer", "HakoOnna.Art", "Unity.Netcode.Runtime"],
   "includePlatforms": ["Editor"],
   "optionalUnityReferences": ["TestAssemblies"]
 }

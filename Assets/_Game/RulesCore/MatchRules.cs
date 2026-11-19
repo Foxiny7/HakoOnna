@@ -27,9 +27,16 @@ namespace HakoOnna.Rules
             this.weakness = weakness;
         }
 
+        public const int InventorySize = 9;
+
         public Player AddExplorer(int playerId, params ItemKind?[] items)
         {
-            var player = new Player(Role.Explorer, items.Append(ItemKind.Flashlight).ToArray());
+            if (items.Length >= InventorySize)
+                throw new ArgumentException("Leave room for the starting flashlight.", nameof(items));
+            var slots = new ItemKind?[InventorySize];
+            items.CopyTo(slots, 0);
+            slots[items.Length] = ItemKind.Flashlight;
+            var player = new Player(Role.Explorer, slots);
             players.Add(playerId, player);
             return player;
         }
@@ -54,6 +61,13 @@ namespace HakoOnna.Rules
 
         public bool BeginSearch(int playerId, int containerId, SearchKind kind)
         {
+            if (!ReserveSearch(playerId, containerId, kind)) return false;
+            StartSearchClock(playerId, containerId);
+            return true;
+        }
+
+        public bool ReserveSearch(int playerId, int containerId, SearchKind kind)
+        {
             if (!players.TryGetValue(playerId, out var player) || player.Role != Role.Explorer ||
                 player.SearchContainerId.HasValue || !containers.TryGetValue(containerId, out var container) ||
                 container.SearcherId.HasValue || (kind != SearchKind.Normal && kind != SearchKind.Deep))
@@ -61,9 +75,17 @@ namespace HakoOnna.Rules
 
             player.SearchContainerId = containerId;
             container.SearcherId = playerId;
-            container.SearchStartedAt = now;
-            container.SearchEndsAt = now + settings.SearchSeconds * (kind == SearchKind.Deep ? 2 : 1);
+            container.Kind = kind;
+            container.SearchEndsAt = double.PositiveInfinity;
             return true;
+        }
+
+        public void StartSearchClock(int playerId, int containerId)
+        {
+            var container = containers[containerId];
+            if (container.SearcherId != playerId || !double.IsPositiveInfinity(container.SearchEndsAt)) return;
+            container.SearchStartedAt = now;
+            container.SearchEndsAt = now + settings.SearchSeconds * (container.Kind == SearchKind.Deep ? 2 : 1);
         }
 
         public bool EndSearch(int playerId, int containerId)
@@ -73,6 +95,32 @@ namespace HakoOnna.Rules
 
             CloseSearch(player, containers[containerId]);
             return true;
+        }
+
+        public ItemKind? ContainerItem(int containerId) => containers[containerId].Item;
+
+        public bool ExchangeWithContainer(int playerId, int containerId, int slot, bool take)
+        {
+            if (!players.TryGetValue(playerId, out var player) || player.SearchContainerId != containerId ||
+                !containers.TryGetValue(containerId, out var box) || !box.IsOpen ||
+                slot < 0 || slot >= player.Items.Length)
+                return false;
+
+            if (take ? !box.Item.HasValue || player.Items[slot].HasValue :
+                box.Item.HasValue || !player.Items[slot].HasValue)
+                return false;
+
+            (player.Items[slot], box.Item) = (box.Item, player.Items[slot]);
+            return true;
+        }
+
+        public void RemoveExplorer(int playerId)
+        {
+            if (!players.TryGetValue(playerId, out var player) || player.Role != Role.Explorer)
+                return;
+            if (player.SearchContainerId.HasValue)
+                EndSearch(playerId, player.SearchContainerId.Value);
+            players.Remove(playerId);
         }
 
         public double SearchProgress(int containerId)
@@ -188,6 +236,7 @@ namespace HakoOnna.Rules
             public IReadOnlyList<ItemKind?> Inventory { get; }
 
             internal ItemKind?[] Items { get; }
+            public int PickupSlot(int selected) => Inventory[selected].HasValue ? Array.IndexOf(Items, null) : selected;
             internal int? SearchContainerId { get; set; }
             internal double NextTransferAt { get; set; }
         }
@@ -199,11 +248,12 @@ namespace HakoOnna.Rules
                 Item = item;
             }
 
-            public ItemKind? Item { get; }
+            public ItemKind? Item { get; internal set; }
             public int? SearcherId { get; internal set; }
             public bool IsOpen { get; internal set; }
 
             internal double SearchStartedAt { get; set; }
+            internal SearchKind Kind { get; set; }
             internal double SearchEndsAt { get; set; }
         }
     }

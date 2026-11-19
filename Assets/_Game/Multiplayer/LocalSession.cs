@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using HakoOnna.Art;
+using HakoOnna.Rules;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
@@ -22,6 +24,9 @@ namespace HakoOnna.Multiplayer
         private string status = "Loading house...";
 
         public bool Ready => ready;
+        internal ContainerVisual[] Containers { get; private set; }
+        internal DoorVisual[] Doors { get; private set; }
+        internal MatchRules Rules { get; private set; }
 
         private IEnumerator Start()
         {
@@ -38,6 +43,11 @@ namespace HakoOnna.Multiplayer
             yield return SceneManager.LoadSceneAsync(HouseScene, LoadSceneMode.Additive);
             var house = SceneManager.GetSceneByPath(HouseScene);
             SceneManager.SetActiveScene(house);
+            Containers = GameObject.Find("House_Blockout/Containers").GetComponentsInChildren<ContainerVisual>();
+            Doors = GameObject.Find("House_Blockout").GetComponentsInChildren<DoorVisual>();
+            foreach (var container in Containers)
+                ConfigureDrawer(container);
+            ZashikiArt.DressAlcove(GameObject.Find("House_Blockout/Props/Zashiki_Tokonoma").transform);
             // Ambient fill belongs to this graybox playtest so movement remains easy to inspect.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = Color.gray;
@@ -58,6 +68,33 @@ namespace HakoOnna.Multiplayer
                 StartSession(mode);
         }
 
+        internal static void ConfigureDrawer(ContainerVisual visual)
+        {
+            var top = visual.transform.Find("Drawer_0");
+            var bottom = visual.transform.Find("Drawer_2");
+            if (!top || !bottom || !top.Find("ItemAnchor")) return;
+
+            var closed = top.localPosition;
+            visual.SetOpenImmediate(true);
+            var travel = top.localPosition - closed;
+            visual.SetOpenImmediate(false);
+            for (int i = top.childCount - 1; i >= 0; i--)
+            {
+                var child = top.GetChild(i);
+                if (child.name == "ItemAnchor" || child.name.StartsWith("Tray"))
+                    child.SetParent(bottom, false);
+            }
+            visual.ConfigureParts(new[] { new ContainerVisual.MovingPart { part = bottom, openOffset = travel } });
+            if (visual.transform.parent.name == "Zashiki_Tansu_02")
+                ZashikiArt.DressChest(visual.transform, bottom);
+            // The guest futon occupies the right side of this extended tray in the current house.
+            if (visual.transform.parent.name == "Oku_Tansu_03")
+            {
+                var anchor = bottom.Find("ItemAnchor");
+                anchor.localPosition += Vector3.left * (bottom.Find("TrayBottom").localScale.x * .30f);
+            }
+        }
+
         public void StartSession(string mode)
         {
             if (!ready || manager.IsListening || manager.ShutdownInProgress)
@@ -65,6 +102,14 @@ namespace HakoOnna.Multiplayer
 
             spawnSlots.Clear();
             status = mode + " starting...";
+            foreach (var door in Doors) door.SetOpenImmediate(door.StartsOpen);
+            if (mode == "host" || mode == "server")
+            {
+                var config = manager.NetworkConfig.PlayerPrefab.GetComponent<NetworkPlayer>().Config;
+                Rules = new MatchRules(config.ToRulesSettings(), ItemKind.Gasoline);
+                for (var i = 0; i < Containers.Length; i++)
+                    Rules.AddContainer(i);
+            }
             bool started;
             switch (mode)
             {
@@ -142,7 +187,8 @@ namespace HakoOnna.Multiplayer
             if (manager != null && manager.IsListening)
             {
                 GUILayout.Label("Players visible: " + FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None).Length);
-                GUILayout.Label("WASD move | Shift run | Mouse look | Esc release cursor");
+                GUILayout.Label("WASD move | Shift run | Space jump | Esc release cursor");
+                GUILayout.Label("1–9 / Wheel: Equip   |   T: Flashlight");
                 if (Cursor.lockState == CursorLockMode.None && GUILayout.Button("Capture mouse"))
                 {
                     Cursor.lockState = CursorLockMode.Locked;

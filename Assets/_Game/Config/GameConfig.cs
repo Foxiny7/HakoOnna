@@ -15,8 +15,20 @@ namespace HakoOnna
         [SerializeField, Min(0.01f)] private float playerRadius = 0.22f;
         [SerializeField, Min(0.1f)] private float eyeHeight = 1.45f;
 
+        [SerializeField, Min(0.1f)] private float searchReach = 2.5f;
+        public float SearchReach => searchReach;
         public float WalkSpeed => walkSpeed;
         public float RunSpeed => runSpeed;
+        [SerializeField, Min(.1f)] private float jumpHeight = .65f;
+        [SerializeField, Min(.1f)] private float sprintSeconds = 6;
+        [SerializeField, Min(.1f)] private float recoverySeconds = 8;
+        [SerializeField, Min(0)] private float recoveryDelay = 1;
+        [SerializeField, Range(.01f, 1)] private float resumeStamina = .3f;
+        public float JumpHeight => jumpHeight;
+        public float SprintSeconds => sprintSeconds;
+        public float RecoverySeconds => recoverySeconds;
+        public float RecoveryDelay => recoveryDelay;
+        public float ResumeStamina => resumeStamina;
         public float MouseSensitivity => mouseSensitivity;
         public float PlayerHeight => playerHeight;
         public float PlayerRadius => playerRadius;

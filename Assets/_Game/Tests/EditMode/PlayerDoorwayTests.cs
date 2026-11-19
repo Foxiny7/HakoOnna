@@ -27,21 +27,12 @@ namespace HakoOnna.Tests
         [TestCase(5.46f, 0f, -1.3999f, 5.46f, 0f, 0.9899f, TestName = "Door_0")]
         [TestCase(5.46f, 0f, 9.0201f, 5.46f, 0f, 11f, TestName = "Door_1")]
         [TestCase(9.1054f, 0f, 6.37f, 12.8018f, 0.55f, 6.37f, TestName = "Door_2")]
-        [TestCase(9.1054f, 0f, 1.36f, 12.6895f, 0.55f, 1.36f, TestName = "Door_3")]
         [TestCase(9.1054f, 0f, 13.65f, 12.8018f, 0.55f, 13.65f, TestName = "Door_4")]
-        [TestCase(9.1054f, 0f, 18.66f, 12.6895f, 0.55f, 18.66f, TestName = "Door_5")]
         [TestCase(3.64f, 0f, 19.03f, 3.64f, 0f, 21.42f, TestName = "Door_6")]
-        [TestCase(17.2101f, 0.55f, 6.37f, 19.19f, 0.55f, 6.37f, TestName = "Door_8")]
         [TestCase(24.49f, 0.55f, 6.37f, 26.4699f, 0.55f, 6.37f, TestName = "Door_9")]
-        [TestCase(17.2101f, 0.55f, 13.65f, 19.19f, 0.55f, 13.65f, TestName = "Door_10")]
-        [TestCase(24.49f, 0.55f, 13.65f, 26.4699f, 0.55f, 13.65f, TestName = "Door_11")]
-        [TestCase(14.56f, 0.55f, 9.0201f, 14.56f, 0.55f, 11f, TestName = "Door_12")]
-        [TestCase(19.9999f, 0.55f, 9.0201f, 19.9999f, 0.55f, 11f, TestName = "Door_13")]
-        [TestCase(32.4001f, 0.55f, 9.0201f, 32.4001f, 0.55f, 11f, TestName = "Door_14")]
         [TestCase(14.56f, 0.55f, 1.3062f, 14.56f, 0.55f, 3.72f, TestName = "Door_15")]
         [TestCase(21.84f, 0.55f, 1.3062f, 21.84f, 0.55f, 3.72f, TestName = "Door_16")]
         [TestCase(30f, 0.55f, 1.3062f, 30f, 0.55f, 3.72f, TestName = "Door_17")]
-        [TestCase(33.59f, 0.55f, 6.37f, 36.0039f, 0.55f, 6.37f, TestName = "Door_18")]
         [TestCase(33.59f, 0.55f, 13.65f, 36.0039f, 0.55f, 13.65f, TestName = "Door_19")]
         [TestCase(14.56f, 0.55f, 16.3f, 14.56f, 0.55f, 18.7139f, TestName = "Door_20")]
         [TestCase(21.84f, 0.55f, 16.3f, 21.84f, 0.55f, 18.7139f, TestName = "Door_21")]
@@ -50,7 +41,6 @@ namespace HakoOnna.Tests
         [TestCase(33.59f, 0.55f, 1.365f, 36.0039f, 0.55f, 1.365f, TestName = "Door_24")]
         [TestCase(12.7399f, 0.55f, 18.596f, 12.7399f, 0.55f, 21.0099f, TestName = "Door_25")]
         [TestCase(19.9999f, 0.55f, 18.596f, 19.9999f, 0.55f, 21.0099f, TestName = "Door_26")]
-        [TestCase(13.447f, 0.55f, 24.6f, 15.5499f, 0.55f, 24.6f, TestName = "Door_28")]
         [TestCase(16.38f, 0f, 32.34f, 16.38f, 0.3f, 36.4176f, TestName = "Door_33")]
         [TestCase(20.0253f, 0.3f, 39.2f, 24.08f, 0f, 39.2f, TestName = "Door_34")]
         [TestCase(5.46f, 0f, -12.3201f, 5.46f, 0f, -9.5201f, TestName = "Door_35")]
@@ -59,7 +49,6 @@ namespace HakoOnna.Tests
         [TestCase(17.2101f, 4.15f, 13.65f, 19.19f, 4.15f, 13.65f, TestName = "Door_38")]
         [TestCase(13.6001f, 4.15f, 18.596f, 13.6001f, 4.15f, 21.0099f, TestName = "Door_39")]
         [TestCase(20.9999f, 4.15f, 18.596f, 20.9999f, 4.15f, 21.0099f, TestName = "Door_40")]
-        [TestCase(15.3901f, 4.15f, 23.2f, 17.37f, 4.15f, 23.2f, TestName = "Door_41")]
         [TestCase(13.6001f, 4.15f, 25.4001f, 13.6001f, 4.15f, 27.8139f, TestName = "Door_42")]
         [TestCase(20.9999f, 4.15f, 25.4001f, 20.9999f, 4.15f, 27.8139f, TestName = "Door_43")]
         [TestCase(9.08f, 0f, 18.4485f, 9.08f, 4.15f, 27.8308f, TestName = "KitchenStair_FromDoma")]
@@ -76,6 +65,22 @@ namespace HakoOnna.Tests
             gate.gameObject.SetActive(false);
             try { WalkRoute(new Vector3(x,y,z), new Vector3(endX,endY,endZ)); }
             finally { gate.gameObject.SetActive(true); }
+        }
+
+        [TestCase(9.1054f, 0f, 1.36f, 12.6895f, 0.55f, 1.36f, TestName = "Sealed_3")]
+        [TestCase(9.1054f, 0f, 18.66f, 12.6895f, 0.55f, 18.66f, TestName = "Sealed_5")]
+        [TestCase(17.2101f, 0.55f, 6.37f, 19.19f, 0.55f, 6.37f, TestName = "Sealed_8")]
+        [TestCase(17.2101f, 0.55f, 13.65f, 19.19f, 0.55f, 13.65f, TestName = "Sealed_10")]
+        [TestCase(24.49f, 0.55f, 13.65f, 26.4699f, 0.55f, 13.65f, TestName = "Sealed_11")]
+        [TestCase(14.56f, 0.55f, 9.0201f, 14.56f, 0.55f, 11f, TestName = "Sealed_12")]
+        [TestCase(19.9999f, 0.55f, 9.0201f, 19.9999f, 0.55f, 11f, TestName = "Sealed_13")]
+        [TestCase(32.4001f, 0.55f, 9.0201f, 32.4001f, 0.55f, 11f, TestName = "Sealed_14")]
+        [TestCase(33.59f, 0.55f, 6.37f, 36.0039f, 0.55f, 6.37f, TestName = "Sealed_18")]
+        [TestCase(13.447f, 0.55f, 24.6f, 15.5499f, 0.55f, 24.6f, TestName = "Sealed_28")]
+        [TestCase(15.3901f, 4.15f, 23.2f, 17.37f, 4.15f, 23.2f, TestName = "Sealed_41")]
+        public void SealedOpeningBlocksPassage(float x, float y, float z, float endX, float endY, float endZ)
+        {
+            WalkRoute(new Vector3(x,y,z), new Vector3(endX,endY,endZ), true);
         }
 
         [TestCase(18f, 1.4238f, 18f, -2.24f)]
@@ -114,6 +119,24 @@ namespace HakoOnna.Tests
             {
                 Assert.IsTrue(house.GetPhysicsScene().Raycast(spawn.position + Vector3.up * 2, Vector3.up, out var hit, 3f));
                 Assert.AreEqual("Slab_1F",hit.collider.name);
+            }
+        }
+
+        [Test]
+        public void EveryContainerCanBeTargetedFromItsInteractionPoint()
+        {
+            var containers = house.GetRootGameObjects().Single(go => go.name == "House_Blockout")
+                .transform.Find("Containers");
+            Assert.Greater(containers.childCount, 0);
+            var config = AssetDatabase.LoadAssetAtPath<GameConfig>("Assets/_Game/Config/GameConfig.asset");
+            foreach (Transform box in containers)
+            {
+                var eye = box.Find("InteractPoint").position + Vector3.up * config.EyeHeight;
+                var collision = box.Find("Visual/Collision").GetComponent<BoxCollider>();
+                var direction = (collision.bounds.center - eye).normalized;
+                Assert.IsTrue(house.GetPhysicsScene().Raycast(eye, direction, out var hit, config.SearchReach,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore), box.name);
+                Assert.AreEqual(collision, hit.collider, box.name);
             }
         }
 

@@ -27,11 +27,47 @@ namespace HakoOnna.Tests
         }
 
         [Test]
+        public void OnlySearcherCanExchangeAfterOpeningAndDisconnectReleasesContainer()
+        {
+            var other = rules.AddExplorer(3);
+            Assert.IsTrue(rules.BeginSearch(3, Destination, SearchKind.Normal));
+            Assert.IsFalse(rules.ExchangeWithContainer(3, Destination, 0, false));
+            rules.AdvanceTo(2);
+            Assert.IsFalse(rules.ExchangeWithContainer(ExplorerId, Destination, 0, false));
+            Assert.IsTrue(rules.ExchangeWithContainer(3, Destination, 0, false));
+            Assert.IsNull(other.Inventory[0]);
+            Assert.AreEqual(ItemKind.Flashlight, destination.Item);
+            Assert.IsTrue(rules.ExchangeWithContainer(3, Destination, 0, true));
+            Assert.IsFalse(rules.ExchangeWithContainer(3, Destination, 0, true));
+            Assert.AreEqual(ItemKind.Flashlight, other.Inventory[0]);
+            rules.RemoveExplorer(3);
+            Assert.IsFalse(destination.IsOpen);
+            Assert.IsTrue(rules.BeginSearch(ExplorerId, Destination, SearchKind.Normal));
+        }
+
+        [Test]
+        public void ApproachReservesTheBoxWithoutAdvancingTheSearch()
+        {
+            Assert.IsTrue(rules.ReserveSearch(ExplorerId, Destination, SearchKind.Deep));
+            rules.AddExplorer(3);
+            Assert.IsFalse(rules.BeginSearch(3, Destination, SearchKind.Normal));
+            rules.AdvanceTo(12);
+            Assert.AreEqual(0, rules.SearchProgress(Destination));
+            rules.StartSearchClock(ExplorerId, Destination);
+            rules.AdvanceTo(14);
+            Assert.AreEqual(.5, rules.SearchProgress(Destination));
+            Assert.IsTrue(rules.EndSearch(ExplorerId, Destination));
+            Assert.IsTrue(rules.BeginSearch(3, Destination, SearchKind.Normal));
+        }
+
+        [Test]
         public void ExplorerStartsWithAFlashlightInAnInventorySlot()
         {
             var startingExplorer = rules.AddExplorer(3);
 
-            Assert.AreEqual(1, startingExplorer.Inventory.Count);
+            Assert.AreEqual(9, startingExplorer.Inventory.Count);
+            Assert.AreEqual(1, startingExplorer.PickupSlot(0));
+            Assert.AreEqual(8, startingExplorer.PickupSlot(8));
             Assert.AreEqual(ItemKind.Flashlight, startingExplorer.Inventory[0]);
         }
 
