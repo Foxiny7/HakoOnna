@@ -37,6 +37,7 @@ namespace HakoOnna.Art.EditorTools
             ArtKit.EnsureFolder(ProfileDir);
             var normal = LoadOrCreate(NormalPath, FillNormal);
             var hunt = LoadOrCreate(HuntPath, FillHunt);
+            EnsureBloomGuard(normal);
 
             var globalGo = new GameObject("PostFX_Normal");
             globalGo.transform.SetParent(parent, false);
@@ -57,7 +58,7 @@ namespace HakoOnna.Art.EditorTools
             // 预览相机：程序接入玩家相机后删除
             var camGo = new GameObject("BlockoutPreviewCamera_DeleteLater");
             camGo.transform.SetParent(parent, false);
-            camGo.transform.SetPositionAndRotation(new Vector3(2f, 1.6f, 1.2f), Quaternion.Euler(5f, 10f, 0f));
+            camGo.transform.SetPositionAndRotation(HouseBlockoutGenerator.MapOldPoint(new Vector3(2.7f, 1.6f, 1f)), Quaternion.Euler(5f, 10f, 0f));
             camGo.tag = "MainCamera";
             var cam = camGo.AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor;
@@ -83,6 +84,35 @@ namespace HakoOnna.Art.EditorTools
             EditorUtility.SetDirty(profile);
             AssetDatabase.SaveAssets();
             return profile;
+        }
+
+        /// <summary>参与泛光计算的亮度上限（HDR）。灯火、月光照亮的墙面照样有柔光，单个高光点扩不成大光斑。</summary>
+        internal const float BloomClamp = 4f;
+
+        /// <summary>
+        /// URP 资产（PC_RPAsset）自带的 SampleSceneProfile 开着 Bloom（强度 0.25、亮度不封顶）。
+        /// 月光打在镜子、玻璃、水面这类很光滑的材质上，高光点能亮到上千，被泛光放大成一大团白光
+        /// （上二楼的楼梯处最明显）。这里在常态 Volume 里接管 Bloom：强度、阈值、扩散保持原样，只加亮度上限。
+        /// 已有的设置不覆盖（和 LoadOrCreate 一样尊重手调过的参数）。
+        /// </summary>
+        static void EnsureBloomGuard(VolumeProfile p)
+        {
+            bool changed = false;
+            if (!p.TryGet(out Bloom bloom))
+            {
+                bloom = p.Add<Bloom>();
+                bloom.hideFlags = HideFlags.HideInInspector | HideFlags.HideInHierarchy;
+                AssetDatabase.AddObjectToAsset(bloom, p);
+                changed = true;
+            }
+            if (!bloom.intensity.overrideState) { bloom.intensity.Override(0.25f); changed = true; }
+            if (!bloom.threshold.overrideState) { bloom.threshold.Override(1f); changed = true; }
+            if (!bloom.scatter.overrideState) { bloom.scatter.Override(0.5f); changed = true; }
+            if (!bloom.clamp.overrideState) { bloom.clamp.Override(BloomClamp); changed = true; }
+            if (!changed) return;
+            EditorUtility.SetDirty(bloom);
+            EditorUtility.SetDirty(p);
+            AssetDatabase.SaveAssets();
         }
 
         static void FillNormal(VolumeProfile p)

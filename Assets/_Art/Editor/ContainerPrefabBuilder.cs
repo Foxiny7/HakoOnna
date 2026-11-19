@@ -35,17 +35,21 @@ namespace HakoOnna.Art.EditorTools
         public static readonly string[] Variants = { "A", "B" };
         const float K = 0.03f; // 板材厚度
 
-        /// <summary>宽 × 高 × 深（米）</summary>
+        /// <summary>
+        /// 宽 × 高 × 深（米，真实尺寸；场景里统一再放大 FurnitureScale = 1.25）。
+        /// 每种都要“看起来藏得下一个蜷着的人”：放大后内腔最小边约 0.5 m 以上（抽屉柜每层约 0.5 m 高、
+        /// 0.7 m 深；掀盖箱内腔约 1.0 × 0.7 × 0.7 m）。
+        /// </summary>
         public static readonly Dictionary<ContainerKind, Vector3> Sizes = new Dictionary<ContainerKind, Vector3>
         {
             { ContainerKind.Oshiire, new Vector3(1.8f, 1.8f, 0.85f) },
             { ContainerKind.YofukuTansu, new Vector3(1.0f, 1.8f, 0.6f) },
-            { ContainerKind.Tansu, new Vector3(1.0f, 1.1f, 0.45f) },
-            { ContainerKind.ChaTansu, new Vector3(0.9f, 1.0f, 0.4f) },
-            { ContainerKind.GetaBako, new Vector3(0.9f, 1.0f, 0.35f) },
+            { ContainerKind.Tansu, new Vector3(1.2f, 1.25f, 0.6f) },     // 衣装箪笥：大抽屉
+            { ContainerKind.ChaTansu, new Vector3(1.0f, 1.2f, 0.55f) },  // 大号茶箪笥
+            { ContainerKind.GetaBako, new Vector3(0.9f, 1.5f, 0.5f) },   // 高的下駄箱
             { ContainerKind.Nagamochi, new Vector3(1.6f, 0.75f, 0.8f) },
-            { ContainerKind.Tsuzura, new Vector3(0.7f, 0.45f, 0.5f) },
-            { ContainerKind.Komebitsu, new Vector3(0.6f, 0.7f, 0.5f) },
+            { ContainerKind.Tsuzura, new Vector3(0.9f, 0.6f, 0.6f) },    // 大葛籠
+            { ContainerKind.Komebitsu, new Vector3(0.8f, 0.75f, 0.6f) },
         };
 
         public static string PathFor(ContainerKind k, string variant) => $"{Dir}/Container_{k}_{variant}.prefab";
@@ -69,7 +73,8 @@ namespace HakoOnna.Art.EditorTools
                 for (int v = 0; v < Variants.Length; v++)
                 {
                     string path = PathFor(kind, Variants[v]);
-                    if (!force && AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) continue;
+                    var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                    if (!force && existing != null && !BlockoutSizeChanged(existing, Sizes[kind])) continue;
                     var go = Build(kind, v, pal);
                     PrefabUtility.SaveAsPrefabAsset(go, path);
                     Object.DestroyImmediate(go);
@@ -84,6 +89,18 @@ namespace HakoOnna.Art.EditorTools
             }
 
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// 还是灰盒（Visual 下有 Shell 生成的 Back）且碰撞体尺寸和 Sizes 不一致 → 需要重建。
+        /// 手动换过模型的预制体不动。
+        /// </summary>
+        static bool BlockoutSizeChanged(GameObject prefab, Vector3 size)
+        {
+            var visual = prefab.transform.Find("Visual");
+            if (visual == null || visual.Find("Back") == null) return false;
+            var col = visual.Find("Collision")?.GetComponent<BoxCollider>();
+            return col != null && (col.size - size).sqrMagnitude > 1e-6f;
         }
 
         static GameObject Build(ContainerKind kind, int variant, Palette pal)

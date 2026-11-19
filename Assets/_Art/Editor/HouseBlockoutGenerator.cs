@@ -8,13 +8,20 @@ namespace HakoOnna.Art.EditorTools
     /// <summary>
     /// 生成日式老宅灰盒场景：两层主屋 + 土蔵（仓库）+ 围墙庭院。
     /// 坐标：1 单位 = 1 米，x 向东，z 向北，原点 = 主屋西南角。
-    /// 布局已由设计者确认（MVP 使用这一张地图）。
+    /// 基于 V3 平面（京間）。建筑尺度参照 CS / Apex：平面 ×2、一楼净高 3.4 m、二楼 3.2 m、
+    /// 门高 2.2 m、门宽 ×1.25（和家具放大比例一致）；家具、容器、玩家保持真实尺寸（搬家规则见 HouseBlockoutGenerator.Rescale.cs）。
     /// </summary>
-    public static class HouseBlockoutGenerator
+    public static partial class HouseBlockoutGenerator
     {
         const string ScenePath = "Assets/_Art/Scenes/House_Blockout.unity";
         const float T = 0.08f;       // 单侧墙厚（相邻房间各建一层，内墙总厚 0.16）
-        const float DoorTop = 2.0f;  // 普通门洞高度
+        // 只放大建筑：平面坐标、层高、门窗。家具和容器以实际米数搭建。
+        const float PlanScale = 2.0f;
+        static Vector3 Plan(float x, float y, float z) => new Vector3(x * PlanScale, y, z * PlanScale);
+
+        const float DoorTop = 2.2f;             // 门楣（鴨居）离地高度
+        const float OpeningWidthScale = 1.25f;  // 门窗宽度相对 V3 的倍数（= FurnitureScale）
+        const float OpeningTopScale = 1.25f;    // 一楼自定义门顶（绝对高度）相对 V3 的倍数
 
         // ---------- 楼层 ----------
         struct Level
@@ -26,10 +33,10 @@ namespace HakoOnna.Art.EditorTools
         const int G0 = 0, G1 = 1, GKura = 2, GFence = 3;
         static readonly Level[] Levels =
         {
-            new Level(0f, 0f, 2.7f),    // 一层
-            new Level(2.7f, 2.9f, 5.3f),// 二层（墙从楼板底部开始，避免缝隙）
-            new Level(0f, 0f, 3.0f),    // 土蔵
-            new Level(0f, 0f, 2.4f),    // 围墙
+            new Level(0f, 0.55f, 3.95f),
+            new Level(4.15f, 4.15f, 7.35f),
+            new Level(0f, 0.30f, 4.2f),
+            new Level(0f, 0f, 3.0f),    // 围墙
         };
 
         // ---------- 房间与开口 ----------
@@ -37,7 +44,8 @@ namespace HakoOnna.Art.EditorTools
         {
             public string id, label;
             public int group;
-            public Rect r; // x, y(=z), width, depth
+            public Rect r;  // x, y(=z), width, depth
+            public Rect r0; // V3 旧尺寸下的范围（家具按它搬家）
             public Material floor;
             public bool hasFloor = true;
         }
@@ -47,32 +55,55 @@ namespace HakoOnna.Art.EditorTools
             public int group;
             public bool alongX; // true: 墙沿 x 方向，位于 z = line；false: 墙沿 z 方向，位于 x = line
             public float line, center, width, sill, top;
+            public float line0, center0; // V3 旧尺寸下的世界坐标
             public bool window;
+            public bool glass; // 落地玻璃拉门：按窗处理（有碰撞，关着），只是看得见外面
         }
 
         static Room R(string id, string label, int g, float x0, float z0, float x1, float z1, Material floor, bool hasFloor = true) =>
-            new Room { id = id, label = label, group = g, r = Rect.MinMaxRect(x0, z0, x1, z1), floor = floor, hasFloor = hasFloor };
+            new Room
+            {
+                id = id, label = label, group = g, floor = floor, hasFloor = hasFloor,
+                r = Rect.MinMaxRect(x0 * PlanScale, z0 * PlanScale, x1 * PlanScale, z1 * PlanScale),
+                r0 = Rect.MinMaxRect(x0 * OldPS, z0 * OldPS, x1 * OldPS, z1 * OldPS),
+            };
 
-        static Opening DX(int g, float z, float x, float w, float top = DoorTop) =>
-            new Opening { group = g, alongX = true, line = z, center = x, width = w, sill = 0f, top = top };
+        // 门窗宽度和门顶在这里统一换成新尺度；w 以 V3 的米数书写。
+        static float DoorTopFor(float oldTop) =>
+            oldTop == OldDoorTop ? DoorTop : oldTop >= 2.85f ? Levels[G0].wallTop : oldTop * OpeningTopScale;
 
-        static Opening DZ(int g, float x, float z, float w, float top = DoorTop) =>
-            new Opening { group = g, alongX = false, line = x, center = z, width = w, sill = 0f, top = top };
+        static Opening DX(int g, float z, float x, float w, float top = OldDoorTop) =>
+            new Opening { group = g, alongX = true, line = z, center = x, width = w * OpeningWidthScale, sill = 0f, top = DoorTopFor(top) };
 
+        static Opening DZ(int g, float x, float z, float w, float top = OldDoorTop) =>
+            new Opening { group = g, alongX = false, line = x, center = z, width = w * OpeningWidthScale, sill = 0f, top = DoorTopFor(top) };
+
+        /// <summary>整面打通的开口，宽度用平面单位（跟着 PlanScale 走）。</summary>
+        static Opening DXP(int g, float z, float x, float wPlan) =>
+            new Opening { group = g, alongX = true, line = z, center = x, width = wPlan * PlanScale, sill = 0f, top = DoorTop };
+
+        static Opening DZP(int g, float x, float z, float wPlan) =>
+            new Opening { group = g, alongX = false, line = x, center = z, width = wPlan * PlanScale, sill = 0f, top = DoorTop };
+
+        // 窗：窗台不变，窗顶跟门楣一起抬高
         static Opening WX(int g, float z, float x, float w, float sill, float top) =>
-            new Opening { group = g, alongX = true, line = z, center = x, width = w, sill = sill, top = top, window = true };
+            new Opening { group = g, alongX = true, line = z, center = x, width = w * OpeningWidthScale, sill = sill, top = top + DoorTop - OldDoorTop, window = true };
 
         static Opening WZ(int g, float x, float z, float w, float sill, float top) =>
-            new Opening { group = g, alongX = false, line = x, center = z, width = w, sill = sill, top = top, window = true };
+            new Opening { group = g, alongX = false, line = x, center = z, width = w * OpeningWidthScale, sill = sill, top = top + DoorTop - OldDoorTop, window = true };
+
+        // 朝院子的落地玻璃拉门（ガラス戸）：关着，看得到院子但出不去。窗台 0，窗顶 = 门楣
+        static Opening GX(int g, float z, float x, float w) { var o = WX(g, z, x, w, 0f, OldDoorTop); o.glass = true; return o; }
+        static Opening GZ(int g, float x, float z, float w) { var o = WZ(g, x, z, w, 0f, OldDoorTop); o.glass = true; return o; }
 
         // ---------- 容器摆放 ----------
         struct Place
         {
             public string room;
             public ContainerKind kind;
-            public char wall;     // N/S/E/W：靠哪面墙，正面朝向房间内
-            public float offset;  // 沿墙方向，从房间 min 角到容器中心的距离
-            public Place(string room, ContainerKind kind, char wall, float offset) { this.room = room; this.kind = kind; this.wall = wall; this.offset = offset; }
+            public float x, z, yaw;
+            public Place(string room, ContainerKind kind, float x, float z, float yaw)
+            { this.room = room; this.kind = kind; this.x = x; this.z = z; this.yaw = yaw; }
         }
 
         [MenuItem("Hako/Art/2 生成老宅灰盒场景", priority = 20)]
@@ -93,13 +124,20 @@ namespace HakoOnna.Art.EditorTools
 
             var rooms = DefineRooms(pal);
             var openings = DefineOpenings();
+            foreach (var opening in openings)
+            {
+                opening.line0 = opening.line * OldPS;
+                opening.center0 = opening.center * OldPS;
+                opening.line *= PlanScale;
+                opening.center *= PlanScale;
+            }
             var roomById = new Dictionary<string, Room>();
             foreach (var room in rooms) roomById[room.id] = room;
 
             foreach (var room in rooms) BuildRoom(structure, room, openings, pal);
-            BuildSlabs(structure, pal);
+            BuildSlabs(structure, rooms, pal);
             BuildStairs(structure, pal);
-            var ground = ArtKit.Box(structure, "Ground_Garden", new Vector3(10f, -0.06f, 9.5f), new Vector3(36f, 0.1f, 35f), pal.Ground);
+            var ground = ArtKit.Box(structure, "Ground_Garden", Plan(9.55f, -0.05f, 10f), Plan(40f, 0.1f, 36.5f), pal.Ground);
             // 地面很大，降低光照贴图精度，避免超出图集大小的警告
             var so = new SerializedObject(ground.GetComponent<MeshRenderer>());
             so.FindProperty("m_ScaleInLightmap").floatValue = 0.15f;
@@ -109,6 +147,7 @@ namespace HakoOnna.Art.EditorTools
             PlaceContainers(containers, roomById);
             BuildGameplayMarkers(gameplay, roomById, pal);
             BuildProps(props, pal);
+            BuildDetails(root, structure, props, rooms, openings, pal);
             AtmosphereBuilder.Build(lighting);
 
             ArtKit.EnsureFolder("Assets/_Art/Scenes");
@@ -121,175 +160,178 @@ namespace HakoOnna.Art.EditorTools
         // =====================================================================
         static List<Room> DefineRooms(Palette p) => new List<Room>
         {
-            // ---- 一层 (主屋 20 × 13 m) ----
-            R("Genkan", "玄関", G0, 0, 0, 4, 8, p.Stone),
-            R("Engawa", "縁側", G0, 4, 0, 20, 2, p.WoodFloor),
-            R("Ima", "居間", G0, 4, 2, 10, 8, p.Tatami),
-            R("Zashiki", "座敷", G0, 10, 2, 16, 8, p.Tatami),
-            R("Butsuma", "仏間", G0, 16, 2, 20, 8, p.Tatami),
-            R("Rouka", "廊下", G0, 0, 8, 20, 9.5f, p.WoodFloor),
-            R("Daidokoro", "台所", G0, 0, 9.5f, 6, 13, p.WoodFloor),
-            R("Furo", "風呂", G0, 6, 9.5f, 9, 13, p.Tile),
-            R("Benjo", "便所", G0, 9, 9.5f, 11, 13, p.Tile),
-            R("Kaidan", "階段", G0, 11, 9.5f, 14, 13, p.WoodFloor),
-            R("Nando", "納戸", G0, 14, 9.5f, 20, 13, p.WoodFloor),
-
-            // ---- 二层 (14 × 8 m，位于主屋西北部) ----
-            R("Rouka2F", "二階廊下", G1, 0, 8.2f, 14, 9.6f, p.WoodFloor),
-            R("StairW2F", "裏階段口", G1, 0, 9.6f, 1.5f, 13, null, hasFloor: false),
-            R("Kodomo", "子供部屋", G1, 1.5f, 9.6f, 7, 13, p.Tatami),
-            R("Shinshitsu", "寝室", G1, 7, 9.6f, 12.3f, 13, p.Tatami),
-            R("StairE2F", "階段口", G1, 12.3f, 9.6f, 14, 13, null, hasFloor: false),
-            R("Monooki", "物置", G1, 0, 5, 5, 8.2f, p.WoodFloor),
-            R("Washitsu2F", "二階和室", G1, 5, 5, 14, 8.2f, p.Tatami),
-
-            // ---- 土蔵 ----
-            R("Kura", "土蔵", GKura, 6, 16, 12, 21, p.Stone),
-
-            // ---- 围墙（不建地板） ----
-            R("Fence", "塀", GFence, -5, -5, 25, 24, null, hasFloor: false),
+            R("Genkan", "玄関", G0, 0f, 0f, 5.46f, 5.005f, p.Stone),
+            R("Daidokoro", "台所", G0, 0f, 5.005f, 5.46f, 10.01f, p.Stone),
+            R("Tsugi", "次の間", G0, 5.46f, 1.365f, 9.1f, 5.005f, p.Tatami),
+            R("Butsuma", "仏間", G0, 9.1f, 1.365f, 12.74f, 5.005f, p.Tatami),
+            R("Zashiki", "座敷", G0, 12.74f, 1.365f, 17.29f, 5.005f, p.Tatami),
+            R("Ima", "居間", G0, 5.46f, 5.005f, 9.1f, 8.645f, p.Tatami),
+            R("Nando", "納戸", G0, 9.1f, 5.005f, 12.74f, 8.645f, p.WoodFloor),
+            R("Oku", "奥の間", G0, 12.74f, 5.005f, 17.29f, 8.645f, p.Tatami),
+            R("Engawa", "縁側", G0, 5.46f, 0f, 17.29f, 1.365f, p.WoodFloor),
+            R("EngawaE", "東縁側", G0, 17.29f, 0f, 18.655f, 10.01f, p.WoodFloor),
+            R("Rouka", "廊下", G0, 5.46f, 8.645f, 17.29f, 10.01f, p.WoodFloor),
+            R("UraKaidan", "裏階段", G0, 3.64f, 10.01f, 5.46f, 14.56f, p.Stone),
+            R("Benjo", "便所", G0, 5.46f, 10.01f, 7.28f, 14.56f, p.Tile),
+            R("Furo", "風呂", G0, 7.28f, 10.01f, 12.74f, 14.56f, p.Tile),
+            R("Kaidan", "階段", G0, 12.74f, 10.01f, 14.56f, 14.56f, p.WoodFloor),
+            R("Kura", "土蔵", GKura, 5.46f, 17.29f, 10.92f, 21.84f, p.Stone),
+            R("Shinshitsu", "寝室", G1, 3.64f, 5.005f, 9.1f, 8.645f, p.Tatami),
+            R("Washitsu2F", "二階和室", G1, 9.1f, 5.005f, 14.56f, 8.645f, p.Tatami),
+            R("Rouka2F", "二階中廊下", G1, 3.64f, 8.645f, 14.56f, 10.01f, p.WoodFloor),
+            R("StairW2F", "裏階段井", G1, 3.64f, 10.01f, 5.46f, 13.195f, null, false),
+            R("Monooki", "物置", G1, 5.46f, 10.01f, 8.19f, 13.195f, p.WoodFloor),
+            R("Kodomo", "子供部屋", G1, 8.19f, 10.01f, 12.74f, 13.195f, p.Tatami),
+            R("StairE2F", "主階段井", G1, 12.74f, 10.01f, 14.56f, 13.195f, null, false),
+            R("Rouka2FN", "二階北廊下", G1, 3.64f, 13.195f, 14.56f, 14.56f, p.WoodFloor),
+            R("Fence", "塀", GFence, -4.55f, -5.46f, 23.66f, 25.48f, null, false),
         };
 
         static List<Opening> DefineOpenings() => new List<Opening>
         {
-            // ---- 一层门 ----
-            DX(G0, 0, 2, 1.6f),          // 玄関 正门（通往庭院）
-            DZ(G0, 4, 5, 1.0f),          // 玄関 ↔ 居間
-            DZ(G0, 4, 1, 1.0f),          // 玄関 ↔ 縁側
-            DX(G0, 8, 2, 1.2f),          // 玄関 ↔ 廊下
-            DX(G0, 2, 7, 2.0f),          // 居間 ↔ 縁側
-            DZ(G0, 10, 5, 1.8f),         // 居間 ↔ 座敷
-            DX(G0, 8, 8, 1.0f),          // 居間 ↔ 廊下
-            DX(G0, 2, 13, 3.0f),         // 座敷 ↔ 縁側
-            DZ(G0, 16, 5, 1.8f),         // 座敷 ↔ 仏間
-            DX(G0, 2, 18, 1.5f),         // 仏間 ↔ 縁側
-            DX(G0, 8, 18, 1.0f),         // 仏間 ↔ 廊下
-            DX(G0, 0, 10, 4.0f, 2.2f),   // 縁側 → 庭院
-            DX(G0, 0, 17, 2.0f, 2.2f),   // 縁側 → 庭院
-            DZ(G0, 20, 1, 1.5f, 2.2f),   // 縁側 东端 → 庭院
-            DX(G0, 9.5f, 3, 1.2f),       // 廊下 ↔ 台所
-            DX(G0, 9.5f, 7.5f, 0.9f),    // 廊下 ↔ 風呂
-            DX(G0, 9.5f, 10, 0.8f),      // 廊下 ↔ 便所
-            DX(G0, 9.5f, 11.6f, 1.0f),   // 廊下 ↔ 階段
-            DX(G0, 9.5f, 17, 1.0f),      // 廊下 ↔ 納戸
-            DX(G0, 13, 2, 1.0f),         // 台所 后门 → 庭院（通往土蔵）
-            DZ(G0, 6, 11, 0.8f),         // 台所 ↔ 風呂
-            DZ(G0, 11, 11.5f, 0.8f),     // 便所 ↔ 階段
-            DZ(G0, 20, 11, 1.0f),        // 納戸 后门 → 庭院
-
-            // ---- 一层窗（装障子纸，不可通行） ----
-            WZ(G0, 0, 6, 1.2f, 0.9f, 1.8f),      // 玄関 西
-            WX(G0, 13, 4.5f, 1.0f, 1.2f, 1.9f),  // 台所 北
-            WX(G0, 13, 7.5f, 0.6f, 1.2f, 1.8f),  // 風呂 北
-            WZ(G0, 20, 12.3f, 0.8f, 1.0f, 1.8f), // 納戸 东
-            WZ(G0, 20, 3, 1.0f, 1.0f, 1.8f),     // 仏間 东
-
-            // ---- 二层门 ----
-            DX(G1, 9.6f, 0.75f, 1.5f),   // 廊下 ↔ 裏階段
-            DX(G1, 9.6f, 13.15f, 1.7f),  // 廊下 ↔ 主階段
-            DX(G1, 9.6f, 4, 0.9f),       // 廊下 ↔ 子供部屋
-            DX(G1, 9.6f, 9.5f, 0.9f),    // 廊下 ↔ 寝室
-            DX(G1, 8.2f, 2.5f, 0.9f),    // 廊下 ↔ 物置
-            DX(G1, 8.2f, 10, 1.8f),      // 廊下 ↔ 二階和室
-            DZ(G1, 5, 6.5f, 0.9f),       // 物置 ↔ 二階和室
-            DZ(G1, 7, 11.5f, 0.9f),      // 子供部屋 ↔ 寝室
-
-            // ---- 二层窗 ----
-            WX(G1, 13, 6, 0.8f, 1.2f, 1.8f),
-            WX(G1, 13, 9.9f, 0.6f, 0.9f, 1.8f),
-            WX(G1, 5, 8.45f, 0.8f, 1.2f, 1.8f),
-            WX(G1, 5, 12.9f, 1.0f, 0.9f, 1.8f),
-            WZ(G1, 0, 6.6f, 0.8f, 1.2f, 1.8f),
-            WZ(G1, 14, 8.9f, 0.6f, 1.0f, 1.8f),
-
-            // ---- 土蔵 ----
-            DX(GKura, 16, 9, 1.4f, 2.2f),
-            DZ(GKura, 12, 18.5f, 1.0f),
-            WX(GKura, 21, 9, 0.6f, 1.8f, 2.3f),
-
-            // ---- 围墙大门（路线二的出口） ----
-            DX(GFence, -5, 2, 2.4f, 2.4f),
+            DX(G0, 0f, 2.73f, 1.8f, 2f),
+            DX(G0, 5.005f, 2.73f, 3.6f, 2.31f),
+            DZ(G0, 5.46f, 3.185f, 1.8f),
+            DZ(G0, 5.46f, 0.68f, 0.9f),
+            DZ(G0, 5.46f, 6.825f, 1.8f),
+            DZ(G0, 5.46f, 9.33f, 0.9f),
+            DX(G0, 10.01f, 1.82f, 0.9f, 2f),
+            DX(G0, 10.01f, 4.54f, 1.4f, 2.85f),
+            DZ(G0, 9.1f, 3.185f, 3.4f),
+            DZ(G0, 12.74f, 3.185f, 3.4f),
+            DZ(G0, 9.1f, 6.825f, 1.8f),
+            DZ(G0, 12.74f, 6.825f, 1.8f),
+            DX(G0, 5.005f, 7.28f, 1.8f),
+            DX(G0, 5.005f, 10f, 0.9f),
+            DX(G0, 5.005f, 16.2f, 1.6f),
+            DX(G0, 1.365f, 7.28f, 3.4f),
+            DX(G0, 1.365f, 10.92f, 3.4f),
+            DX(G0, 1.365f, 15f, 4.3f),
+            DZ(G0, 17.29f, 3.185f, 3.4f),
+            DZ(G0, 17.29f, 6.825f, 1.8f),
+            DX(G0, 8.645f, 7.28f, 0.9f),
+            DX(G0, 8.645f, 10.92f, 0.9f),
+            DX(G0, 8.645f, 15f, 0.9f),
+            DZ(G0, 17.29f, 9.33f, 1.2f),
+            DZP(G0, 17.29f, 0.6825f, 1.365f),
+            DX(G0, 10.01f, 6.37f, 0.8f),
+            DX(G0, 10.01f, 10f, 0.9f),
+            DX(G0, 10.01f, 13.65f, 1.4f, 2.85f),
+            DZ(G0, 7.28f, 12.3f, 0.8f),
+            // 縁側朝院子的开口全部是关着的玻璃拉门：只有玄関正门和台所后门能到室外
+            GX(G0, 0f, 9f, 2.7f),
+            GX(G0, 0f, 15f, 2.7f),
+            GZ(G0, 18.655f, 4.5f, 2.7f),
+            GX(G0, 10.01f, 17.97f, 1.2f),
+            DX(GKura, 17.29f, 8.19f, 1.4f),
+            DZ(GKura, 10.92f, 19.6f, 0.9f),
+            DX(GFence, -5.46f, 2.73f, 2.4f, 2.4f),
+            DX(G1, 8.645f, 6.37f, 0.9f),
+            DX(G1, 8.645f, 11.8f, 1.8f),
+            DZ(G1, 9.1f, 6.825f, 1.8f),
+            DX(G1, 10.01f, 6.8f, 0.9f),
+            DX(G1, 10.01f, 10.5f, 0.9f),
+            DZ(G1, 8.19f, 11.6f, 0.9f),
+            DX(G1, 13.195f, 6.8f, 0.9f),
+            DX(G1, 13.195f, 10.5f, 0.9f),
+            DXP(G1, 13.195f, 4.55f, 1.82f),
+            DXP(G1, 13.195f, 13.65f, 1.82f),
+            WZ(G0, 0, 3.5f, 1.0f, .8f, 1.65f),
+            WZ(G0, 0, 8f, 1.2f, .8f, 1.65f),
+            WX(G0, 0, 12f, 1.2f, .8f, 1.65f),
+            WZ(G0, 18.655f, 7.6f, 1.2f, .8f, 1.65f),
+            WX(G0, 10.01f, 15.8f, .8f, .8f, 1.65f),
+            WX(G0, 14.56f, 6.37f, .65f, .8f, 1.65f),
+            WX(G0, 14.56f, 9.3f, 1f, .8f, 1.65f),
+            WX(G0, 14.56f, 4.55f, .65f, .8f, 1.65f),
+            WX(G0, 14.56f, 13.65f, .65f, .8f, 1.65f),
+            // 楼梯井边的扶手墙：下 0.9 m 实墙，上面全开
+            new Opening { group = G1, alongX = true, line = 10.01f, center = 4.55f, width = 1.82f * PlanScale, sill = .9f, top = 9f },
+            new Opening { group = G1, alongX = true, line = 10.01f, center = 13.65f, width = 1.82f * PlanScale, sill = .9f, top = 9f },
+            WX(G1, 5.005f, 7f, 1.6f, .8f, 1.65f),
+            WX(G1, 5.005f, 12f, 1.6f, .8f, 1.65f),
+            WZ(G1, 14.56f, 9.33f, .75f, .8f, 1.65f),
+            WX(G1, 14.56f, 9f, 1.2f, .8f, 1.65f),
+            WX(GKura, 21.84f, 8.5f, 1f, .8f, 1.7f),
         };
 
         static readonly Place[] Placements =
         {
-            new Place("Genkan", ContainerKind.GetaBako, 'W', 2.0f),
-            new Place("Genkan", ContainerKind.GetaBako, 'W', 3.2f),
-            new Place("Genkan", ContainerKind.Tsuzura, 'W', 6.5f),
-            new Place("Genkan", ContainerKind.GetaBako, 'E', 3.0f),
-
-            new Place("Ima", ContainerKind.ChaTansu, 'N', 1.5f),
-            new Place("Ima", ContainerKind.Tansu, 'N', 3.0f),
-            new Place("Ima", ContainerKind.Tansu, 'W', 5.0f),
-
-            new Place("Zashiki", ContainerKind.Nagamochi, 'N', 1.4f),
-            new Place("Zashiki", ContainerKind.Oshiire, 'N', 4.2f),
-            new Place("Zashiki", ContainerKind.Tansu, 'W', 1.2f),
-
-            new Place("Butsuma", ContainerKind.Tsuzura, 'E', 1.0f),
-            new Place("Butsuma", ContainerKind.ChaTansu, 'E', 5.0f),
-
-            new Place("Engawa", ContainerKind.Nagamochi, 'S', 2.0f),
-            new Place("Engawa", ContainerKind.Tsuzura, 'S', 10.0f),
-
-            new Place("Daidokoro", ContainerKind.ChaTansu, 'N', 4.5f),
-            new Place("Daidokoro", ContainerKind.Komebitsu, 'S', 4.8f),
-            new Place("Daidokoro", ContainerKind.Tsuzura, 'S', 1.6f),
-
-            new Place("Furo", ContainerKind.GetaBako, 'W', 3.0f),
-            new Place("Benjo", ContainerKind.GetaBako, 'N', 1.0f),
-
-            new Place("Nando", ContainerKind.Nagamochi, 'N', 1.2f),
-            new Place("Nando", ContainerKind.YofukuTansu, 'N', 3.3f),
-            new Place("Nando", ContainerKind.Tsuzura, 'N', 5.2f),
-            new Place("Nando", ContainerKind.Tansu, 'W', 1.75f),
-            new Place("Nando", ContainerKind.Komebitsu, 'S', 1.0f),
-
-            new Place("Kodomo", ContainerKind.Oshiire, 'N', 2.0f),
-            new Place("Kodomo", ContainerKind.Tansu, 'N', 4.5f),
-            new Place("Kodomo", ContainerKind.Tsuzura, 'W', 1.5f),
-
-            new Place("Shinshitsu", ContainerKind.Oshiire, 'N', 1.5f),
-            new Place("Shinshitsu", ContainerKind.YofukuTansu, 'N', 3.8f),
-            new Place("Shinshitsu", ContainerKind.Tansu, 'E', 1.7f),
-
-            new Place("Monooki", ContainerKind.Nagamochi, 'S', 1.2f),
-            new Place("Monooki", ContainerKind.Tsuzura, 'S', 3.0f),
-            new Place("Monooki", ContainerKind.Tansu, 'S', 4.3f),
-            new Place("Monooki", ContainerKind.Komebitsu, 'W', 2.5f),
-
-            new Place("Washitsu2F", ContainerKind.Oshiire, 'S', 2.0f),
-            new Place("Washitsu2F", ContainerKind.Tansu, 'S', 4.5f),
-            new Place("Washitsu2F", ContainerKind.ChaTansu, 'S', 6.5f),
-            new Place("Washitsu2F", ContainerKind.Nagamochi, 'E', 1.6f),
-
-            new Place("Kura", ContainerKind.Nagamochi, 'N', 1.2f),
-            new Place("Kura", ContainerKind.Nagamochi, 'N', 3.0f),
-            new Place("Kura", ContainerKind.Tsuzura, 'N', 4.8f),
-            new Place("Kura", ContainerKind.Tansu, 'W', 2.5f),
-            new Place("Kura", ContainerKind.YofukuTansu, 'W', 3.6f),
-            new Place("Kura", ContainerKind.Komebitsu, 'S', 1.0f),
-            new Place("Kura", ContainerKind.Tsuzura, 'E', 1.2f),
+            new Place("Genkan", ContainerKind.GetaBako, 0.265f, 4.29f, 90f),
+            new Place("Genkan", ContainerKind.GetaBako, 1.04f, 0.265f, 0f),
+            new Place("Genkan", ContainerKind.Tsuzura, 0.34f, 1.04f, 90f),
+            new Place("Nando", ContainerKind.Nagamochi, 12.08f, 7.62f, 270f),
+            new Place("Nando", ContainerKind.YofukuTansu, 9.43f, 5.57f, 90f),
+            new Place("Daidokoro", ContainerKind.ChaTansu, 0.29f, 6.545f, 90f),
+            new Place("Daidokoro", ContainerKind.Tsuzura, 2.99f, 9.645f, 180f),
+            new Place("Daidokoro", ContainerKind.Komebitsu, 1.89f, 5.63f, 0f),
+            new Place("Daidokoro", ContainerKind.Komebitsu, 4.84f, 8.395f, 270f),
+            // 西北角贴北墙；旧尺寸离西墙留 0.44 m，放大后推回西墙（离北门留空区的压入量不超过原来）
+            new Place("Tsugi", ContainerKind.Nagamochi, 6.43f, 4.42f, 180f),
+            new Place("Tsugi", ContainerKind.Tansu, 5.91f, 1.82f, 90f),
+            new Place("Butsuma", ContainerKind.ChaTansu, 11.94f, 1.94f, 0f),
+            new Place("Butsuma", ContainerKind.Tsuzura, 9.725f, 2.105f, 90f),
+            new Place("Zashiki", ContainerKind.Nagamochi, 15.0f, 4.65f, 180f),
+            new Place("Zashiki", ContainerKind.Tansu, 16.23f, 1.965f, 0f),
+            new Place("Ima", ContainerKind.Tansu, 6.06f, 7.995f, 90f),
+            new Place("Ima", ContainerKind.ChaTansu, 5.81f, 5.45f, 90f),
+            new Place("Ima", ContainerKind.Tsuzura, 6.6f, 8.37f, 180f),
+            new Place("Nando", ContainerKind.Tansu, 12.04f, 5.32f, 0f),
+            new Place("Nando", ContainerKind.Tsuzura, 9.79f, 8.295f, 180f),
+            new Place("Nando", ContainerKind.Komebitsu, 11.20f, 5.36f, 0f),
+            new Place("Oku", ContainerKind.Oshiire, 14.015f, 5.52f, 0f),
+            new Place("Oku", ContainerKind.YofukuTansu, 13.58f, 8.245f, 180f),
+            new Place("Oku", ContainerKind.Tansu, 16.53f, 8.32f, 180f),
+            new Place("Engawa", ContainerKind.Tsuzura, 11.85f, 0.34f, 0f),
+            new Place("Benjo", ContainerKind.GetaBako, 5.725f, 13.9f, 90f),
+            new Place("Furo", ContainerKind.GetaBako, 7.545f, 13.85f, 90f),
+            new Place("Kura", ContainerKind.Nagamochi, 5.95f, 18.18f, 90f),
+            new Place("Kura", ContainerKind.Nagamochi, 5.95f, 20.88f, 90f),
+            new Place("Kura", ContainerKind.Nagamochi, 7.75f, 21.33f, 180f),
+            new Place("Kura", ContainerKind.YofukuTansu, 10.15f, 17.68f, 0f),
+            new Place("Kura", ContainerKind.Tansu, 9.1f, 21.505f, 180f),
+            new Place("Kura", ContainerKind.Tsuzura, 6.75f, 17.63f, 0f),
+            new Place("Shinshitsu", ContainerKind.Oshiire, 6.18f, 5.52f, 0f),
+            new Place("Shinshitsu", ContainerKind.YofukuTansu, 4.43f, 5.395f, 0f),
+            new Place("Shinshitsu", ContainerKind.Tansu, 8.48f, 5.32f, 0f),
+            new Place("Washitsu2F", ContainerKind.Oshiire, 11.09f, 5.52f, 0f),
+            new Place("Washitsu2F", ContainerKind.Nagamochi, 13.24f, 5.495f, 0f),
+            new Place("Washitsu2F", ContainerKind.ChaTansu, 9.69f, 5.295f, 0f),
+            new Place("Monooki", ContainerKind.Nagamochi, 5.87f, 12.0f, 90f),
+            new Place("Monooki", ContainerKind.Tsuzura, 5.8f, 10.75f, 90f),
+            new Place("Monooki", ContainerKind.Komebitsu, 7.85f, 12.75f, 270f),
+            new Place("Kodomo", ContainerKind.Oshiire, 12.205f, 11.6f, 270f),
+            new Place("Kodomo", ContainerKind.Tansu, 8.83f, 10.325f, 0f),
+            new Place("Kodomo", ContainerKind.Tsuzura, 8.53f, 12.75f, 90f),
         };
 
-        // =====================================================================
         // 构建
         // =====================================================================
         static void BuildRoom(Transform parent, Room room, List<Opening> openings, Palette pal)
         {
             var lv = Levels[room.group];
+            lv.floorTop = FloorHeight(room);
             var t = ArtKit.Empty(parent, $"Room_{room.id}_{room.label}", Vector3.zero);
             var r = room.r;
             var wallMat = room.group == GFence ? pal.Fence : pal.Plaster;
 
             if (room.hasFloor && room.floor != null)
             {
-                if (room.group == G1)
-                    ArtKit.Box(t, "Floor", new Vector3(r.center.x, lv.floorTop + 0.005f, r.center.y), new Vector3(r.width, 0.01f, r.height), room.floor, false);
-                else
-                    ArtKit.Box(t, "Floor", new Vector3(r.center.x, -0.05f, r.center.y), new Vector3(r.width, 0.1f, r.height), room.floor);
+                float depth = room.group == G1 ? .012f : Mathf.Max(.1f, lv.floorTop);
+                ArtKit.Box(t, "Floor", new Vector3(r.center.x, lv.floorTop - depth / 2 + (room.group == G1 ? .003f : 0), r.center.y),
+                    new Vector3(r.width, depth, r.height), room.floor, room.group != G1);
+                if (room.group == G0 && lv.floorTop > 0)
+                    ArtKit.Box(t, "Foundation", new Vector3(r.center.x, .26f, r.center.y),
+                        new Vector3(r.width + .002f, .52f, r.height + .002f), pal.WoodDarkB);
             }
 
+            if (room.id.StartsWith("Stair"))
+            {
+                bool west = room.id == "StairW2F";
+                BuildEdge(t, room, lv, false, west ? r.xMin : r.xMax, r.yMin, r.yMax,
+                    west ? 1f : -1f, wallMat, openings, pal);
+                return;
+            }
             BuildEdge(t, room, lv, true, r.yMin, r.xMin, r.xMax, +1f, wallMat, openings, pal);
             BuildEdge(t, room, lv, true, r.yMax, r.xMin, r.xMax, -1f, wallMat, openings, pal);
             BuildEdge(t, room, lv, false, r.xMin, r.yMin + T, r.yMax - T, +1f, wallMat, openings, pal);
@@ -316,17 +358,56 @@ namespace HakoOnna.Art.EditorTools
                 float a = Mathf.Max(from, o.center - o.width / 2f);
                 float b = Mathf.Min(to, o.center + o.width / 2f);
                 if (a > cursor + 0.001f) WallPiece(parent, "Wall", alongX, wallLine, cursor, a, lv.wallBase, lv.wallTop, mat);
-                float bottom = lv.floorTop + o.sill;
+                float bottom = o.window || o.sill > 0 ? lv.floorTop + o.sill : lv.wallBase;
                 float top = Mathf.Min(lv.wallTop, lv.floorTop + o.top);
+                if (!o.window && room.group == G0)
+                    top = o.top == DoorTop ? .55f + DoorTop : o.top;
                 if (bottom > lv.wallBase + 0.001f) WallPiece(parent, "Wall_Below", alongX, wallLine, a, b, lv.wallBase, bottom, mat);
                 if (top < lv.wallTop - 0.001f) WallPiece(parent, "Wall_Lintel", alongX, wallLine, a, b, top, lv.wallTop, mat);
-                if (o.window)
+                if (o.glass)
+                {
+                    // 玻璃拉门：关着，只留一层碰撞挡住玩家（门扇和玻璃在 BuildDetails 里做）
+                    var pane = WallPiece(parent, "Window_Glass", alongX, wallLine, a, b, bottom, top, mat);
+                    var s = pane.transform.localScale;
+                    pane.transform.localScale = alongX ? new Vector3(s.x, s.y, 0.04f) : new Vector3(0.04f, s.y, s.z);
+                    Object.DestroyImmediate(pane.GetComponent<MeshRenderer>());
+                    Object.DestroyImmediate(pane.GetComponent<MeshFilter>());
+                }
+                else if (o.window)
                 {
                     // 障子窗：可透月光（不投射阴影），但有碰撞，玩家不能翻出去
                     var shoji = WallPiece(parent, "Window_Shoji", alongX, wallLine, a, b, bottom, top, pal.Paper);
                     var s = shoji.transform.localScale;
                     shoji.transform.localScale = alongX ? new Vector3(s.x, s.y, 0.02f) : new Vector3(0.02f, s.y, s.z);
+                    float face = wallLine + inward * .015f;
+                    WallPiece(parent, "WindowRail", alongX, face, a, b, (bottom + top) / 2, (bottom + top) / 2 + .025f, pal.WoodMidA);
+                    for (float mid = a + .27f; mid < b - .04f; mid += .27f)
+                        WallPiece(parent, "WindowLattice", alongX, face, mid, mid + .024f, bottom, top, pal.WoodMidA);
                     shoji.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+                if (!o.window && o.sill == 0 && top + .075f < lv.wallTop && room.group != GFence)
+                {
+                    // 展示收在墙边的门扇，中央净宽保持可通行。
+                    bool paperDoor = room.floor == pal.Tatami;
+                    bool entrance = room.id == "Genkan" && alongX && line == 0;
+                    if (paperDoor || entrance)
+                    {
+                        float leaf = Mathf.Min((b - a) / 2, .84f * OpeningWidthScale, a - cursor - .08f);
+                        if (leaf > .24f)
+                        {
+                            float skin = wallLine + inward * .012f;
+                            WallPiece(parent, "ParkedSlidingPanel", alongX, skin, a - leaf, a - .055f,
+                                lv.floorTop + .05f, top - .04f, paperDoor ? pal.Paper : pal.WoodDarkA);
+                            WallPiece(parent, "PanelRail", alongX, skin + inward * .008f, a - leaf, a - .055f,
+                                lv.floorTop + .78f, lv.floorTop + .81f, pal.WoodMidA);
+                        }
+                    }
+                    float face = wallLine + inward * .025f;
+                    WallPiece(parent, "Kamoi", alongX, face, a, b, top, top + .075f, pal.WoodDarkA);
+                    if (a - from > .06f)
+                        WallPiece(parent, "DoorPost", alongX, face, a - .055f, a, lv.floorTop, top, pal.WoodMidA);
+                    if (to - b > .06f)
+                        WallPiece(parent, "DoorPost", alongX, face, b, b + .055f, lv.floorTop, top, pal.WoodMidA);
                 }
                 cursor = Mathf.Max(cursor, b);
             }
@@ -341,113 +422,112 @@ namespace HakoOnna.Art.EditorTools
                 : ArtKit.Box(parent, name, new Vector3(wallLine, ym, mid), new Vector3(T, h, len), mat);
         }
 
-        static void BuildSlabs(Transform parent, Palette pal)
+        static float FloorHeight(Room room) =>
+            room.id == "Genkan" || room.id == "Daidokoro" || room.id == "UraKaidan" ? 0 : Levels[room.group].floorTop;
+
+        static void BuildSlabs(Transform parent, List<Room> rooms, Palette pal)
         {
             var t = ArtKit.Empty(parent, "Slabs", Vector3.zero);
             // 一层天花板 / 二层楼板（留出两个楼梯井）
-            var holes = new[] { Rect.MinMaxRect(0f, 9.6f, 1.5f, 13f), Rect.MinMaxRect(12.3f, 9.6f, 14f, 13f) };
-            foreach (var r in SubtractRects(Rect.MinMaxRect(0f, 0f, 20f, 13f), holes))
-                ArtKit.Box(t, "Slab_1F", new Vector3(r.center.x, 2.8f, r.center.y), new Vector3(r.width, 0.2f, r.height), pal.Ceiling);
-            // 二层屋顶
-            ArtKit.Box(t, "Roof_2F", new Vector3(7f, 5.375f, 9f), new Vector3(14f, 0.15f, 8f), pal.Roof);
-            // 土蔵屋顶
-            ArtKit.Box(t, "Roof_Kura", new Vector3(9f, 3.075f, 18.5f), new Vector3(6f, 0.15f, 5f), pal.Roof);
-        }
-
-        /// <summary>从矩形中挖掉若干矩形，返回剩余部分（按行合并）。</summary>
-        static List<Rect> SubtractRects(Rect outer, IList<Rect> holes)
-        {
-            var xs = new SortedSet<float> { outer.xMin, outer.xMax };
-            var zs = new SortedSet<float> { outer.yMin, outer.yMax };
-            foreach (var h in holes)
+            foreach (var room in rooms)
             {
-                xs.Add(Mathf.Clamp(h.xMin, outer.xMin, outer.xMax)); xs.Add(Mathf.Clamp(h.xMax, outer.xMin, outer.xMax));
-                zs.Add(Mathf.Clamp(h.yMin, outer.yMin, outer.yMax)); zs.Add(Mathf.Clamp(h.yMax, outer.yMin, outer.yMax));
+                if (room.group != G0 && room.group != GKura) continue;
+                var r = room.r;
+                if (room.id == "Kaidan" || room.id == "UraKaidan") r.yMin = 13.195f * PlanScale;
+                bool kura = room.group == GKura;
+                ArtKit.Box(t, kura ? "Roof_Kura" : "Slab_1F", new Vector3(r.center.x, Levels[room.group].wallTop + .1f, r.center.y),
+                    new Vector3(r.width, .2f, r.height), kura ? pal.Roof : pal.Ceiling);
             }
-            var xl = new List<float>(xs);
-            var zl = new List<float>(zs);
-            var result = new List<Rect>();
-            for (int j = 0; j < zl.Count - 1; j++)
-            {
-                float runStart = float.NaN;
-                for (int i = 0; i <= xl.Count - 1; i++)
-                {
-                    bool filled = false;
-                    if (i < xl.Count - 1)
-                    {
-                        var c = new Vector2((xl[i] + xl[i + 1]) / 2f, (zl[j] + zl[j + 1]) / 2f);
-                        filled = true;
-                        foreach (var h in holes) if (h.Contains(c)) { filled = false; break; }
-                    }
-                    if (filled && float.IsNaN(runStart)) runStart = xl[i];
-                    if (!filled && !float.IsNaN(runStart))
-                    {
-                        result.Add(Rect.MinMaxRect(runStart, zl[j], xl[i], zl[j + 1]));
-                        runStart = float.NaN;
-                    }
-                }
-            }
-            return result;
+            ArtKit.Box(t, "Roof_2F", Plan(9.1f, Levels[G1].wallTop + .1f, 9.7825f), new Vector3(10.92f * PlanScale, .2f, 9.555f * PlanScale), pal.Roof);
         }
 
         static void BuildStairs(Transform parent, Palette pal)
         {
             var t = ArtKit.Empty(parent, "Stairs", Vector3.zero);
-            // 两座楼梯都从北端（z=12.9）向南爬升到二层（z=9.6）。日式老宅楼梯很陡，约 41°。
-            BuildStair(t, "Stair_Main", 12.6f, 13.9f, 12.9f, 9.6f, 2.9f, 13, pal.WoodDarkA);
-            BuildStair(t, "Stair_Kitchen", 0.2f, 1.2f, 12.9f, 9.6f, 2.9f, 13, pal.WoodDarkB);
+            // 踏步高约 0.2 m
+            BuildFlight(t, "Stair_Main", 13.65f, .55f, 18, pal.WoodDarkA);
+            BuildFlight(t, "Stair_Kitchen", 4.54f, 0, 21, pal.WoodDarkB);
+            const float W = OpeningWidthScale;
+            foreach (float z in new[] { .68f, 3.185f, 6.825f, 9.33f })
+                Threshold(t, Plan(5.46f,.55f,z), Vector3.right, (z == .68f || z == 9.33f ? .9f : 1.8f) * W, pal.WoodMidA);
+            // 縁側的玻璃拉门关着：门外只放一块沓脱石（不再有坡道），西边那块上面摆着下駄
+            ShoeStone(t, Plan(9f,.55f,0), Vector3.forward, .4f, pal.Stone);
+            ShoeStone(t, Plan(15f,.55f,0), Vector3.forward, -.2f, pal.Stone);
+            ShoeStone(t, Plan(18.655f,.55f,4.5f), Vector3.left, .1f, pal.Stone);
+            ShoeStone(t, Plan(17.97f,.55f,10.01f), Vector3.back, 0f, pal.Stone);
+            Threshold(t, Plan(8.19f,.3f,17.29f), Vector3.forward, 1.4f * W, pal.Stone);
+            Threshold(t, Plan(10.92f,.3f,19.6f), Vector3.left, .9f * W, pal.Stone);
         }
 
-        static void BuildStair(Transform parent, string name, float x0, float x1, float zBottom, float zTop, float rise, int steps, Material mat)
+        static void Threshold(Transform parent, Vector3 end, Vector3 direction, float width, Material mat)
+        {
+            Vector3 start = end - direction * .8f;
+            start.y = 0;
+            var step = ArtKit.Box(parent, "ThresholdStep", (start + end) / 2 - Vector3.up * end.y / 4,
+                new Vector3(width, end.y / 2, .78f), mat, false);
+            step.transform.rotation = Quaternion.LookRotation(direction);
+            Ramp(parent, start, end, width);
+        }
+
+        /// <summary>
+        /// 关着的玻璃拉门外的沓脱石：一块顶面 0.275 m 的自然石，沿墙方向可以偏一点。
+        /// 门不能走，所以不加坡道。inward 和 Threshold 一样指向屋内。
+        /// </summary>
+        static void ShoeStone(Transform parent, Vector3 door, Vector3 inward, float shift, Material mat)
+        {
+            var side = Vector3.Cross(Vector3.up, inward);
+            var c = door - inward * .48f + side * shift;
+            c.y = 0;
+            var rot = Quaternion.LookRotation(inward) * Quaternion.Euler(0, 4f, 0);
+            var top = ArtKit.Box(parent, "ShoeStone", c + Vector3.up * .2f, new Vector3(1.3f, .15f, .62f), mat);
+            top.transform.rotation = rot;
+            var body = ArtKit.Box(parent, "ShoeStone", c + Vector3.up * .07f, new Vector3(1.18f, .14f, .54f), mat);
+            body.transform.rotation = rot * Quaternion.Euler(0, -7f, 0);
+        }
+
+        static void BuildFlight(Transform parent, string name, float x, float floor, int count, Material mat)
         {
             var t = ArtKit.Empty(parent, name, Vector3.zero);
-            float run = (zBottom - zTop) / steps, stepRise = rise / steps, w = x1 - x0, xm = (x0 + x1) / 2f;
-            for (int i = 0; i < steps; i++)
+            x *= PlanScale;
+            float tread = 3.185f * PlanScale / count;
+            float top = Levels[G1].floorTop;
+            for (int i = 0; i < count; i++)
             {
-                float h = (i + 1) * stepRise;
-                float zc = zBottom - (i + 0.5f) * run;
-                ArtKit.Box(t, $"Step_{i:00}", new Vector3(xm, h / 2f, zc), new Vector3(w, h, run), mat, false);
+                float h = (top - floor) * (i + 1) / count;
+                float z = 10.01f * PlanScale + (i + .5f) * tread;
+                ArtKit.Box(t, $"Step_{i:00}", new Vector3(x, floor + h / 2, z), new Vector3(1.2f * PlanScale,h,tread), mat, false);
+                foreach (float side in new[] { -.64f, .64f })
+                    ArtKit.Box(t, "Stringer", new Vector3(x + side * PlanScale, floor + (h + .9f) / 2, z),
+                        new Vector3(.08f,h + .9f,tread), mat);
             }
-            // 行走用的斜坡碰撞体（台阶本身无碰撞，避免角色控制器卡台阶）
-            float len = Mathf.Sqrt(run * steps * run * steps + rise * rise);
-            float angle = Mathf.Atan2(rise, zBottom - zTop) * Mathf.Rad2Deg;
-            var ramp = new GameObject("WalkRamp");
-            ramp.transform.SetParent(t, false);
-            ramp.transform.localPosition = new Vector3(xm, rise / 2f + stepRise * 0.5f, (zBottom + zTop) / 2f);
-            ramp.transform.localRotation = Quaternion.Euler(angle, 0f, 0f);
-            ramp.AddComponent<BoxCollider>().size = new Vector3(w, 0.05f, len);
+            Ramp(t, new Vector3(x,floor,10.01f * PlanScale), new Vector3(x,top,13.195f * PlanScale), 1.2f * PlanScale);
+        }
+
+        static void Ramp(Transform parent, Vector3 start, Vector3 end, float width)
+        {
+            var ramp = ArtKit.Empty(parent, "WalkRamp", (start + end) / 2);
+            ramp.rotation = Quaternion.LookRotation(end - start);
+            var box = ramp.gameObject.AddComponent<BoxCollider>();
+            box.size = new Vector3(width,.06f,Vector3.Distance(start,end));
+            box.center = Vector3.down * .03f;
         }
 
         static void PlaceContainers(Transform parent, Dictionary<string, Room> rooms)
         {
-            var rng = new System.Random(4521); // 固定种子：每次生成的变体分布一致
+            var rng = new System.Random(4521);
             var counter = new Dictionary<string, int>();
             foreach (var p in Placements)
             {
-                if (!rooms.TryGetValue(p.room, out var room)) { Debug.LogError($"[Hako Art] 未知房间 {p.room}"); continue; }
-                var size = ContainerPrefabBuilder.Sizes[p.kind];
+                var room = rooms[p.room];
                 string variant = ContainerPrefabBuilder.Variants[rng.Next(ContainerPrefabBuilder.Variants.Length)];
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ContainerPrefabBuilder.PathFor(p.kind, variant));
-                if (prefab == null) { Debug.LogError($"[Hako Art] 缺少预制体 {p.kind}_{variant}"); continue; }
-
-                var r = room.r;
-                float y = Levels[room.group].floorTop;
-                float half = size.z / 2f;
-                Vector3 pos;
-                float yaw;
-                switch (p.wall)
-                {
-                    case 'N': pos = new Vector3(r.xMin + p.offset, y, r.yMax - T - half); yaw = 180f; break;
-                    case 'S': pos = new Vector3(r.xMin + p.offset, y, r.yMin + T + half); yaw = 0f; break;
-                    case 'W': pos = new Vector3(r.xMin + T + half, y, r.yMin + p.offset); yaw = 90f; break;
-                    default: pos = new Vector3(r.xMax - T - half, y, r.yMin + p.offset); yaw = -90f; break;
-                }
-
+                // 先按 V3 旧尺寸摆，BuildDetails 里再整体搬到新尺寸（贴墙的保持离墙距离）
+                var pos = OldPlan(p.x, OldFloorHeight(room), p.z);
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
                 counter.TryGetValue(p.room, out int n);
                 counter[p.room] = n + 1;
                 go.name = $"{p.room}_{p.kind}_{n + 1:00}";
-                go.transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
+                go.transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, p.yaw, 0f));
             }
         }
 
@@ -455,7 +535,8 @@ namespace HakoOnna.Art.EditorTools
         {
             // 探索者出生点（玄関）
             var spawns = ArtKit.Empty(parent, "ExplorerSpawnPoints", Vector3.zero);
-            Vector3[] sp = { new Vector3(1.2f, 0, 2.5f), new Vector3(2.8f, 0, 2.5f), new Vector3(1.2f, 0, 4.5f), new Vector3(2.8f, 0, 4.5f), new Vector3(2f, 0, 6.3f) };
+            // 出生点、保险箱、仏坛按旧尺寸摆，之后和家具一起搬家（见 Rescale）
+            Vector3[] sp = { OldPlan(1.4f,0,1.6f), OldPlan(2.7f,0,1.6f), OldPlan(4f,0,1.6f), OldPlan(2f,0,3.2f), OldPlan(3.4f,0,3.2f) };
             for (int i = 0; i < sp.Length; i++)
             {
                 var s = ArtKit.Empty(spawns, $"SpawnPoint_{i}", sp[i]);
@@ -464,17 +545,19 @@ namespace HakoOnna.Art.EditorTools
 
             // 秘密出口候选点：地毯 + HatchAnchor。暗门只在被发现时由程序生成。
             var candidates = ArtKit.Empty(parent, "SecretExitCandidates", Vector3.zero);
-            Vector3[] cp = { new Vector3(7f, 0, 4.8f), new Vector3(13f, 0, 4.8f), new Vector3(17.2f, 0, 11.1f), new Vector3(9f, 0, 18.4f) };
+            // 各房间中央：居間、座敷、納戸、土蔵
             string[] cn = { "Ima", "Zashiki", "Nando", "Kura" };
-            for (int i = 0; i < cp.Length; i++)
+            for (int i = 0; i < cn.Length; i++)
             {
-                var c = ArtKit.Empty(candidates, $"SecretExitCandidate_{i}_{cn[i]}", cp[i]);
+                var room = rooms[cn[i]];
+                var center = room.r.center;
+                var c = ArtKit.Empty(candidates, $"SecretExitCandidate_{i}_{cn[i]}", new Vector3(center.x, FloorHeight(room), center.y));
                 ArtKit.Box(c, "Carpet", new Vector3(0f, 0.006f, 0f), new Vector3(2.0f, 0.012f, 1.5f), pal.Carpet, false);
                 ArtKit.Empty(c, "HatchAnchor", Vector3.zero);
             }
 
             // 保险箱（居間北墙）
-            var safe = ArtKit.Empty(parent, "Safe_Kinko", new Vector3(9.2f, 0f, 8f - T - 0.275f));
+            var safe = ArtKit.Empty(parent, "Safe_Kinko", OldPlan(8.5f, .55f, 8.645f) - Vector3.forward * (T + .275f));
             safe.rotation = Quaternion.Euler(0f, 180f, 0f);
             ArtKit.Box(safe, "Body", new Vector3(0f, 0.4f, 0f), new Vector3(0.6f, 0.8f, 0.55f), pal.Metal);
             ArtKit.Cylinder(safe, "Dial", new Vector3(0f, 0.5f, 0.285f), new Vector3(0.12f, 0.01f, 0.12f), Quaternion.Euler(90f, 0f, 0f), pal.Rust);
@@ -482,26 +565,135 @@ namespace HakoOnna.Art.EditorTools
             ArtKit.Empty(safe, "KeyAnchor", new Vector3(0f, 0.3f, 0f));
 
             // 超度地点：仏壇（仏間东墙）
-            var memorial = ArtKit.Empty(parent, "MemorialPoint_Butsudan", new Vector3(20f - T - 0.3f, 0f, 5f));
-            memorial.rotation = Quaternion.Euler(0f, -90f, 0f);
+            var memorial = ArtKit.Empty(parent, "MemorialPoint_Butsudan", OldPlan(11.9f, .55f, 5.005f) - Vector3.forward * (T + .3f));
+            memorial.rotation = Quaternion.Euler(0f, 180f, 0f);
             ArtKit.Box(memorial, "Butsudan", new Vector3(0f, 0.8f, 0f), new Vector3(1.2f, 1.6f, 0.6f), pal.Lacquer);
             ArtKit.Box(memorial, "Altar", new Vector3(0f, 0.45f, 0.45f), new Vector3(1.0f, 0.05f, 0.3f), pal.WoodDarkA);
             ArtKit.Empty(memorial, "InteractPoint", new Vector3(0f, 0f, 1.0f));
 
             // 大门（路线二）：围墙南侧，锁着的两扇门板
-            var gate = ArtKit.Empty(parent, "Gate_Main", new Vector3(2f, 0f, -5f + T / 2f));
-            ArtKit.Box(gate, "GateDoor_L", new Vector3(-0.6f, 1.2f, 0f), new Vector3(1.2f, 2.4f, 0.1f), pal.WoodDarkA);
-            ArtKit.Box(gate, "GateDoor_R", new Vector3(0.6f, 1.2f, 0f), new Vector3(1.2f, 2.4f, 0.1f), pal.WoodDarkA);
+            var gate = ArtKit.Empty(parent, "Gate_Main", Plan(2.73f, 0f, -5.46f) + Vector3.forward * (T / 2f));
+            float leafW = 1.2f * OpeningWidthScale, leafH = Levels[GFence].wallTop;
+            ArtKit.Box(gate, "GateDoor_L", new Vector3(-leafW / 2, leafH / 2, 0f), new Vector3(leafW, leafH, 0.1f), pal.WoodDarkA);
+            ArtKit.Box(gate, "GateDoor_R", new Vector3(leafW / 2, leafH / 2, 0f), new Vector3(leafW, leafH, 0.1f), pal.WoodDarkA);
             ArtKit.Empty(gate, "InteractPoint", new Vector3(0f, 0f, 0.8f));
-            ArtKit.Empty(parent, "EscapeZone_Gate", new Vector3(2f, 0f, -6.5f));
+            ArtKit.Empty(parent, "EscapeZone_Gate", Plan(2.73f, 0f, -5.46f) - Vector3.forward * 1.5f);
         }
 
-        static void BuildProps(Transform parent, Palette pal)
+        static void BuildProps(Transform parent, Palette p)
         {
-            // 少量非容器道具，只用于判断空间比例
-            ArtKit.Box(parent, "Bathtub", new Vector3(8.4f, 0.3f, 11.8f), new Vector3(1.0f, 0.6f, 0.8f), pal.WoodMidA);
-            ArtKit.Box(parent, "Chabudai_Ima", new Vector3(6.2f, 0.17f, 3.3f), new Vector3(0.9f, 0.34f, 0.9f), pal.WoodDarkB);
-            ArtKit.Box(parent, "Kamado_Daidokoro", new Vector3(5.45f, 0.4f, 12.35f), new Vector3(0.9f, 0.8f, 0.7f), pal.Stone);
+            // Fixtures have one solid footprint. Legs, bedding and tableware stay visual.
+            var bench = Table(parent, "Genkan_ShoeBench", new Vector3(6.1f, 0, .48f), 1.25f, .43f, .42f, p);
+            Part(bench, "SeatPad", 0,.46f,0, .82f,.06f,.35f, p.WickerA);
+
+            var kitchen = Fixture(parent, "Daidokoro_KamadoAndSink", new Vector3(.5f,0,11.55f), 3.2f,.86f,.74f,90);
+            Part(kitchen, "Base", 0,.39f,0, 3.14f,.78f,.7f,p.WoodMidB);
+            Part(kitchen, "Worktop", 0,.82f,0, 3.2f,.08f,.74f,p.Stone);
+            Part(kitchen, "Firebox", -1.02f,.36f,.356f, .59f,.38f,.018f,p.Interior);
+            Round(kitchen,"CookingPot",-1.02f,.98f,0,.46f,.24f,p.Metal);
+            Round(kitchen,"PotLid",-1.02f,1.12f,0,.48f,.04f,p.WoodDarkA);
+            Part(kitchen, "SinkRim", .98f,.876f,0, .84f,.032f,.54f,p.Metal);
+            Part(kitchen, "SinkBasin", .98f,.897f,0, .70f,.012f,.41f,p.Interior);
+            Part(kitchen, "Tap", .98f,1.05f,-.29f,.04f,.39f,.04f,p.Metal);
+            Part(kitchen, "Spout", .98f,1.23f,-.20f,.04f,.04f,.21f,p.Metal);
+            Part(kitchen, "ChoppingBoard", -.02f,.885f,0,.46f,.04f,.28f,p.WoodLightA);
+            var dining = Table(parent,"Daidokoro_DiningTable",new Vector3(4.4f,0,11.35f),1.45f,.72f,.8f,p);
+            Round(dining,"ServingBowl",.38f,.79f,0,.20f,.13f,p.Lacquer);
+            Round(dining,"RiceBowl",-.40f,.765f,-.12f,.14f,.09f,p.Paper);
+            Chair(parent,"DiningChair_S",new Vector3(4.4f,0,10.65f),180,p);
+            Chair(parent,"DiningChair_N",new Vector3(4.4f,0,12.05f),0,p);
+
+            var tea = Table(parent,"Tsugi_TeaTable",new Vector3(11.339f,.55f,5.738f),.86f,.31f,.56f,p);
+            Round(tea,"Teapot",0,.405f,0,.20f,.19f,p.Lacquer);
+            Round(tea,"Cup",.28f,.35f,.06f,.09f,.08f,p.Paper);
+            var hearth = Table(parent,"Ima_IroriTable",new Vector3(11.65f,.55f,8.12f),1.4f,.34f,.83f,p);
+            Part(hearth,"HearthLining",0,.35f,0,.79f,.02f,.52f,p.Interior);
+            Round(hearth,"IronKettle",0,.49f,0,.27f,.26f,p.Metal);
+            Cushion(parent,"Ima_Zabuton",new Vector3(11.64f,.55f,8.92f),p.Carpet);
+            Cushion(parent,"Butsuma_PrayerCushion",new Vector3(16.82f,.55f,5.86f),p.WickerB);
+
+            var alcove = Fixture(parent,"Zashiki_Tokonoma",new Vector3(19.45f,.55f,6.74f),1.88f,.17f,.42f);
+            Part(alcove,"DisplayPlatform",0,.085f,0,1.88f,.17f,.42f,p.WoodDarkA);
+            Round(alcove,"Vase",-.52f,.35f,0,.18f,.36f,p.Lacquer);
+            Part(alcove,"HangingScroll",.23f,1.25f,.23f,.5f,1.10f,.025f,p.FusumaA);
+            Part(alcove,"InkPanel",.23f,1.26f,.21f,.28f,.60f,.014f,p.WickerB);
+            Bed(parent,"Oku_GuestFuton",new Vector3(22.56f,.55f,10.89f),1.02f,90,p);
+            Bed(parent,"Shinshitsu_MainBed",new Vector3(6.37f,3.05f,10.45f),1.50f,0,p);
+            Table(parent,"Shinshitsu_Bedside",new Vector3(7.62f,3.05f,11.1f),.46f,.45f,.46f,p);
+            Bed(parent,"Kodomo_SingleBed",new Vector3(16.61f,3.05f,17.95f),.92f,90,p);
+            var desk = Table(parent,"Kodomo_StudyDesk",new Vector3(16.62f,3.05f,14.72f),1.28f,.72f,.59f,p);
+            Part(desk,"OpenNotebook",0,.737f,0,.31f,.026f,.21f,p.Paper);
+            Part(desk,"Book",.40f,.76f,-.09f,.22f,.07f,.26f,p.Carpet);
+            Chair(parent,"Kodomo_DeskChair",new Vector3(16.62f,3.05f,15.34f),0,p);
+            var guest = Table(parent,"Washitsu2F_WritingTable",new Vector3(19.38f,3.05f,10.95f),1.12f,.35f,.62f,p);
+            Part(guest,"LetterPaper",0,.365f,0,.31f,.02f,.22f,p.Paper);
+            Cushion(parent,"Washitsu2F_Zabuton",new Vector3(19.38f,3.05f,10.22f),p.WickerA);
+
+            var tub = Fixture(parent,"Furo_HinokiTub",new Vector3(16.55f,.55f,19.99f),1.68f,.66f,.98f);
+            Part(tub,"TubBody",0,.31f,0,1.68f,.62f,.98f,p.WoodMidA);
+            Part(tub,"Inside",0,.622f,0,1.49f,.02f,.80f,p.Interior);
+            foreach(float side in new[]{-1f,1f})
+            {
+                Part(tub,"LongRim",0,.645f,side*.455f,1.68f,.05f,.07f,p.WoodLightA);
+                Part(tub,"EndRim",side*.805f,.645f,0,.07f,.05f,.85f,p.WoodLightA);
+            }
+            Table(parent,"Furo_WashingStool",new Vector3(15.17f,.55f,19.57f),.39f,.26f,.34f,p);
+            var vanity = Table(parent,"Furo_Washstand",new Vector3(11.2f,.55f,15.13f),1.06f,.76f,.58f,p);
+            Round(vanity,"Basin",0,.84f,0,.40f,.16f,p.Paper);
+            var toilet = Fixture(parent,"Benjo_Toilet",new Vector3(9.50f,.55f,19.83f),.48f,.76f,.76f);
+            Round(toilet,"Pedestal",0,.19f,-.08f,.34f,.38f,p.Paper);
+            Round(toilet,"Bowl",0,.38f,-.10f,.47f,.21f,p.Paper);
+            Round(toilet,"SeatOpening",0,.49f,-.10f,.29f,.02f,p.Interior);
+            Part(toilet,"Cistern",0,.56f,.26f,.44f,.40f,.20f,p.Paper);
+        }
+
+        static Transform Fixture(Transform parent,string name,Vector3 floor,float width,float height,float depth,float yaw = 0)
+        {
+            var t = ArtKit.Empty(parent,name,floor);
+            t.localRotation = Quaternion.Euler(0,yaw,0);
+            var box = t.gameObject.AddComponent<BoxCollider>();
+            box.center = Vector3.up * (height / 2);
+            box.size = new Vector3(width,height,depth);
+            return t;
+        }
+
+        static void Part(Transform t,string name,float x,float y,float z,float w,float h,float d,Material mat) =>
+            ArtKit.Box(t,name,new Vector3(x,y,z),new Vector3(w,h,d),mat,false);
+
+        static void Round(Transform t,string name,float x,float y,float z,float diameter,float height,Material mat) =>
+            ArtKit.Cylinder(t,name,new Vector3(x,y,z),new Vector3(diameter,height/2,diameter),Quaternion.identity,mat);
+
+        static Transform Table(Transform parent,string name,Vector3 floor,float w,float h,float d,Palette p)
+        {
+            var t = Fixture(parent,name,floor,w,h,d);
+            Part(t,"Top",0,h-.035f,0,w,.07f,d,p.WoodMidA);
+            foreach(float x in new[]{-1f,1f})
+                foreach(float z in new[]{-1f,1f})
+                    Part(t,"Leg",x*(w/2-.08f),(h-.07f)/2,z*(d/2-.08f),.065f,h-.07f,.065f,p.WoodDarkA);
+            return t;
+        }
+
+        static void Chair(Transform parent,string name,Vector3 floor,float yaw,Palette p)
+        {
+            var seat = Table(parent,name,floor,.43f,.43f,.43f,p);
+            seat.localRotation = Quaternion.Euler(0,yaw,0);
+            Part(seat,"Back",0,.65f,.19f,.42f,.42f,.055f,p.WoodMidA);
+        }
+
+        static void Cushion(Transform parent,string name,Vector3 floor,Material mat) =>
+            ArtKit.Box(parent,name,floor+Vector3.up*.045f,new Vector3(.50f,.09f,.48f),mat,false);
+
+        static void Bed(Transform parent,string name,Vector3 floor,float width,float yaw,Palette p)
+        {
+            bool futon = name.Contains("Futon");
+            float baseHeight = futon ? .05f : .24f;
+            var bed = Fixture(parent,name,floor,width,baseHeight+.18f,2.04f,yaw);
+            Part(bed,"Base",0,baseHeight/2,0,width,baseHeight,2.04f,p.WoodDarkB);
+            Part(bed,"Mattress",0,baseHeight+.08f,0,width-.04f,.16f,2f,p.Paper);
+            Part(bed,"Quilt",0,baseHeight+.18f,-.25f,width-.015f,.075f,1.44f,p.FusumaB);
+            Part(bed,"QuiltBorder",0,baseHeight+.22f,.37f,width-.03f,.015f,.12f,p.Carpet);
+            Part(bed,"Pillow",0,baseHeight+.22f,.73f,width*.65f,.13f,.36f,p.FusumaA);
+            if (!futon) Part(bed,"Headboard",0,.38f,.99f,width,.76f,.08f,p.WoodMidB);
         }
     }
 }
