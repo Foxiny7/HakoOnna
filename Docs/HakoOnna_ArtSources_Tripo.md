@@ -40,7 +40,7 @@
 - 提示词用英文，Tripo 对英文理解更好。
 - 导出 **FBX**，选 **Quad remesh（四边面重拓扑）**，面数按下表设置。
 - 角色勾选 **Auto Rig（自动绑定）**。
-- 生成后统一缩放：Unity 里 1 单位 = 1 米，探索者身高约 1.7 m。
+- 生成后统一缩放：Unity 里 1 单位 = 1 米，探索者身高约 1.7 m，箱女约 1.2 m。
 - **原创要求**：提示词不要出现 “Hako Onna”、桌游名或任何现有作品名。
 
 ### 2.2 角色
@@ -51,12 +51,14 @@
 | 探索者 B | ≤ 20k | 是 | `realistic young woman, urban explorer, olive field jacket, jeans, hiking boots, short hair, A-pose, full body, game character, PBR` |
 | 探索者 C | ≤ 20k | 是 | `realistic young man, hoodie and denim jacket, beanie hat, work trousers, A-pose, full body, game character, PBR` |
 | 探索者 D | ≤ 20k | 是 | `realistic young woman, long raincoat, ponytail, black trousers, rubber boots, A-pose, full body, game character, PBR` |
-| 箱女 | ≤ 30k | 是 | `tall emaciated pale woman, unnaturally long thin limbs, long black hair completely covering the face, faded torn white kimono, barefoot, grey skin, horror creature, A-pose, full body, realistic, PBR` |
-| 伸出的手 | ≤ 5k | 否 | `pair of pale grey emaciated human hands and forearms, long thin fingers, dirty fingernails, reaching forward, realistic horror, PBR` |
+| 箱女 | ≤ 30k | 是 | `pale thin little girl about 7 years old, very messy uneven hacked shoulder-length black hair with clumps sticking out, faded dark red simple child kimono with soft sash, torn hem, barefoot, grey-white skin with faint paper fold creases, completely black eyes, japanese horror ghost, A-pose, full body, realistic, PBR` |
 
 **说明：**
 - 第一人称手臂用探索者模型本身：在 Unity 里只显示手臂部分，不用单独生成。
 - 箱女需要“四肢着地奔跑”“关节反折”这类非标准动作。Tripo 的自动绑定只能保证标准人形骨骼，这些动作要另外找动画或手调。可以先用 Mixamo 的标准动画占位。
+- 箱女的 8 个藏匿姿势和跳脸的脸都要手调、手工雕刻，Tripo 只出基础模型（见美术设定文档 6.2、6.5）。
+- 开箱死亡改用完整模型扑出来（美术设定文档 4.3），不再单独生成“伸出的手”。
+- 箱人不单独生成：用探索者模型改成箱人版（美术设定文档 6.3）。
 - 4 个探索者的外套颜色要明显不同，方便在黑暗里区分队友。
 
 ### 2.3 关键物品
