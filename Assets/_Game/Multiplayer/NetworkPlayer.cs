@@ -52,6 +52,7 @@ namespace HakoOnna.Multiplayer
             if (IsOwner && !IsServer) RequestDoorsRpc();
             if (IsOwner && !Application.isBatchMode)
             {
+                playerCamera.gameObject.AddComponent<HouseAmbience>().Begin(session.Foley);
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
             }
@@ -170,7 +171,11 @@ namespace HakoOnna.Multiplayer
         private void LateUpdate()
         {
             if (!IsSpawned) return;
-            if (IsOwner) UpdateInspectionPose();
+            if (IsOwner)
+            {
+                UpdateInspectionPose();
+                if (footsteps && footsteps.isPlaying && !OwnerWalking) footsteps.Stop();
+            }
             UpdateEquipmentPose();
         }
 

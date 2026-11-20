@@ -37,6 +37,7 @@ namespace HakoOnna.Multiplayer
             MoveView(-1, Current);
             if (Application.isBatchMode) return;
             view.gameObject.SetActive(true);
+            view.gameObject.AddComponent<HouseAmbience>().Begin(session.Foley);
             body.gameObject.SetActive(true);
             sight = new GhostSight(view.GetComponent<Camera>(), body, session);
             MoveView(-1, Current);

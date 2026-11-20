@@ -9,18 +9,23 @@ namespace HakoOnna.Multiplayer
     internal sealed class HouseFoley
     {
         private readonly List<(Bounds bounds, FootSurface surface)> floors = new();
-        private readonly AudioClip[] steps = new AudioClip[6];
+        private readonly List<Bounds> rooms = new();
+        private readonly AudioClip[,] steps = new AudioClip[6, 2];
 
         public HouseFoley(Transform house)
         {
             foreach (FootSurface surface in System.Enum.GetValues(typeof(FootSurface)))
-                steps[(int)surface] = Resources.Load<AudioClip>("Foley/Step_" + surface);
+            {
+                steps[(int)surface, 0] = Resources.Load<AudioClip>("Foley/Step_" + surface);
+                steps[(int)surface, 1] = Resources.Load<AudioClip>("Foley/Step_" + surface + "_B");
+            }
 
             foreach (var renderer in house.Find("Structure").GetComponentsInChildren<MeshRenderer>())
             {
                 FootSurface surface;
                 if (renderer.name == "Floor" && renderer.transform.parent.name.StartsWith("Room_"))
                 {
+                    rooms.Add(renderer.bounds);
                     surface = renderer.sharedMaterial.name switch
                     {
                         "M_Tatami" => FootSurface.Tatami,
@@ -36,7 +41,18 @@ namespace HakoOnna.Multiplayer
             }
         }
 
-        public AudioClip Step(FootSurface surface) => steps[(int)surface];
+        public AudioClip Step(FootSurface surface, bool left = true) => steps[(int)surface, left ? 0 : 1];
+
+        public bool IsInside(Vector3 listener)
+        {
+            foreach (var room in rooms)
+            {
+                float height = listener.y - room.max.y;
+                if (height >= -.15f && height < 4f && listener.x >= room.min.x && listener.x <= room.max.x &&
+                    listener.z >= room.min.z && listener.z <= room.max.z) return true;
+            }
+            return false;
+        }
 
         public FootSurface SurfaceAt(Vector3 feet)
         {
@@ -74,10 +90,7 @@ namespace HakoOnna.Multiplayer
         public static void Bind(ContainerVisual container)
         {
             var kind = container.transform.parent.name.Split('_')[1];
-            var source = Source(container.gameObject, .75f);
-            source.clip = Resources.Load<AudioClip>("Foley/Open_" + kind);
-            container.Opened += source.Play;
-            container.GrabPlayed += source.Play;
+            container.gameObject.AddComponent<ContainerFoley>().Bind(container, kind);
         }
     }
 }

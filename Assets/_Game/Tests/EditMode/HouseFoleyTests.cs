@@ -20,11 +20,23 @@ namespace HakoOnna.Tests
                 foreach (var container in containers)
                 {
                     HouseFoley.Bind(container);
-                    Check(container.GetComponent<AudioSource>().clip, container.transform.parent.name);
+                    var source = container.GetComponent<AudioSource>();
+                    var kind = container.transform.parent.name.Split('_')[1];
+                    container.IsOpen = true;
+                    Check(source.clip, kind);
+                    Assert.AreEqual("Open_" + kind, source.clip.name);
+                    container.IsOpen = false;
+                    Check(source.clip, kind);
+                    Assert.AreEqual("Close_" + kind, source.clip.name);
                 }
                 var foley = new HouseFoley(house.transform);
+                foreach (bool left in new[] { true, false })
                 foreach (FootSurface surface in System.Enum.GetValues(typeof(FootSurface)))
-                    Check(foley.Step(surface), surface.ToString());
+                {
+                    var clip = foley.Step(surface, left);
+                    Assert.IsNotNull(clip, surface.ToString());
+                    Assert.That(clip.length, Is.InRange(.015f, .14f), surface.ToString());
+                }
                 foreach (var floor in house.GetComponentsInChildren<MeshRenderer>())
                 {
                     if (floor.name != "Floor") continue;
@@ -42,6 +54,10 @@ namespace HakoOnna.Tests
                         Assert.AreEqual(expected.Value, foley.SurfaceAt(new Vector3(floor.bounds.center.x,
                             floor.bounds.max.y, floor.bounds.center.z)), room[1]);
                 }
+                Check(Resources.Load<AudioClip>("Foley/HiderShriek"), "Occupied opening");
+                Assert.IsFalse(foley.IsInside(new Vector3(5, 1.4f, -4)));
+                foreach (var area in new[] { "Indoor", "Yard" })
+                    Assert.Greater(Resources.Load<AudioClip>("Foley/" + area).length, 1f);
                 Assert.AreEqual(FootSurface.Gravel, foley.SurfaceAt(new Vector3(5, 0, -4)));
                 Assert.AreEqual(FootSurface.Earth, foley.SurfaceAt(new Vector3(-3, 0, -3)));
             }

@@ -30,10 +30,22 @@ namespace HakoOnna.Multiplayer
             glow.intensity = 4;
             var start = bounds.center;
             var end = Vector3.Lerp(start, victim.position + Vector3.up * 1.3f, .75f);
+            var foley = box.GetComponent<ContainerFoley>();
+            bool lunged = false, closing = false;
             try
             {
                 for (float t = 0; t < 1.4f && box && !box.IsOpen; t += Time.deltaTime)
                 {
+                    if (!lunged && t >= .12f)
+                    {
+                        lunged = true;
+                        foley?.Shriek();
+                    }
+                    if (!closing && t >= .95f)
+                    {
+                        closing = true;
+                        foley?.Close();
+                    }
                     float open = Mathf.SmoothStep(0, 1, t / .22f) * (1 - Mathf.SmoothStep(0, 1, (t - .95f) / .45f));
                     for (int i = 0; i < parts.Length; i++)
                     {
