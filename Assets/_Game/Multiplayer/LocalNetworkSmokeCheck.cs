@@ -83,11 +83,12 @@ namespace HakoOnna.Multiplayer
 
         private System.Collections.IEnumerator CaptureVision(string path)
         {
-            while (!FindFirstObjectByType<NetworkHider>() || !Camera.allCameras.Any(camera => camera.name == "HiderView"))
+            Camera camera;
+            while (!(camera = Camera.allCameras.FirstOrDefault(c => c.name == "HiderView" || c.name == "PlayerCamera")))
                 yield return null;
             yield return new WaitForSeconds(1);
             yield return new WaitForEndOfFrame();
-            var camera = Camera.allCameras.First(c => c.name == "HiderView");
+            Debug.Log("[Hako] Capturing " + camera.name);
             var frame = RenderTexture.GetTemporary(1100, 700, 24, RenderTextureFormat.ARGB32);
             var previous = RenderTexture.active;
             var request = new UnityEngine.Rendering.RenderPipeline.StandardRequest { destination = frame };

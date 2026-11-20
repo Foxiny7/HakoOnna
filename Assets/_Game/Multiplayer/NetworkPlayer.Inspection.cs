@@ -23,10 +23,11 @@ namespace HakoOnna.Multiplayer
 
         private void Awake() => slots = new NetworkList<int>(null, NetworkVariableReadPermission.Owner);
 
-        private static Transform Primitive(PrimitiveType type, string name, Transform parent, Vector3 scale)
+        private Transform Primitive(PrimitiveType type, string name, Transform parent, Vector3 scale)
         {
             var part = GameObject.CreatePrimitive(type);
             part.name = name;
+            part.GetComponent<Renderer>().sharedMaterial = body.sharedMaterial;
             var collider = part.GetComponent<Collider>();
             collider.enabled = false;
             Destroy(collider);
@@ -52,6 +53,8 @@ namespace HakoOnna.Multiplayer
             var lens = Primitive(PrimitiveType.Cylinder, "Lens", lampModel, new Vector3(.065f, .018f, .065f));
             lens.localRotation = barrel.localRotation;
             lens.localPosition = Vector3.forward * .08f;
+            finish.SetColor("_BaseColor", new Color(.72f, .79f, .83f));
+            lens.GetComponent<Renderer>().SetPropertyBlock(finish);
             var emitter = new GameObject("Beam").transform;
             emitter.SetParent(lampModel, false);
             emitter.localPosition = Vector3.forward * .11f;

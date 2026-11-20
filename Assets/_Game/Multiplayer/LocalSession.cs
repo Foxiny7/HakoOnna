@@ -120,7 +120,9 @@ namespace HakoOnna.Multiplayer
             if (TestBox >= 0) { mode = "host"; playHider = false; }
             spawnSlots.Clear();
             hiderClient = null;
-            manager.NetworkConfig.ConnectionData = new byte[] { (byte)(playHider ? 1 : 0) };
+            bool asHider = playHider || mode == "hider";
+            if (mode == "hider") mode = "host";
+            manager.NetworkConfig.ConnectionData = new byte[] { (byte)(asHider ? 1 : 0) };
             status = mode + " starting...";
             foreach (var door in Doors) door.SetOpenImmediate(door.StartsOpen);
             if (mode == "host" || mode == "server")
@@ -265,7 +267,9 @@ namespace HakoOnna.Multiplayer
             else
             {
                 GUI.enabled = ready && manager != null && !manager.ShutdownInProgress;
-                playHider = GUILayout.Toggle(playHider, "Play as Hako Onna (one per house)");
+                if (GUILayout.Button("Play as Hako Onna"))
+                    StartSession("hider");
+                playHider = GUILayout.Toggle(playHider, "Choose Hako Onna for Host / Join");
                 if (GUILayout.Button("Test occupied container (solo)"))
                     StartSession("occupied");
                 if (GUILayout.Button("Host on this PC"))
