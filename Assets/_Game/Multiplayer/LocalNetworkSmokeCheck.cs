@@ -28,6 +28,8 @@ namespace HakoOnna.Multiplayer
             public int peakPlayers;
             public float localDistance;
             public int activeCameras;
+            public bool keptFull, swapped, contested;
+            public int occupied, groundCount, held;
             public bool actor, sawOpen, sawClose, exchanged;
             public bool jumped, tired, recovered, doorClosed;
             public List<string> errors;
@@ -41,6 +43,10 @@ namespace HakoOnna.Multiplayer
         private Vector3 localStart;
         private bool recordedStart;
         private bool reported;
+        private bool groundCheck, keptFull, swapped, contested;
+        private int groundStep;
+        private ulong raceId;
+        private Vector3 raceDirection;
         private bool containerCheck, positioned, actor, sawOpen, sawClose, exchanged;
         private int searchStep;
         private bool jumped, tired, recovered, doorClosed, nearDoor, jumpSent;
@@ -54,6 +60,7 @@ namespace HakoOnna.Multiplayer
 
             var check = new GameObject("LocalNetworkSmokeCheck").AddComponent<LocalNetworkSmokeCheck>();
             check.reportPath = path;
+            check.groundCheck = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-hakoGroundSmoke") >= 0;
             check.containerCheck = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-hakoContainerSmoke") >= 0;
             check.expectedPlayers = int.Parse(LocalSession.Argument("-hakoSmokePlayers"));
             DontDestroyOnLoad(check);
@@ -94,6 +101,11 @@ namespace HakoOnna.Multiplayer
 
             var elapsed = Time.unscaledTime - allConnectedAt;
             var local = manager.LocalClient?.PlayerObject?.GetComponent<NetworkPlayer>();
+            if (groundCheck)
+            {
+                CheckGround(manager, players, local, elapsed);
+                return;
+            }
             if (containerCheck)
             {
                 var containers = FindFirstObjectByType<LocalSession>().Containers;
@@ -163,6 +175,64 @@ namespace HakoOnna.Multiplayer
                 WriteReport(manager, players);
         }
 
+        private void CheckGround(NetworkManager manager, NetworkPlayer[] players, NetworkPlayer local, float elapsed)
+        {
+            var first = players.OrderBy(p => p.OwnerClientId).First();
+            if (manager.IsServer && !positioned)
+            {
+                var second = players.First(p => p != first);
+                var controller = second.GetComponent<CharacterController>();
+                controller.enabled = false;
+                second.transform.position = first.transform.position + Vector3.right * .85f;
+                controller.enabled = true;
+                first.SeedExchangeTest(true);
+                second.SeedExchangeTest(false);
+                positioned = true;
+            }
+            if (elapsed > 16) { WriteReport(manager, players); return; }
+            if (!local) return;
+            bool fullPlayer = local == first;
+            var items = FindObjectsByType<GroundItem>(FindObjectsSortMode.None);
+            var key = items.FirstOrDefault(i => i.Kind.Value == HakoOnna.Rules.ItemKind.GateKey);
+            var diary = items.FirstOrDefault(i => i.Kind.Value == HakoOnna.Rules.ItemKind.Diary);
+            var eye = local.transform.position + Vector3.up * local.Config.EyeHeight;
+            if (groundStep == 0 && elapsed > 2)
+            {
+                if (!fullPlayer) local.DropGroundRpc();
+            }
+            else if (groundStep == 1 && elapsed > 3 && key)
+            {
+                if (fullPlayer) local.TakeGroundRpc(key.NetworkObjectId, (key.transform.position - eye).normalized);
+            }
+            else if (groundStep == 2 && elapsed > 5 && key)
+            {
+                keptFull = !fullPlayer || local.TestOccupied == 9;
+                if (fullPlayer) local.DropGroundRpc();
+            }
+            else if (groundStep == 3 && elapsed > 7 && (fullPlayer ? key : diary))
+            {
+                var target = fullPlayer ? key : diary;
+                local.TakeGroundRpc(target.NetworkObjectId, (target.transform.position - eye).normalized);
+            }
+            else if (groundStep == 4 && elapsed > 9)
+            {
+                swapped = local.TestHeld == (int)(fullPlayer ? HakoOnna.Rules.ItemKind.GateKey : HakoOnna.Rules.ItemKind.Diary);
+                local.DropGroundRpc();
+            }
+            else if (groundStep == 5 && elapsed > 11 && diary)
+            {
+                raceId = diary.NetworkObjectId;
+                raceDirection = (diary.transform.position - eye).normalized;
+            }
+            else if (groundStep == 6 && elapsed > 13)
+            {
+                local.TakeGroundRpc(raceId, raceDirection);
+                contested = true;
+            }
+            else return;
+            groundStep++;
+        }
+
         private void WriteReport(NetworkManager manager, NetworkPlayer[] players)
         {
             reported = true;
@@ -178,6 +248,19 @@ namespace HakoOnna.Multiplayer
                 jumped = jumped, tired = tired, recovered = recovered, doorClosed = doorClosed
             };
             var local = manager?.LocalClient?.PlayerObject;
+            if (groundCheck)
+            {
+                report.keptFull = keptFull;
+                report.swapped = swapped;
+                report.contested = contested;
+                report.groundCount = FindObjectsByType<GroundItem>(FindObjectsSortMode.None).Length;
+                if (local)
+                {
+                    var owner = local.GetComponent<NetworkPlayer>();
+                    report.held = owner.TestHeld;
+                    report.occupied = owner.TestOccupied;
+                }
+            }
             if (local != null)
                 report.localDistance = Vector3.Distance(localStart, local.transform.position);
 

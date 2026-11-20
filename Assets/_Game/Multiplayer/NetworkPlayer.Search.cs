@@ -19,6 +19,7 @@ namespace HakoOnna.Multiplayer
         private int requested = -1;
         private int aimed = -1;
         private int aimedDoor = -1;
+        private GroundItem aimedGround;
         private bool deep;
         private double serverStart;
         private float duration;
@@ -60,12 +61,21 @@ namespace HakoOnna.Multiplayer
             => LookTarget(direction, out _);
 
         private int LookTarget(Vector3 direction, out int door)
+            => LookTarget(direction, out door, out _);
+
+        private int LookTarget(Vector3 direction, out int door, out GroundItem ground)
         {
             var eye = transform.position + Vector3.up * config.EyeHeight;
             var ray = new Ray(eye, direction);
             Physics.Raycast(ray, out var hit, config.SearchReach,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            ground = null;
+            if (Physics.Raycast(ray, out var itemHit, hit.collider ? hit.distance : config.SearchReach,
+                Physics.IgnoreRaycastLayer, QueryTriggerInteraction.Collide) &&
+                itemHit.collider.TryGetComponent(out ground))
+                hit = itemHit;
             door = FindDoorAtFrame(session.Doors, ray, config.SearchReach, hit);
+            if (door >= 0) ground = null;
             if (door >= 0 || !hit.collider) return -1;
             var visual = hit.collider.GetComponentInParent<HakoOnna.Art.ContainerVisual>();
             return visual ? System.Array.IndexOf(session.Containers, visual) : -1;
@@ -79,7 +89,8 @@ namespace HakoOnna.Multiplayer
                 ReadEquipmentKeys(keyboard);
             var direction = Quaternion.Euler(pitch, yaw, 0) * Vector3.forward;
             aimedDoor = -1;
-            aimed = focused && requested < 0 ? LookTarget(direction, out aimedDoor) : -1;
+            aimedGround = null;
+            aimed = focused && requested < 0 ? LookTarget(direction, out aimedDoor, out aimedGround) : -1;
             if (requested >= 0)
             {
                 if (!focused || keyboard.escapeKey.wasPressedThisFrame ||
@@ -92,6 +103,10 @@ namespace HakoOnna.Multiplayer
                 else if (Observing && keyboard.gKey.wasPressedThisFrame)
                     ExchangeRpc(requested, false);
             }
+            else if (aimedGround && keyboard.eKey.wasPressedThisFrame)
+                TakeGroundRpc(aimedGround.NetworkObjectId, direction);
+            else if (focused && keyboard.gKey.wasPressedThisFrame)
+                DropGroundRpc();
             else if (aimedDoor >= 0 && keyboard.eKey.wasPressedThisFrame)
                 UseDoorRpc(aimedDoor, direction);
             else if (aimed >= 0 && (keyboard.eKey.wasPressedThisFrame || keyboard.rKey.wasPressedThisFrame))
@@ -313,6 +328,15 @@ namespace HakoOnna.Multiplayer
                 return;
             }
             GUI.Label(new Rect(Screen.width / 2 - 4, Screen.height / 2 - 10, 20, 24), "+");
+            if (aimedGround && requested < 0)
+            {
+                bool full = true;
+                foreach (var item in slots)
+                    if (item < 0) { full = false; break; }
+                GUI.Box(new Rect(Screen.width / 2 - 110, Screen.height / 2 + 18, 220, 24),
+                    full ? "Inventory full" : "E  |  Take " + aimedGround.Kind.Value);
+                return;
+            }
             if (aimedDoor >= 0 && requested < 0)
             {
                 var door = session.Doors[aimedDoor];

@@ -28,6 +28,7 @@ namespace HakoOnna.Multiplayer
 
         public bool Ready => ready;
         internal ContainerVisual[] Containers { get; private set; }
+        internal GameObject GroundPrefab { get; private set; }
         internal DoorVisual[] Doors { get; private set; }
         internal MatchRules Rules { get; private set; }
 
@@ -36,6 +37,7 @@ namespace HakoOnna.Multiplayer
             Application.runInBackground = true;
             Application.targetFrameRate = 60;
             manager = GetComponent<NetworkManager>();
+            GroundPrefab = Resources.Load<GameObject>("GroundItem");
             manager.ConnectionApprovalCallback = ApproveConnection;
             manager.OnClientConnectedCallback += OnConnected;
             manager.OnClientDisconnectCallback += OnDisconnected;
@@ -193,7 +195,7 @@ namespace HakoOnna.Multiplayer
             {
                 GUILayout.Label("Players visible: " + FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None).Length);
                 GUILayout.Label("WASD move | Shift run | Space jump | Esc release cursor");
-                GUILayout.Label("1–9 / Wheel: Equip   |   T: Flashlight");
+                GUILayout.Label("1–9 / Wheel: Equip   |   T: Flashlight   |   G: Drop");
                 if (Cursor.lockState == CursorLockMode.None && GUILayout.Button("Capture mouse"))
                 {
                     Cursor.lockState = CursorLockMode.Locked;

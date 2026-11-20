@@ -237,6 +237,25 @@ namespace HakoOnna.Rules
 
             internal ItemKind?[] Items { get; }
             public int PickupSlot(int selected) => Inventory[selected].HasValue ? Array.IndexOf(Items, null) : selected;
+            public bool TryDrop(int slot, out ItemKind kind)
+            {
+                kind = default;
+                if (Role != Role.Explorer || SearchContainerId.HasValue ||
+                    slot < 0 || slot >= Items.Length || !Items[slot].HasValue) return false;
+                kind = Items[slot].Value;
+                Items[slot] = null;
+                return true;
+            }
+
+            public int Receive(ItemKind kind, int selected)
+            {
+                if (Role != Role.Explorer || SearchContainerId.HasValue ||
+                    selected < 0 || selected >= Items.Length) return -1;
+                int slot = PickupSlot(selected);
+                if (slot >= 0) Items[slot] = kind;
+                return slot;
+            }
+
             internal int? SearchContainerId { get; set; }
             internal double NextTransferAt { get; set; }
         }

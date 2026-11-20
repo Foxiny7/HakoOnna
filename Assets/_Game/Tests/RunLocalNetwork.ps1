@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('host','server')]
     [string]$Mode,
-    [switch]$Containers
+    [switch]$Containers,
+    [switch]$Ground
 )
 $ErrorActionPreference = 'Stop'
 $project = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../..')).ProviderPath
@@ -17,6 +18,7 @@ function Start-Peer([string]$Role, [int]$Index) {
     $arguments = @('-batchmode', '-nographics', '-hakoMode', $Role,
         '-hakoSmoke', ('"{0}"' -f $report), '-hakoSmokePlayers', '2',
         '-logFile', ('"{0}"' -f $log))
+    if ($Ground) { $arguments += '-hakoGroundSmoke' }
     if ($Containers) { $arguments += '-hakoContainerSmoke' }
     $process = Start-Process -FilePath $executable -ArgumentList $arguments -WindowStyle Hidden -PassThru
     return [pscustomobject]@{ Process = $process; Report = $report; Role = $Role }
@@ -37,7 +39,12 @@ try {
         $report = Get-Content -Raw -LiteralPath $peer.Report | ConvertFrom-Json
         if ($report.errors.Count -ne 0) { throw ($report.errors -join [Environment]::NewLine) }
         if ($report.peakPlayers -ne 2) { throw "$($peer.Role): expected two players." }
-        if ($Containers) {
+        if ($Ground) {
+            if ($report.groundCount -ne 1 -or ($report.client -and
+                (!$report.keptFull -or !$report.swapped -or !$report.contested))) {
+                throw "Ground exchange failed on $($peer.Role). See $($peer.Report)"
+            }
+        } elseif ($Containers) {
             if (!$report.sawOpen -or !$report.sawClose -or !$report.doorClosed -or ($report.actor -and !$report.exchanged)) {
                 throw "Container interaction failed on $($peer.Role). See $($peer.Report)"
             }
@@ -65,7 +72,12 @@ try {
             if ($distance -gt 0.15) { throw "Player $($player.owner) observer differs by $distance metres." }
         }
     }
-    if ($Containers) { "PASS $Mode with 2 players: container opened, exchanged item, closed on all peers." }
+    if ($Ground) {
+        $owners = @($reports | Where-Object client)
+        if (($owners.occupied | Measure-Object -Sum).Sum -ne 10 -or
+            @($owners | Where-Object { $_.held -eq 3 }).Count -ne 1) { throw 'Contested diary lost or duplicated.' }
+        "PASS $Mode ground exchange, full inventory and competing pickups."
+    } elseif ($Containers) { "PASS $Mode with 2 players: container opened, exchanged item, closed on all peers." }
     else { "PASS $Mode with 2 players: owner input, server movement, room collision, replicated positions." }
     "Reports: $runDirectory"
 } finally {

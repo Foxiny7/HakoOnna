@@ -27,6 +27,20 @@ namespace HakoOnna.Tests
         }
 
         [Test]
+        public void GroundExchangeUsesAvailableSlotAndLeavesFullBagUntouched()
+        {
+            var full = rules.AddExplorer(8, ItemKind.Diary, ItemKind.GateKey, ItemKind.Remains, ItemKind.MaryDoll,
+                ItemKind.Gasoline, ItemKind.Pliers, ItemKind.RustyChain, ItemKind.WhiteWoodenStake);
+            Assert.That(full.Receive(ItemKind.Diary, 3), Is.EqualTo(-1));
+            Assert.That(full.TryDrop(5, out var dropped), Is.True);
+            Assert.That(dropped, Is.EqualTo(ItemKind.Pliers));
+            Assert.That(full.TryDrop(5, out _), Is.False);
+            Assert.That(full.Receive(ItemKind.Diary, 3), Is.EqualTo(5));
+            Assert.That(full.Inventory[3], Is.EqualTo(ItemKind.MaryDoll));
+            Assert.That(full.Inventory[5], Is.EqualTo(ItemKind.Diary));
+        }
+
+        [Test]
         public void OnlySearcherCanExchangeAfterOpeningAndDisconnectReleasesContainer()
         {
             var other = rules.AddExplorer(3);

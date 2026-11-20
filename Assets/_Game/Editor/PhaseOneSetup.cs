@@ -48,6 +48,34 @@ namespace HakoOnna.EditorTools
             AssetDatabase.SaveAssets();
         }
 
+        public static void CreateGroundItemPrefab()
+        {
+            const string folder = "Assets/_Game/Resources";
+            const string path = folder + "/GroundItem.prefab";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(path)) return;
+            if (!AssetDatabase.IsValidFolder(folder)) AssetDatabase.CreateFolder("Assets/_Game", "Resources");
+            var root = new GameObject("GroundItem");
+            root.layer = LayerMask.NameToLayer("Ignore Raycast");
+            var target = root.AddComponent<BoxCollider>();
+            target.isTrigger = true;
+            target.size = new Vector3(.28f, .16f, .30f);
+            root.AddComponent<NetworkObject>();
+            root.AddComponent<GroundItem>();
+            foreach (var name in new[] { "Flashlight", "Parcel" })
+            {
+                bool lamp = name == "Flashlight";
+                var mesh = GameObject.CreatePrimitive(lamp ? PrimitiveType.Cylinder : PrimitiveType.Cube);
+                mesh.name = name;
+                mesh.transform.SetParent(root.transform, false);
+                UnityEngine.Object.DestroyImmediate(mesh.GetComponent<Collider>());
+                mesh.transform.localScale = lamp ? new Vector3(.09f, .13f, .09f) : new Vector3(.22f, .08f, .16f);
+                if (lamp) mesh.transform.localRotation = Quaternion.Euler(90, 0, 0);
+            }
+            PrefabUtility.SaveAsPrefabAsset(root, path);
+            UnityEngine.Object.DestroyImmediate(root);
+            AssetDatabase.SaveAssets();
+        }
+
         private static void EnsureBuildScenes()
         {
             PlayerSettings.runInBackground = true;
