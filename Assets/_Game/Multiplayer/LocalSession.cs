@@ -34,6 +34,7 @@ namespace HakoOnna.Multiplayer
         public bool Ready => ready;
         internal ContainerVisual[] Containers { get; private set; }
         internal GameObject GroundPrefab { get; private set; }
+        internal HouseFoley Foley { get; private set; }
         internal HiderRoutes Routes { get; private set; }
         internal DoorVisual[] Doors { get; private set; }
         internal MatchRules Rules { get; private set; }
@@ -57,8 +58,12 @@ namespace HakoOnna.Multiplayer
             Containers = GameObject.Find("House_Blockout/Containers").GetComponentsInChildren<ContainerVisual>();
             Routes = new HiderRoutes(Containers);
             Doors = GameObject.Find("House_Blockout").GetComponentsInChildren<DoorVisual>();
+            Foley = new HouseFoley(GameObject.Find("House_Blockout").transform);
             foreach (var container in Containers)
+            {
                 ConfigureDrawer(container);
+                HouseFoley.Bind(container);
+            }
             ZashikiArt.DressAlcove(GameObject.Find("House_Blockout/Props/Zashiki_Tokonoma").transform);
             if (debugAmbientFill)
             {

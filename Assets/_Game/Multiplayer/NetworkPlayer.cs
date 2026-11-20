@@ -149,6 +149,7 @@ namespace HakoOnna.Multiplayer
                 if (stamina.Value >= config.ResumeStamina) exhausted.Value = false;
             }
             TickSearch();
+            TickFootsteps(transform.position - previous, (flags & CollisionFlags.Below) != 0, running);
         }
 
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
