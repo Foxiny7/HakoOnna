@@ -12,7 +12,7 @@ namespace HakoOnna.Multiplayer
         private Transform view, body;
         private GhostSight sight;
         private int selected = -1, hovered = -1;
-        private float yaw, pitch = 16;
+        private float yaw, pitch;
         private string feedback = "";
         internal int Current => container.Value;
 
@@ -40,8 +40,8 @@ namespace HakoOnna.Multiplayer
             body.gameObject.SetActive(true);
             sight = new GhostSight(view.GetComponent<Camera>(), body, session);
             MoveView(-1, Current);
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
 
         private void MoveView(int previous, int next)
@@ -54,10 +54,18 @@ namespace HakoOnna.Multiplayer
             var size = new Vector3(session.Config.PlayerRadius * 2, session.Config.PlayerHeight, session.Config.PlayerRadius * 2);
             float fit = .85f * Mathf.Min(bounds.size.x / size.x, bounds.size.y / size.y, bounds.size.z / size.z, 1f);
             body.localScale = new Vector3(size.x, size.y / 2, size.z) * fit;
-            yaw = marker.eulerAngles.y + 180;
-            pitch = 16;
+            yaw = marker.eulerAngles.y;
+            pitch = 0;
+            float head = body.localScale.y;
+            float clearance = Mathf.Min(.06f, (bounds.extents.y - head) * .5f);
+            // Show the torso below eye level; the cylinder's flat head would cover the lower view.
+            var torso = body.localScale;
+            torso.y *= .55f;
+            body.localScale = torso;
+            body.position -= Vector3.up * (head - torso.y);
+            view.SetPositionAndRotation(bounds.center + Vector3.up * (head + clearance),
+                Quaternion.Euler(pitch, yaw, 0));
             sight?.Show(next);
-            Orbit();
             feedback = "";
         }
 
@@ -87,31 +95,28 @@ namespace HakoOnna.Multiplayer
         [Rpc(SendTo.Owner)]
         private void DeniedRpc() => feedback = "Transfer unavailable.";
 
-        private void Orbit()
-        {
-            var rotation = Quaternion.Euler(pitch, yaw, 0);
-            var eye = body.position;
-            float distance = 2.6f;
-            if (Physics.SphereCast(eye, .10f, rotation * Vector3.back, out var hit, distance,
-                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
-                distance = Mathf.Clamp(hit.distance - .08f, .65f, distance);
-            view.SetPositionAndRotation(eye - rotation * Vector3.forward * distance, rotation);
-        }
-
         private void Update()
         {
             if (!IsOwner || !IsSpawned || Application.isBatchMode || !Application.isFocused) return;
             var mouse = Mouse.current;
             if (sight == null || mouse == null) return;
-            if (mouse.rightButton.isPressed)
+            if (Keyboard.current?.escapeKey.wasPressedThisFrame == true)
             {
-                var delta = mouse.delta.ReadValue() * session.Config.MouseSensitivity;
-                yaw += delta.x;
-                pitch = Mathf.Clamp(pitch - delta.y, -75, 75);
-                Orbit();
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
             }
-            var pointer = mouse.position.ReadValue();
-            hovered = sight.Pick(pointer, Current, selected, mouse.leftButton.wasPressedThisFrame);
+            if (Cursor.lockState != CursorLockMode.Locked)
+            {
+                hovered = -1;
+                return;
+            }
+
+            var delta = mouse.delta.ReadValue() * session.Config.MouseSensitivity;
+            yaw = Mathf.Repeat(yaw + delta.x, 360f);
+            pitch = Mathf.Clamp(pitch - delta.y, -85, 85);
+            view.rotation = Quaternion.Euler(pitch, yaw, 0);
+            var center = new Vector2(Screen.width * .5f, Screen.height * .5f);
+            hovered = sight.Pick(center, Current, selected, mouse.leftButton.wasPressedThisFrame);
             if (mouse.leftButton.wasPressedThisFrame && hovered >= 0)
             {
                 selected = hovered;
@@ -127,6 +132,8 @@ namespace HakoOnna.Multiplayer
             if (!IsSpawned || !IsOwner || Application.isBatchMode || Current < 0) return;
             sight?.DrawPeriphery();
             sight?.DrawMarkers(Current, selected);
+            if (Cursor.lockState == CursorLockMode.Locked)
+                GUI.Label(new Rect(Screen.width / 2 - 4, Screen.height / 2 - 10, 20, 24), "+");
             var panel = new Rect((Screen.width - 430) / 2, Screen.height - 87, 430, 78);
             GUILayout.BeginArea(panel, GUI.skin.box);
             GUILayout.Label("GHOST SIGHT   /   " + session.Containers[Current].transform.parent.name);
@@ -135,7 +142,13 @@ namespace HakoOnna.Multiplayer
                 hovered >= 0 ? session.Containers[hovered].transform.parent.name : "";
             GUILayout.Label(wait > 0 ? $"Recovering  {wait:F1}s" : feedback.Length > 0 ? feedback :
                 target.Length > 0 ? target + (selected >= 0 ? "   [E] Transfer" : "   [Click] Select") : "Look for a cyan container");
-            GUILayout.Label("Hold RMB: orbit    /    Click: select    /    E: transfer");
+            if (Cursor.lockState == CursorLockMode.Locked)
+                GUILayout.Label("Mouse: look    /    Click: select    /    E: transfer    /    Esc: cursor");
+            else if (GUILayout.Button("Resume mouse look"))
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
             GUILayout.EndArea();
         }
 
