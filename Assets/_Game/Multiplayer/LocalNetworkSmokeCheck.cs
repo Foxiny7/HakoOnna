@@ -59,6 +59,15 @@ namespace HakoOnna.Multiplayer
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Initialize()
         {
+            var shot = LocalSession.Argument("-hakoVisionShot");
+            if (!string.IsNullOrEmpty(shot))
+            {
+                var review = new GameObject("Ghost vision capture").AddComponent<LocalNetworkSmokeCheck>();
+                review.enabled = false;
+                review.StartCoroutine(review.CaptureVision(shot));
+                DontDestroyOnLoad(review);
+                return;
+            }
             var path = LocalSession.Argument("-hakoSmoke");
             if (string.IsNullOrEmpty(path))
                 return;
@@ -70,6 +79,28 @@ namespace HakoOnna.Multiplayer
             check.containerCheck = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-hakoContainerSmoke") >= 0;
             check.expectedPlayers = int.Parse(LocalSession.Argument("-hakoSmokePlayers"));
             DontDestroyOnLoad(check);
+        }
+
+        private System.Collections.IEnumerator CaptureVision(string path)
+        {
+            while (!FindFirstObjectByType<NetworkHider>() || !Camera.allCameras.Any(camera => camera.name == "HiderView"))
+                yield return null;
+            yield return new WaitForSeconds(1);
+            yield return new WaitForEndOfFrame();
+            var camera = Camera.allCameras.First(c => c.name == "HiderView");
+            var frame = RenderTexture.GetTemporary(1100, 700, 24, RenderTextureFormat.ARGB32);
+            var previous = RenderTexture.active;
+            var request = new UnityEngine.Rendering.RenderPipeline.StandardRequest { destination = frame };
+            UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(camera, request);
+            RenderTexture.active = frame;
+            var image = new Texture2D(frame.width, frame.height, TextureFormat.RGB24, false);
+            image.ReadPixels(new Rect(0, 0, frame.width, frame.height), 0, 0);
+            image.Apply();
+            File.WriteAllBytes(path, image.EncodeToPNG());
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(frame);
+            Destroy(image);
+            Application.Quit();
         }
 
         private void Awake()
@@ -94,6 +125,25 @@ namespace HakoOnna.Multiplayer
                 return;
             var manager = NetworkManager.Singleton;
             var players = FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None);
+            var session = FindFirstObjectByType<LocalSession>();
+            if (session && session.Ready && session.TestBox >= 0 && players.Length == 1)
+            {
+                if (allConnectedAt < 0) allConnectedAt = Time.unscaledTime;
+                var box = session.Containers[session.TestBox];
+                var drawer = box.transform.Find("Drawer_2");
+                if (!positioned)
+                {
+                    localStart = drawer.localPosition;
+                    box.GrabPlayed += () => exchanged = true;
+                    positioned = true;
+                }
+                if (Time.unscaledTime - allConnectedAt > 1 && searchStep == 0)
+                    players[0].CheckContainerExchange(box, session.TestBox, ref searchStep, ref actor);
+                sawOpen |= exchanged && (drawer.localPosition - localStart).magnitude > .05f;
+                sawClose |= sawOpen && (drawer.localPosition - localStart).magnitude < .005f;
+                if (Time.unscaledTime - allConnectedAt > 9) WriteReport(manager, players);
+                return;
+            }
             if (hiderCheck)
             {
                 CheckHider(manager, players);
@@ -206,9 +256,9 @@ namespace HakoOnna.Multiplayer
                 if (nearby == null)
                 {
                     initialBox = hider.Current;
-                    nearby = Enumerable.Range(0, session.Containers.Length).Where(i => i != initialBox)
+                    nearby = Enumerable.Range(0, session.Containers.Length).Where(i => session.Routes.Allows(initialBox, i))
                         .OrderBy(i => (session.Containers[i].transform.position - explorer.transform.position).sqrMagnitude)
-                        .Take(3).ToArray();
+                        .Take(2).Append(initialBox).ToArray();
                     if (manager.IsServer)
                         session.Rules.ReserveSearch((int)explorer.OwnerClientId, nearby[0], HakoOnna.Rules.SearchKind.Normal);
                 }
@@ -216,6 +266,8 @@ namespace HakoOnna.Multiplayer
                 {
                     if (hiderStep == 0 && elapsed > 2)
                     {
+                        int far = Enumerable.Range(0, session.Containers.Length).First(i => i != initialBox && !session.Routes.Allows(initialBox, i));
+                        hider.Transfer(far);
                         hider.Transfer(nearby[0]);
                         hiderStep++;
                     }

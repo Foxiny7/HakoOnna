@@ -6,6 +6,7 @@
     "HakoOnna.Art",
     "Unity.Netcode.Runtime",
     "Unity.Networking.Transport",
-    "Unity.InputSystem"
+    "Unity.InputSystem",
+    "Unity.RenderPipelines.Universal.Runtime"
   ]
 }

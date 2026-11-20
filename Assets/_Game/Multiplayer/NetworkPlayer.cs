@@ -41,6 +41,14 @@ namespace HakoOnna.Multiplayer
             serverYaw = yaw;
             InitializeSearch();
             InitializeEquipment();
+            if (session.TestBox >= 0 && IsOwner)
+            {
+                var target = session.Containers[session.TestBox].GetComponentInChildren<Collider>().bounds.center;
+                var look = Quaternion.LookRotation(target - playerCamera.transform.position).eulerAngles;
+                pitch = Mathf.DeltaAngle(0, look.x);
+                yaw = look.y;
+                ToggleLampRpc();
+            }
             if (IsOwner && !IsServer) RequestDoorsRpc();
             if (IsOwner && !Application.isBatchMode)
             {

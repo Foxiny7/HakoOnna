@@ -25,6 +25,8 @@ namespace HakoOnna.Multiplayer
         private Camera previewCamera;
         private ulong? hiderClient;
         private bool playHider;
+        internal int TestBox { get; private set; } = -1;
+        internal bool CanReplayGrab { get; set; }
         internal GameConfig Config => manager.NetworkConfig.PlayerPrefab.GetComponent<NetworkPlayer>().Config;
         private bool ready;
         private string status = "Loading house...";
@@ -32,6 +34,7 @@ namespace HakoOnna.Multiplayer
         public bool Ready => ready;
         internal ContainerVisual[] Containers { get; private set; }
         internal GameObject GroundPrefab { get; private set; }
+        internal HiderRoutes Routes { get; private set; }
         internal DoorVisual[] Doors { get; private set; }
         internal MatchRules Rules { get; private set; }
 
@@ -52,6 +55,7 @@ namespace HakoOnna.Multiplayer
             var house = SceneManager.GetSceneByPath(HouseScene);
             SceneManager.SetActiveScene(house);
             Containers = GameObject.Find("House_Blockout/Containers").GetComponentsInChildren<ContainerVisual>();
+            Routes = new HiderRoutes(Containers);
             Doors = GameObject.Find("House_Blockout").GetComponentsInChildren<DoorVisual>();
             foreach (var container in Containers)
                 ConfigureDrawer(container);
@@ -111,6 +115,9 @@ namespace HakoOnna.Multiplayer
             if (!ready || manager.IsListening || manager.ShutdownInProgress)
                 return;
 
+            CanReplayGrab = false;
+            TestBox = mode == "occupied" ? Array.FindIndex(Containers, c => c.transform.parent.name == "Zashiki_Tansu_02") : -1;
+            if (TestBox >= 0) { mode = "host"; playHider = false; }
             spawnSlots.Clear();
             hiderClient = null;
             manager.NetworkConfig.ConnectionData = new byte[] { (byte)(playHider ? 1 : 0) };
@@ -122,6 +129,7 @@ namespace HakoOnna.Multiplayer
                 Rules = new MatchRules(config.ToRulesSettings(), ItemKind.Gasoline);
                 for (var i = 0; i < Containers.Length; i++)
                     Rules.AddContainer(i);
+                if (TestBox >= 0) Rules.PlaceHakoOnna(-1, TestBox);
             }
             bool started;
             switch (mode)
@@ -137,6 +145,13 @@ namespace HakoOnna.Multiplayer
                 status = "Local server running";
         }
 
+        internal IEnumerator PlayOccupied(int id, Transform victim)
+        {
+            CanReplayGrab = false;
+            yield return OccupiedOpening.Play(Containers[id], victim);
+            CanReplayGrab = id == TestBox;
+        }
+
         public void Disconnect()
         {
             manager.Shutdown();
@@ -148,6 +163,12 @@ namespace HakoOnna.Multiplayer
         private void ApproveConnection(NetworkManager.ConnectionApprovalRequest request,
             NetworkManager.ConnectionApprovalResponse response)
         {
+            if (TestBox >= 0 && request.ClientNetworkId != NetworkManager.ServerClientId)
+            {
+                response.Approved = false;
+                response.Reason = "Solo animation test.";
+                return;
+            }
             if (request.Payload is { Length: 1 } && request.Payload[0] == 1)
             {
                 response.Approved = !hiderClient.HasValue;
@@ -169,6 +190,12 @@ namespace HakoOnna.Multiplayer
             spawnSlots.Add(request.ClientNetworkId, slot);
             response.Position = spawnPoints[slot].position + Vector3.up * 0.05f;
             response.Rotation = spawnPoints[slot].rotation;
+            if (TestBox >= 0)
+            {
+                var marker = Containers[TestBox].transform.parent.Find("InteractPoint");
+                response.Position = marker.position + marker.forward * .22f + Vector3.up * .05f;
+                response.Rotation = Quaternion.LookRotation(-marker.forward);
+            }
         }
 
         private void OnConnected(ulong clientId)
@@ -215,7 +242,7 @@ namespace HakoOnna.Multiplayer
             {
                 GUILayout.Label("Explorers visible: " + FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None).Length);
                 if (manager.LocalClient?.PlayerObject && manager.LocalClient.PlayerObject.GetComponent<NetworkHider>())
-                    GUILayout.Label("Hako Onna  |  Select a container to transfer");
+                    GUILayout.Label("Hako Onna  |  Click a highlighted container, then E");
                 else
                 {
                     GUILayout.Label("WASD move | Shift run | Space jump | Esc release cursor");
@@ -226,6 +253,12 @@ namespace HakoOnna.Multiplayer
                         Cursor.visible = false;
                     }
                 }
+                if (TestBox >= 0)
+                {
+                    GUILayout.Label("Occupied box test   |   Aim at the drawer and hold E");
+                    if (CanReplayGrab && GUILayout.Button("Replay occupied opening"))
+                        StartCoroutine(PlayOccupied(TestBox, manager.LocalClient.PlayerObject.transform));
+                }
                 if (GUILayout.Button("Disconnect"))
                     Disconnect();
             }
@@ -233,6 +266,8 @@ namespace HakoOnna.Multiplayer
             {
                 GUI.enabled = ready && manager != null && !manager.ShutdownInProgress;
                 playHider = GUILayout.Toggle(playHider, "Play as Hako Onna (one per house)");
+                if (GUILayout.Button("Test occupied container (solo)"))
+                    StartSession("occupied");
                 if (GUILayout.Button("Host on this PC"))
                     StartSession("host");
                 if (GUILayout.Button("Join 127.0.0.1"))

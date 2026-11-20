@@ -25,6 +25,44 @@ namespace HakoOnna.Tests
         }
 
         [Test]
+        public void AllHouseContainersReachEachOtherInLocalSteps()
+        {
+            var house = UnityEditor.SceneManagement.EditorSceneManager.OpenPreviewScene(LocalSession.HouseScene);
+            try
+            {
+                var root = System.Array.Find(house.GetRootGameObjects(), obj => obj.name == "House_Blockout");
+                var boxes = root.GetComponentsInChildren<HakoOnna.Art.ContainerVisual>();
+                Assert.AreEqual(45, boxes.Length);
+                var graph = new HiderRoutes(boxes);
+                for (int start = 0; start < boxes.Length; start++)
+                {
+                    bool distant = false;
+                    var visited = new System.Collections.Generic.HashSet<int> { start };
+                    var queue = new System.Collections.Generic.Queue<int>();
+                    queue.Enqueue(start);
+                    while (queue.Count > 0)
+                    {
+                        int from = queue.Dequeue();
+                        for (int j = 0; j < boxes.Length; j++)
+                        {
+                            if (from == start && j != start)
+                            {
+                                if (boxes[j].transform.parent.name.Split('_')[0] == boxes[from].transform.parent.name.Split('_')[0])
+                                    Assert.IsTrue(graph.Allows(from,j));
+                                distant |= !graph.Allows(from,j);
+                            }
+                            Assert.AreEqual(graph.Allows(from,j), graph.Allows(j,from));
+                            if (graph.Allows(from,j) && visited.Add(j)) queue.Enqueue(j);
+                        }
+                    }
+                    Assert.IsTrue(distant);
+                    Assert.AreEqual(boxes.Length, visited.Count);
+                }
+            }
+            finally { UnityEditor.SceneManagement.EditorSceneManager.ClosePreviewScene(house); }
+        }
+
+        [Test]
         public void RollClipIsMonoForSpatialPlayback()
         {
             var roll = Resources.Load<AudioClip>("HiderRoll");

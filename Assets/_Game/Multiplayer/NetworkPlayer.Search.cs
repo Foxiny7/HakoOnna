@@ -170,6 +170,11 @@ namespace HakoOnna.Multiplayer
         {
             if (searching < 0)
                 return;
+            if (explorer.Role == Role.HakoBito && explorer.ContainerId == searching)
+            {
+                ShowOccupiedOpening();
+                return;
+            }
             if (approaching)
             {
                 var offset = standPoint.position - transform.position;
@@ -209,6 +214,11 @@ namespace HakoOnna.Multiplayer
                 return;
             }
             session.Rules.AdvanceTo(Time.realtimeSinceStartupAsDouble);
+            if (explorer.Role == Role.HakoBito && explorer.ContainerId == searching)
+            {
+                ShowOccupiedOpening();
+                return;
+            }
             if (openBox.Value < 0 && session.Rules.SearchProgress(searching) >= 1)
             {
                 openBox.Value = searching;
@@ -226,6 +236,30 @@ namespace HakoOnna.Multiplayer
             selected.Value = slot;
             lampOn.Value = false;
             UpdateItems();
+        }
+
+        private void ShowOccupiedOpening()
+        {
+            int id = searching;
+            EndServerSearch();
+            for (int i = 0; i < slots.Count; i++) slots[i] = -1;
+            heldItem.Value = -1;
+            lampOn.Value = false;
+            foreach (var peer in NetworkManager.ConnectedClientsList)
+            {
+                if (!peer.PlayerObject) continue;
+                bool watches = peer.ClientId == OwnerClientId ||
+                    (peer.PlayerObject.TryGetComponent<NetworkHider>(out var hider) ? hider.Current == id :
+                    Vector3.Distance(peer.PlayerObject.transform.position, session.Containers[id].transform.position) < 12);
+                if (watches) GrabRpc(id, RpcTarget.Single(peer.ClientId, RpcTargetUse.Temp));
+            }
+        }
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        private void GrabRpc(int id, RpcParams recipients = default)
+        {
+            if (IsOwner && requested == id) LeaveInspection();
+            session.StartCoroutine(session.PlayOccupied(id, transform));
         }
 
         private void UpdateItems()
