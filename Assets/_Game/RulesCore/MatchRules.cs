@@ -41,9 +41,11 @@ namespace HakoOnna.Rules
             return player;
         }
 
+        public bool CanHideIn(int containerId) => containers.TryGetValue(containerId, out var box) && !box.SearcherId.HasValue;
+
         public Player PlaceHakoOnna(int playerId, int containerId)
         {
-            if (hakoOnna != null || containers[containerId].SearcherId.HasValue)
+            if (hakoOnna != null || !CanHideIn(containerId))
                 throw new InvalidOperationException("Invalid initial Hako Onna placement.");
 
             var player = new Player(Role.HakoOnna, Array.Empty<ItemKind?>()) { ContainerId = containerId };
@@ -158,7 +160,7 @@ namespace HakoOnna.Rules
         {
             if (!players.TryGetValue(playerId, out var player) || !player.ContainerId.HasValue ||
                 player.ContainerId == destinationId || now < player.NextTransferAt ||
-                !containers.TryGetValue(destinationId, out var destination) || destination.SearcherId.HasValue)
+                !CanHideIn(destinationId))
                 return false;
 
             player.ContainerId = destinationId;

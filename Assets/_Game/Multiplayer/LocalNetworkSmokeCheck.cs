@@ -28,6 +28,8 @@ namespace HakoOnna.Multiplayer
             public int peakPlayers;
             public float localDistance;
             public int activeCameras;
+            public int hiderObjects, rolls, sector;
+            public bool hiderOwner, transferChecks;
             public bool keptFull, swapped, contested;
             public int occupied, groundCount, held;
             public bool actor, sawOpen, sawClose, exchanged;
@@ -43,6 +45,9 @@ namespace HakoOnna.Multiplayer
         private Vector3 localStart;
         private bool recordedStart;
         private bool reported;
+        private bool hiderCheck, blockedTransfer, cooldownHeld;
+        private int hiderStep, initialBox, expectedSector = -1;
+        private int[] nearby;
         private bool groundCheck, keptFull, swapped, contested;
         private int groundStep;
         private ulong raceId;
@@ -60,6 +65,7 @@ namespace HakoOnna.Multiplayer
 
             var check = new GameObject("LocalNetworkSmokeCheck").AddComponent<LocalNetworkSmokeCheck>();
             check.reportPath = path;
+            check.hiderCheck = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-hakoHiderSmoke") >= 0;
             check.groundCheck = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-hakoGroundSmoke") >= 0;
             check.containerCheck = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-hakoContainerSmoke") >= 0;
             check.expectedPlayers = int.Parse(LocalSession.Argument("-hakoSmokePlayers"));
@@ -88,6 +94,11 @@ namespace HakoOnna.Multiplayer
                 return;
             var manager = NetworkManager.Singleton;
             var players = FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None);
+            if (hiderCheck)
+            {
+                CheckHider(manager, players);
+                return;
+            }
             if (allConnectedAt < 0 && players.Length == expectedPlayers)
                 allConnectedAt = Time.unscaledTime;
 
@@ -175,6 +186,62 @@ namespace HakoOnna.Multiplayer
                 WriteReport(manager, players);
         }
 
+        private void CheckHider(NetworkManager manager, NetworkPlayer[] players)
+        {
+            var hider = FindFirstObjectByType<NetworkHider>();
+            bool ready = manager && manager.IsListening && players.Length == 1 &&
+                (!manager.IsServer || manager.ConnectedClientsList.Count == 2) &&
+                (!hider || hider.Current >= 0);
+            if (!ready)
+            {
+                if (Time.unscaledTime > 50) WriteReport(manager, players);
+                return;
+            }
+            if (allConnectedAt < 0) allConnectedAt = Time.unscaledTime;
+            float elapsed = Time.unscaledTime - allConnectedAt;
+            if (hider)
+            {
+                var session = FindFirstObjectByType<LocalSession>();
+                var explorer = players[0];
+                if (nearby == null)
+                {
+                    initialBox = hider.Current;
+                    nearby = Enumerable.Range(0, session.Containers.Length).Where(i => i != initialBox)
+                        .OrderBy(i => (session.Containers[i].transform.position - explorer.transform.position).sqrMagnitude)
+                        .Take(3).ToArray();
+                    if (manager.IsServer)
+                        session.Rules.ReserveSearch((int)explorer.OwnerClientId, nearby[0], HakoOnna.Rules.SearchKind.Normal);
+                }
+                if (hider.IsOwner)
+                {
+                    if (hiderStep == 0 && elapsed > 2)
+                    {
+                        hider.Transfer(nearby[0]);
+                        hiderStep++;
+                    }
+                    else if (hiderStep == 1 && elapsed > 4)
+                    {
+                        blockedTransfer = hider.Current == initialBox;
+                        hider.Transfer(nearby[1]);
+                        hider.Transfer(nearby[2]);
+                        hiderStep++;
+                    }
+                    else if (hiderStep == 2 && elapsed > 8)
+                    {
+                        cooldownHeld = hider.Current == nearby[1];
+                        hider.Transfer(nearby[2]);
+                        hiderStep++;
+                    }
+                }
+                if (manager.IsServer && hider.Current == nearby[2])
+                {
+                    var delta = session.Containers[hider.Current].transform.position - explorer.transform.position;
+                    expectedSector = (Mathf.RoundToInt(Mathf.Atan2(delta.x, delta.z) * Mathf.Rad2Deg / 45) + 8) % 8;
+                }
+            }
+            if (elapsed > 12) WriteReport(manager, players);
+        }
+
         private void CheckGround(NetworkManager manager, NetworkPlayer[] players, NetworkPlayer local, float elapsed)
         {
             var first = players.OrderBy(p => p.OwnerClientId).First();
@@ -248,6 +315,20 @@ namespace HakoOnna.Multiplayer
                 jumped = jumped, tired = tired, recovered = recovered, doorClosed = doorClosed
             };
             var local = manager?.LocalClient?.PlayerObject;
+            if (hiderCheck)
+            {
+                var hider = FindFirstObjectByType<NetworkHider>();
+                report.hiderObjects = hider ? 1 : 0;
+                report.hiderOwner = hider && hider.IsOwner;
+                report.transferChecks = report.hiderOwner && nearby != null && blockedTransfer && cooldownHeld &&
+                    hider.Current == nearby[2];
+                report.sector = expectedSector;
+                if (local && local.TryGetComponent<NetworkPlayer>(out var listener))
+                {
+                    report.rolls = listener.ReceivedRolls;
+                    report.sector = listener.LastRollSector;
+                }
+            }
             if (groundCheck)
             {
                 report.keptFull = keptFull;

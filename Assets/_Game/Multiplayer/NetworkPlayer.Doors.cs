@@ -36,8 +36,8 @@ namespace HakoOnna.Multiplayer
             {
                 if (door.IsOpen)
                     foreach (var peer in NetworkManager.ConnectedClientsList)
-                        if (peer.PlayerObject && door.WorldClosedVolume.Intersects(
-                            peer.PlayerObject.GetComponent<CharacterController>().bounds)) return;
+                        if (peer.PlayerObject && peer.PlayerObject.TryGetComponent<CharacterController>(out var character) &&
+                            door.WorldClosedVolume.Intersects(character.bounds)) return;
                 door.IsOpen = !door.IsOpen;
             }
             DoorChangedRpc(id, door.IsOpen);

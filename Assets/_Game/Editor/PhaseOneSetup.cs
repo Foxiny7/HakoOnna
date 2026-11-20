@@ -76,6 +76,35 @@ namespace HakoOnna.EditorTools
             AssetDatabase.SaveAssets();
         }
 
+        public static void CreateHiderPrefab()
+        {
+            const string path = "Assets/_Game/Resources/HakoOnnaPlayer.prefab";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(path)) return;
+            var root = new GameObject("HakoOnnaPlayer");
+            root.AddComponent<NetworkObject>().SynchronizeTransform = false;
+            root.AddComponent<NetworkHider>();
+            var cylinder = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            cylinder.name = "Body";
+            cylinder.transform.SetParent(root.transform, false);
+            UnityEngine.Object.DestroyImmediate(cylinder.GetComponent<Collider>());
+            var config = AssetDatabase.LoadAssetAtPath<GameConfig>("Assets/_Game/Config/GameConfig.asset");
+            cylinder.transform.localScale = new Vector3(config.PlayerRadius * 2, config.PlayerHeight / 2, config.PlayerRadius * 2);
+            var red = new Material(Shader.Find("Universal Render Pipeline/Lit")) { color = new Color(.78f, .035f, .055f) };
+            AssetDatabase.CreateAsset(red, "Assets/_Game/Prefabs/HakoOnnaRed.mat");
+            cylinder.GetComponent<Renderer>().sharedMaterial = red;
+            cylinder.SetActive(false);
+            var view = new GameObject("HiderView", typeof(Camera), typeof(AudioListener));
+            view.transform.SetParent(root.transform, false);
+            var camera = view.GetComponent<Camera>();
+            camera.nearClipPlane = .04f;
+            camera.fieldOfView = 75;
+            camera.GetUniversalAdditionalCameraData().renderPostProcessing = true;
+            view.SetActive(false);
+            PrefabUtility.SaveAsPrefabAsset(root, path);
+            UnityEngine.Object.DestroyImmediate(root);
+            AssetDatabase.SaveAssets();
+        }
+
         private static void EnsureBuildScenes()
         {
             PlayerSettings.runInBackground = true;

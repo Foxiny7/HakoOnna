@@ -16,6 +16,8 @@ namespace HakoOnna
         [SerializeField, Min(0.1f)] private float eyeHeight = 1.45f;
 
         [SerializeField, Min(0.1f)] private float searchReach = 2.5f;
+        [SerializeField, Min(.1f)] private float rollHearingRange = 12f;
+        public float RollHearingRange => rollHearingRange;
         public float SearchReach => searchReach;
         public float WalkSpeed => walkSpeed;
         public float RunSpeed => runSpeed;

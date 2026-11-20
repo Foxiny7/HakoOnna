@@ -3,12 +3,13 @@ param(
     [ValidateSet('host','server')]
     [string]$Mode,
     [switch]$Containers,
-    [switch]$Ground
+    [switch]$Ground,
+    [switch]$Hider
 )
 $ErrorActionPreference = 'Stop'
 $project = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../..')).ProviderPath
 $executable = Join-Path $project 'Builds/PhaseOne/HakoOnna.exe'
-$runDirectory = Join-Path (Join-Path $project 'Temp') ('network-' + $Mode + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+$runDirectory = Join-Path (Join-Path $project 'Logs') ('network-' + $Mode + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Path $runDirectory | Out-Null
 $processes = @()
 $reports = @()
@@ -18,6 +19,12 @@ function Start-Peer([string]$Role, [int]$Index) {
     $arguments = @('-batchmode', '-nographics', '-hakoMode', $Role,
         '-hakoSmoke', ('"{0}"' -f $report), '-hakoSmokePlayers', '2',
         '-logFile', ('"{0}"' -f $log))
+    if ($Hider) {
+        $arguments += '-hakoHiderSmoke'
+        if ($Role -eq 'host' -or ($Mode -eq 'server' -and $Index -eq 1)) {
+            $arguments += @('-hakoRole','hider')
+        }
+    }
     if ($Ground) { $arguments += '-hakoGroundSmoke' }
     if ($Containers) { $arguments += '-hakoContainerSmoke' }
     $process = Start-Process -FilePath $executable -ArgumentList $arguments -WindowStyle Hidden -PassThru
@@ -38,6 +45,11 @@ try {
     foreach ($peer in $peers) {
         $report = Get-Content -Raw -LiteralPath $peer.Report | ConvertFrom-Json
         if ($report.errors.Count -ne 0) { throw ($report.errors -join [Environment]::NewLine) }
+        if ($Hider) {
+            if ($report.peakPlayers -ne 1) { throw "Expected one explorer. See $($peer.Report)" }
+            $reports += $report
+            continue
+        }
         if ($report.peakPlayers -ne 2) { throw "$($peer.Role): expected two players." }
         if ($Ground) {
             if ($report.groundCount -ne 1 -or ($report.client -and
@@ -60,6 +72,16 @@ try {
             }
         }
         $reports += $report
+    }
+    if ($Hider) {
+        $hako = @($reports | Where-Object hiderOwner)
+        $listener = @($reports | Where-Object { $_.client -and !$_.hiderOwner })
+        $server = @($reports | Where-Object server)[0]
+        if ($hako.Count -ne 1 -or !$hako[0].transferChecks -or $listener.Count -ne 1 -or
+            $listener[0].hiderObjects -ne 0 -or $listener[0].rolls -ne 2 -or
+            $listener[0].sector -ne $server.sector) { throw "Hider transfer, privacy or audio failed. See $runDirectory" }
+        "PASS $Mode private hider, occupied destination, cooldown and two directional roll sounds."
+        return
     }
     $authority = @($reports | Where-Object server)[0]
     foreach ($observer in @($reports | Where-Object { !$_.server })) {

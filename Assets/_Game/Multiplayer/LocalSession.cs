@@ -23,6 +23,9 @@ namespace HakoOnna.Multiplayer
         private NetworkManager manager;
         private Transform[] spawnPoints;
         private Camera previewCamera;
+        private ulong? hiderClient;
+        private bool playHider;
+        internal GameConfig Config => manager.NetworkConfig.PlayerPrefab.GetComponent<NetworkPlayer>().Config;
         private bool ready;
         private string status = "Loading house...";
 
@@ -70,6 +73,7 @@ namespace HakoOnna.Multiplayer
             previewCamera.gameObject.SetActive(false);
             ready = true;
             status = "Local server 127.0.0.1:7777";
+            playHider = Argument("-hakoRole") == "hider";
             var mode = Argument("-hakoMode");
             if (!string.IsNullOrEmpty(mode))
                 StartSession(mode);
@@ -108,6 +112,8 @@ namespace HakoOnna.Multiplayer
                 return;
 
             spawnSlots.Clear();
+            hiderClient = null;
+            manager.NetworkConfig.ConnectionData = new byte[] { (byte)(playHider ? 1 : 0) };
             status = mode + " starting...";
             foreach (var door in Doors) door.SetOpenImmediate(door.StartsOpen);
             if (mode == "host" || mode == "server")
@@ -142,6 +148,14 @@ namespace HakoOnna.Multiplayer
         private void ApproveConnection(NetworkManager.ConnectionApprovalRequest request,
             NetworkManager.ConnectionApprovalResponse response)
         {
+            if (request.Payload is { Length: 1 } && request.Payload[0] == 1)
+            {
+                response.Approved = !hiderClient.HasValue;
+                response.CreatePlayerObject = false;
+                response.Reason = response.Approved ? "" : "Hako Onna is already taken.";
+                if (response.Approved) hiderClient = request.ClientNetworkId;
+                return;
+            }
             var slot = 0;
             while (slot < spawnPoints.Length && spawnSlots.ContainsValue(slot))
                 slot++;
@@ -159,6 +173,12 @@ namespace HakoOnna.Multiplayer
 
         private void OnConnected(ulong clientId)
         {
+            if (manager.IsServer && hiderClient == clientId && !manager.ConnectedClients[clientId].PlayerObject)
+            {
+                var pawn = Instantiate(Resources.Load<GameObject>("HakoOnnaPlayer")).GetComponent<NetworkObject>();
+                pawn.CheckObjectVisibility = observer => observer == clientId;
+                pawn.SpawnAsPlayerObject(clientId);
+            }
             status = manager.IsHost ? "Host connected" : manager.IsServer ? "Local server running" : "Connected";
         }
 
@@ -193,13 +213,18 @@ namespace HakoOnna.Multiplayer
             GUILayout.Label(status);
             if (manager != null && manager.IsListening)
             {
-                GUILayout.Label("Players visible: " + FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None).Length);
-                GUILayout.Label("WASD move | Shift run | Space jump | Esc release cursor");
-                GUILayout.Label("1–9 / Wheel: Equip   |   T: Flashlight   |   G: Drop");
-                if (Cursor.lockState == CursorLockMode.None && GUILayout.Button("Capture mouse"))
+                GUILayout.Label("Explorers visible: " + FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None).Length);
+                if (manager.LocalClient?.PlayerObject && manager.LocalClient.PlayerObject.GetComponent<NetworkHider>())
+                    GUILayout.Label("Hako Onna  |  Select a container to transfer");
+                else
                 {
-                    Cursor.lockState = CursorLockMode.Locked;
-                    Cursor.visible = false;
+                    GUILayout.Label("WASD move | Shift run | Space jump | Esc release cursor");
+                    GUILayout.Label("1–9 / Wheel: Equip   |   T: Flashlight   |   G: Drop");
+                    if (Cursor.lockState == CursorLockMode.None && GUILayout.Button("Capture mouse"))
+                    {
+                        Cursor.lockState = CursorLockMode.Locked;
+                        Cursor.visible = false;
+                    }
                 }
                 if (GUILayout.Button("Disconnect"))
                     Disconnect();
@@ -207,6 +232,7 @@ namespace HakoOnna.Multiplayer
             else
             {
                 GUI.enabled = ready && manager != null && !manager.ShutdownInProgress;
+                playHider = GUILayout.Toggle(playHider, "Play as Hako Onna (one per house)");
                 if (GUILayout.Button("Host on this PC"))
                     StartSession("host");
                 if (GUILayout.Button("Join 127.0.0.1"))
