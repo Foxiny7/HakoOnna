@@ -34,8 +34,8 @@ namespace HakoOnna.Tests
                 foreach (FootSurface surface in System.Enum.GetValues(typeof(FootSurface)))
                 {
                     var clip = foley.Step(surface, left);
-                    Assert.IsNotNull(clip, surface.ToString());
-                    Assert.That(clip.length, Is.InRange(.015f, .14f), surface.ToString());
+                    Check(clip, surface.ToString());
+                    Assert.That(clip.length, Is.InRange(.20f, .40f), surface.ToString());
                 }
                 foreach (var floor in house.GetComponentsInChildren<MeshRenderer>())
                 {
@@ -57,7 +57,12 @@ namespace HakoOnna.Tests
                 Check(Resources.Load<AudioClip>("Foley/HiderShriek"), "Occupied opening");
                 Assert.IsFalse(foley.IsInside(new Vector3(5, 1.4f, -4)));
                 foreach (var area in new[] { "Indoor", "Yard" })
-                    Assert.Greater(Resources.Load<AudioClip>("Foley/" + area).length, 1f);
+                {
+                    var loop = Resources.Load<AudioClip>("Foley/" + area);
+                    Assert.AreEqual(2, loop.channels, area);
+                    Assert.AreEqual(48000, loop.frequency, area);
+                    Assert.That(loop.length, Is.InRange(30f, 60f), area);
+                }
                 Assert.AreEqual(FootSurface.Gravel, foley.SurfaceAt(new Vector3(5, 0, -4)));
                 Assert.AreEqual(FootSurface.Earth, foley.SurfaceAt(new Vector3(-3, 0, -3)));
             }
@@ -68,6 +73,7 @@ namespace HakoOnna.Tests
         {
             Assert.IsNotNull(clip, label);
             Assert.AreEqual(1, clip.channels, label);
+            Assert.AreEqual(48000, clip.frequency, label);
             Assert.Greater(clip.length, .06f, label);
         }
     }

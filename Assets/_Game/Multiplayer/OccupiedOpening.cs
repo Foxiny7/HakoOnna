@@ -31,6 +31,7 @@ namespace HakoOnna.Multiplayer
             var start = bounds.center;
             var end = Vector3.Lerp(start, victim.position + Vector3.up * 1.3f, .75f);
             var foley = box.GetComponent<ContainerFoley>();
+            Transform shriek = null;
             bool lunged = false, closing = false;
             try
             {
@@ -39,7 +40,7 @@ namespace HakoOnna.Multiplayer
                     if (!lunged && t >= .12f)
                     {
                         lunged = true;
-                        foley?.Shriek(prop);
+                        shriek = foley?.Shriek(prop.transform);
                     }
                     if (!closing && t >= .95f)
                     {
@@ -60,6 +61,7 @@ namespace HakoOnna.Multiplayer
             finally
             {
                 if (box && !box.IsOpen) box.SetOpenImmediate(false);
+                if (shriek) shriek.SetParent(null, true);
                 Object.Destroy(prop);
             }
         }
