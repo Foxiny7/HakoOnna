@@ -39,7 +39,7 @@ namespace HakoOnna.Multiplayer
                     if (!lunged && t >= .12f)
                     {
                         lunged = true;
-                        foley?.Shriek();
+                        foley?.Shriek(prop);
                     }
                     if (!closing && t >= .95f)
                     {

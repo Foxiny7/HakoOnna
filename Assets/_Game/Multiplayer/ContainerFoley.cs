@@ -19,9 +19,10 @@ namespace HakoOnna.Multiplayer
             container.Closed += Close;
         }
 
-        internal void Shriek()
+        internal void Shriek(GameObject apparition)
         {
-            source.PlayOneShot(shriek, .82f);
+            var voice = HouseFoley.Source(apparition, 1f);
+            voice.PlayOneShot(shriek);
         }
 
         private void Open() => Play(opened);

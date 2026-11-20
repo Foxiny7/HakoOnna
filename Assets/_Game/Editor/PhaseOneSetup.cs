@@ -209,7 +209,7 @@ namespace HakoOnna.EditorTools
         [MenuItem("Hako/Playtest/3 Start extra local client")]
         public static void StartClient()
         {
-            StartPlayer("-hakoMode client -screen-fullscreen 0 -screen-width 960 -screen-height 600");
+            StartPlayer("-hakoMode client");
         }
 
         [MenuItem("Hako/Playtest/4 Start local dedicated server")]

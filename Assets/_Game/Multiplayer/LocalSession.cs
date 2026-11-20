@@ -41,6 +41,11 @@ namespace HakoOnna.Multiplayer
 
         private IEnumerator Start()
         {
+            if (Application.platform == RuntimePlatform.WindowsPlayer && !Application.isBatchMode)
+            {
+                var display = Screen.mainWindowDisplayInfo;
+                Screen.SetResolution(display.width, display.height, FullScreenMode.FullScreenWindow);
+            }
             Application.runInBackground = true;
             Application.targetFrameRate = 60;
             manager = GetComponent<NetworkManager>();
