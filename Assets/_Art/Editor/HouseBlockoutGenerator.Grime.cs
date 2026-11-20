@@ -108,11 +108,15 @@ namespace HakoOnna.Art.EditorTools
             if (parent == null) return;
             foreach (Transform c in parent)
             {
-                var rs = c.GetComponentsInChildren<Renderer>();
-                if (rs.Length == 0) continue;
-                var b = rs[0].bounds;
-                foreach (var r in rs) b.Encapsulate(r.bounds);
-                ContainerBoxes.Add(b);
+                // 金具（Fit_*）不算：和搬家求解量的是同一个箱子
+                Bounds? b = null;
+                foreach (var r in c.GetComponentsInChildren<Renderer>())
+                {
+                    if (ContainerPrefabBuilder.IsFitting(r)) continue;
+                    if (b == null) b = r.bounds;
+                    else { var x = b.Value; x.Encapsulate(r.bounds); b = x; }
+                }
+                if (b != null) ContainerBoxes.Add(b.Value);
             }
         }
 

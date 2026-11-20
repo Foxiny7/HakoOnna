@@ -25,6 +25,8 @@ namespace HakoOnna.Art.EditorTools
 
         readonly Dictionary<Material, Part> parts = new Dictionary<Material, Part>();
         readonly List<Material> order = new List<Material>();
+        /// <summary>登记的外部模型（ExternalModels）：Build 时复制到生成的节点下。m 已含 M。</summary>
+        readonly List<(string id, string only, Matrix4x4 m)> models = new List<(string, string, Matrix4x4)>();
         public Matrix4x4 M = Matrix4x4.identity;
 
         /// <summary>Track = true 时记录写入顶点的世界包围盒（家具搬家时量尺寸用）。</summary>
@@ -183,9 +185,31 @@ namespace HakoOnna.Art.EditorTools
                 }
         }
 
+        /// <summary>
+        /// 登记一个外部模型，local 是模型根节点相对当前 M 的矩阵（一般用 ExternalModels.Place 算）。
+        /// 跟着 M 一起搬家、放大；Track 时用模型包围盒的八个角量尺寸。缺模型时什么也不做。
+        /// </summary>
+        public void Model(string id, Matrix4x4 local, string only = null)
+        {
+            if (Mute) return;
+            var b = ExternalModels.LocalBounds(id, only);
+            if (b.size == Vector3.zero) return;
+            var w = M * local;
+            if (Track)
+                for (int i = 0; i < 8; i++) Grow(w.MultiplyPoint3x4(b.center + Vector3.Scale(b.extents, ExternalModels.Corner(i))));
+            models.Add((id, only, w));
+        }
+
         public GameObject Build(Transform parent, string name, bool shadows = true)
         {
-            if (order.Count == 0) return null;
+            if (order.Count == 0 && models.Count == 0) return null;
+            if (order.Count == 0)
+            {
+                var holder = new GameObject(name);
+                holder.transform.SetParent(parent, false);
+                SpawnModels(holder.transform, shadows);
+                return holder;
+            }
             int total = 0;
             foreach (var m in order) total += parts[m].v.Count;
             var mesh = new Mesh { name = name };
@@ -215,7 +239,13 @@ namespace HakoOnna.Art.EditorTools
             mr.sharedMaterials = order.ToArray();
             if (!shadows) mr.shadowCastingMode = ShadowCastingMode.Off;
             GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccludeeStatic);
+            SpawnModels(go.transform, shadows);
             return go;
+        }
+
+        void SpawnModels(Transform holder, bool shadows)
+        {
+            foreach (var (id, only, m) in models) ExternalModels.Spawn(id, holder, m, only, shadows);
         }
     }
 

@@ -24,6 +24,8 @@ namespace HakoOnna.Art.EditorTools
             public float yaw = float.NaN;
             /// <summary>局部原点 = 占地中心，y = 0 为地面，+z 为正面。</summary>
             public System.Action<Kit, System.Random> draw;
+            /// <summary>盖了防尘布（记到日志里，给它拍一张审图）。</summary>
+            public bool sheet;
             /// <summary>挡块：底面中心、尺寸（局部，真实尺寸）。</summary>
             public readonly List<(Vector3 c, Vector3 size)> blocks = new List<(Vector3 c, Vector3 size)>();
         }
@@ -44,10 +46,10 @@ namespace HakoOnna.Art.EditorTools
                 case "Zashiki": return Sets(CGoBoard());
                 case "Ima": return Sets(CSewing());
                 case "Nando": return Sets(CStoredPile(true));
-                case "Oku": return Sets(CZataku(2, true));
+                case "Oku": return Sets(CZataku(2, true, sheet: true));
                 case "Kura": return Sets(CRiceBalePile());
                 case "Shinshitsu": return Sets(CChabudai(2, false), CIkou());
-                case "Washitsu2F": return Sets(CZataku(4, true), CLaidFuton());
+                case "Washitsu2F": return Sets(CZataku(4, true, sheet: true), CLaidFuton());
                 case "Monooki": return Sets(CStoredPile(false));
                 case "Kodomo": return Sets(CKidsPlay());
                 default: return new List<CenterSet>();
@@ -90,6 +92,19 @@ namespace HakoOnna.Art.EditorTools
             k.PushS(origin, new Vector3(0f, byaw, 0f), Vector3.one * S);
             set.draw(k, rng);
             k.Pop();
+            if (set.sheet)
+            {
+                SheetLog.Add(c.room.id + "/" + set.name);
+                // 审图机位：从离得最远的屋角往回走一点，斜着往下看
+                var far = origin;
+                foreach (var corner in new[] { c.inner.min, c.inner.max, new Vector2(c.inner.xMin, c.inner.yMax), new Vector2(c.inner.xMax, c.inner.yMin) })
+                {
+                    var p = new Vector3(corner.x, c.fl, corner.y);
+                    if ((p - origin).sqrMagnitude > (far - origin).sqrMagnitude) far = p;
+                }
+                var cam = origin + Vector3.ClampMagnitude(far - origin, 2.3f) + Vector3.up * 1.6f;
+                RuinShots.Add(($"sheet_{c.room.id}_{set.name}", cam, origin + Vector3.up * .25f));
+            }
             foreach (var (p, bs) in CenterBlocks(set, origin, byaw))
                 Blocker(c.room.id + "_" + set.name, p, byaw, bs);
             Extents(set, byaw, out float fx, out float fz);
@@ -174,26 +189,42 @@ namespace HakoOnna.Art.EditorTools
                 k.C(D.CeramicWhite, x + .05f + (i % 2) * .08f, y + .018f, z - .06f + (i / 2) * .1f, .028f, .034f, .062f, 12);
         }
 
-        /// <summary>座卓 + 两侧坐垫（seats = 2 / 4 / 6），可选在一头放火钵。</summary>
-        static CenterSet CZataku(int seats, bool hibachi)
+        /// <summary>
+        /// 座卓 + 两侧坐垫（seats = 2 / 4 / 6），可选在一头放火钵。
+        /// sheet：座卓上盖一块防尘布垂到地上（第三轮；只用在铺榻榻米的房间），桌面上的茶具、报纸不画，坐垫、火钵照旧。
+        /// </summary>
+        static CenterSet CZataku(int seats, bool hibachi, bool sheet = false)
         {
             float W = seats > 4 ? 1.8f : seats > 2 ? 1.5f : 1.1f, Dp = seats > 2 ? .75f : .65f;
             const float H = .33f, Zh = .275f;
             float side = Dp / 2 + .1f + Zh;
             float tx = hibachi ? -.33f : 0f, hx = tx + W / 2 + .42f;
-            var set = new CenterSet { name = "Zataku", w = W + (hibachi ? .68f : .1f), d = 2 * (side + Zh), h = hibachi ? .62f : .48f };
+            var set = new CenterSet { name = "Zataku", w = W + (hibachi ? .68f : .1f), d = 2 * (side + Zh), h = hibachi ? .62f : .48f, sheet = sheet };
             set.draw = (k, r) =>
             {
                 var cloth = CushionCloth(r);
                 k.Push(new Vector3(tx, 0, 0));
                 LowTable(k, W, Dp, H);
-                TeaSet(k, Rf(r, -.15f, .15f) * W, H, Rf(r, -.06f, .06f), 2 + r.Next(3));
+                float teaX = Rf(r, -.15f, .15f) * W, teaZ = Rf(r, -.06f, .06f);
+                int cups = 2 + r.Next(3);
+                if (!sheet) TeaSet(k, teaX, H, teaZ, cups);
                 if (seats >= 4)
                 {
                     // 摊开的报纸 + 烟灰缸
-                    k.Br(D.Paper, -W / 2 + .3f, H + .003f, .1f, .4f, .004f, .3f, 0, Rf(r, -15f, 15f), 0);
-                    k.C(D.Iron, W / 2 - .22f, H, -.15f, .055f, .05f, .03f, 12);
+                    float paperYaw = Rf(r, -15f, 15f);
+                    if (!sheet)
+                    {
+                        k.Br(D.Paper, -W / 2 + .3f, H + .003f, .1f, .4f, .004f, .3f, 0, paperYaw, 0);
+                        k.C(D.Iron, W / 2 - .22f, H, -.15f, .055f, .05f, .03f, 12);
+                    }
                 }
+                if (sheet)
+                    DustSheet(k, new System.Random(StableHash("Zataku") ^ seats * 7919), new SheetSpec
+                    {
+                        x0 = -W / 2 - .005f, x1 = W / 2 + .005f, z0 = -Dp / 2 - .005f, z1 = Dp / 2 + .005f, top = H + .005f,
+                        drop = .27f, backDrop = .27f, round = .02f,
+                        floorY = .0075f / FurnitureScale, // 榻榻米面（地板 + 6.5 mm）
+                    });
                 int perSide = seats / 2;
                 for (int sgn = -1; sgn <= 1; sgn += 2)
                     for (int i = 0; i < perSide; i++)
@@ -541,27 +572,104 @@ namespace HakoOnna.Art.EditorTools
             return set;
         }
 
-        /// <summary>衣桁：漆黑的架子上搭着一件和服，两只袖子张开。</summary>
+        /// <summary>
+        /// 衣桁：漆黑的架子（笠木两端微微上翘）上搭着一件和服。第三轮改成 T 字剪影——之前是一整块方布加一道金带，
+        /// 远看像白板 / 屏风。现在：两只袖子顺着笠木张开、身顷垂到快贴地；背面中缝、背紋和两个袖紋，
+        /// 正面白衿交成 V 字、两个胸紋（五つ紋），下摆一道里子（八掛）和几朵白樱的裾模様；肩上积灰，有两个虫蛀的洞。
+        /// 两面都朝外（中央家具组，从哪边看都要认得出是和服）。
+        /// </summary>
         static CenterSet CIkou()
         {
             const float W = 1.5f, H = 1.65f;
             var set = new CenterSet { name = "Ikou", w = 1.85f, d = .55f, h = 1.7f };
             set.draw = (k, r) =>
             {
+                // 架子：两根立柱 + 脚、笠木（两端上翘）、两道横档
                 foreach (float sx in new[] { -W / 2, W / 2 })
                 {
                     k.Bb(D.Lacquer, sx, 0, 0, .06f, .05f, .5f);
                     k.Bb(D.Lacquer, sx, .05f, 0, .04f, H - .05f, .04f);
+                    k.Br(D.Lacquer, sx * 1.19f, H - .006f, 0, .075f, .036f, .045f, 0, 0, Mathf.Sign(sx) * 14f);
                 }
-                k.Bb(D.Lacquer, 0, H - .04f, 0, W + .3f, .04f, .045f);
+                k.Bb(D.Lacquer, 0, H - .04f, 0, W + .24f, .04f, .045f);
                 k.Bb(D.Lacquer, 0, H - .5f, 0, W, .03f, .035f);
+                k.Bb(D.Lacquer, 0, .24f, 0, W, .03f, .035f);
+
                 var m = r.Next(3) switch { 0 => D.ClothIndigo, 1 => D.ClothPurple, _ => D.ClothRed };
-                foreach (float sz in new[] { -.03f, .03f }) k.Bb(m, 0, H - 1.25f, sz, 1.25f, 1.2f, .012f);
-                foreach (float sx in new[] { -.78f, .78f }) k.Bb(m, sx, H - .62f, 0, .3f, .56f, .075f);
-                k.Bb(D.Gold, 0, H - .78f, 0, 1.26f, .1f, .076f);
+                var lining = m == D.ClothRed ? D.Gold : D.ClothRed;
+                const float hem = .16f, bodyW = .62f, slvW = .35f, slvBot = 1.03f, top = H + .005f;
+                float slvX = bodyW / 2 + slvW / 2 - .01f;
+                // 搭在笠木上的肩线（盖住笠木），上面一层灰
+                k.Bb(m, 0, H - .006f, 0, bodyW + 2 * slvW, .022f, .086f);
+                k.Bb(D.Ash, 0, H + .016f, 0, bodyW + 2 * slvW - .04f, .003f, .07f);
+                foreach (float f in new[] { 1f, -1f }) // f = +1 背面（+z）、-1 正面（-z）
+                {
+                    float zb = f * .03f, zs = f * .036f, zo = f * .038f; // 身顷、袖子、贴在外面的花纹
+                    k.Bb(m, 0, hem, zb, bodyW, top - hem, .012f);
+                    foreach (float sx in new[] { -1f, 1f })
+                    {
+                        k.Bb(m, sx * slvX, slvBot, zs, slvW, top - slvBot, .012f);
+                        k.Bb(lining, sx * slvX, slvBot - .004f, zs + f * .0065f, slvW - .01f, .02f, .002f);   // 袖口的里子
+                        k.Bb(D.Black, sx * (bodyW / 2 - .004f), slvBot, zs + f * .0065f, .004f, top - slvBot - .02f, .002f); // 袖付けの縫い目
+                    }
+                    k.Bb(lining, 0, hem - .004f, zo, bodyW - .01f, .024f, .002f); // 下摆的里子（八掛）
+                    // 裾模様：下摆一带几朵白樱，袖子下沿各一朵
+                    int n = f > 0 ? 6 : 4;
+                    for (int i = 0; i < n; i++)
+                        Sakura(k, new Vector3(Rf(r, -bodyW / 2 + .06f, bodyW / 2 - .06f), hem + Rf(r, .07f, .38f), zo), f, Rf(r, .75f, 1.15f), r);
+                    foreach (float sx in new[] { -1f, 1f })
+                        Sakura(k, new Vector3(sx * slvX + Rf(r, -.08f, .08f), slvBot + Rf(r, .07f, .16f), zs + f * .0065f), f, .8f, r);
+                    if (f > 0)
+                    {
+                        k.Bb(D.Black, 0, hem + .03f, zo, .004f, top - hem - .1f, .002f);               // 背中心的缝线
+                        Crest(k, new Vector3(0, top - .12f, zo), f, m);                                  // 背紋
+                        foreach (float sx in new[] { -1f, 1f })
+                            Crest(k, new Vector3(sx * slvX, top - .14f, zs + f * .0065f), f, m);         // 袖紋
+                        // 虫蛀的洞
+                        k.Cr(D.Black, new Vector3(Rf(r, -.2f, .2f), Rf(r, .7f, 1.2f), zo), .009f, .009f, .002f, AlongZ, 7);
+                        k.Cr(D.Black, new Vector3(Rf(r, -.2f, .2f), Rf(r, .5f, .9f), zo), .006f, .006f, .002f, AlongZ, 6);
+                    }
+                    else
+                    {
+                        // 白衿从后颈绕过肩、在胸前交成 V（约 1.3 m 高）：右边那条压在上面，过了交点接着往下成为前襟的衿，
+                        // 左边那条到交点就压在下面看不见了；衿下面接着是前襟的边
+                        void Band(Vector2 a, Vector2 b, float dz)
+                        {
+                            var mid = (a + b) / 2;
+                            float len = Vector2.Distance(a, b), ang = Mathf.Atan2(b.y - a.y, b.x - a.x) * Mathf.Rad2Deg + 90f;
+                            k.Br(D.ClothWhite, mid.x, mid.y, zo + f * dz, .045f, len, .002f, 0, 0, ang);
+                        }
+                        Band(new Vector2(-.1f, top - .01f), new Vector2(.04f, 1.3f), 0f);      // 下面那条
+                        Band(new Vector2(.1f, top - .01f), new Vector2(-.035f, 1.28f), .0015f); // 上面那条
+                        Band(new Vector2(-.035f, 1.3f), new Vector2(-.06f, .86f), .0015f);     // 接着往下
+                        k.Bb(D.Black, -.06f, hem + .02f, zo, .004f, .86f - hem - .03f, .002f);
+                        foreach (float sx in new[] { -1f, 1f })
+                            Crest(k, new Vector3(sx * .2f, top - .27f, zo), f, m);                          // 胸紋
+                    }
+                }
             };
             set.blocks.Add((Vector3.zero, new Vector3(W, 1.6f, .45f)));
             return set;
+        }
+
+        /// <summary>家纹（丸に梅鉢的简化：白圈、圈里一点）贴在布面上；f = +1 朝 +z，-1 朝 -z。</summary>
+        static void Crest(Kit k, Vector3 c, float f, Material cloth)
+        {
+            k.Cr(D.ClothWhite, c - new Vector3(0, 0, f < 0 ? .002f : 0f), .022f, .022f, .002f, AlongZ, 14);
+            k.Cr(cloth, c + new Vector3(0, 0, f * .001f) - new Vector3(0, 0, f < 0 ? .002f : 0f), .017f, .017f, .002f, AlongZ, 14);
+            k.Cr(D.ClothWhite, c + new Vector3(0, 0, f * .002f) - new Vector3(0, 0, f < 0 ? .002f : 0f), .008f, .008f, .002f, AlongZ, 10);
+        }
+
+        /// <summary>一朵白樱（五瓣 + 金色花心），贴在布面上；f = +1 朝 +z，-1 朝 -z。</summary>
+        static void Sakura(Kit k, Vector3 c, float f, float s, System.Random r)
+        {
+            float rot = Rf(r, 0f, 72f), off = f < 0 ? -.002f : 0f;
+            for (int i = 0; i < 5; i++)
+            {
+                float a = (rot + i * 72f) * Mathf.Deg2Rad;
+                k.Cr(D.ClothWhite, c + new Vector3(Mathf.Cos(a) * .016f * s, Mathf.Sin(a) * .016f * s, off), .011f * s, .011f * s, .002f, AlongZ, 8);
+            }
+            k.Cr(D.Gold, c + new Vector3(0, 0, f * .001f + off), .006f * s, .006f * s, .002f, AlongZ, 8);
         }
 
         /// <summary>铺好的被褥：敷布団、掛布団、枕，枕边一盏行灯。</summary>

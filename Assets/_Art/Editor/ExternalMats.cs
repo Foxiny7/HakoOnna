@@ -36,7 +36,10 @@ namespace HakoOnna.Art.EditorTools
         // =====================================================================
         // 导入设置
         // =====================================================================
-        enum Kind { Albedo, Normal, Mask, Decal }
+        /// <summary>AlbedoAlpha：模型的镂空 / 叶片漫反射（*_diff_a.png，透明通道 = 不透明度）；Painting：Met 的画（Clamp）。</summary>
+        enum Kind { Albedo, AlbedoAlpha, Painting, Normal, Mask, Decal }
+
+        public const string MetDir = Root + "/Met";
 
         static Kind KindOf(string path)
         {
@@ -44,6 +47,8 @@ namespace HakoOnna.Art.EditorTools
             if (path.StartsWith(DecalDir) || f.EndsWith("_decal.png")) return Kind.Decal;
             if (f.Contains("_nor_gl") || f.Contains("_NormalGL")) return Kind.Normal;
             if (f.Contains("_mask")) return Kind.Mask;
+            if (f.EndsWith("_diff_a.png")) return Kind.AlbedoAlpha;
+            if (path.StartsWith(MetDir + "/")) return Kind.Painting;
             return Kind.Albedo;
         }
 
@@ -77,6 +82,19 @@ namespace HakoOnna.Art.EditorTools
                     imp.alphaIsTransparency = true;
                     imp.wrapMode = TextureWrapMode.Clamp;
                     break;
+                case Kind.AlbedoAlpha:
+                    imp.textureType = TextureImporterType.Default;
+                    imp.sRGBTexture = true;
+                    imp.alphaSource = TextureImporterAlphaSource.FromInput;
+                    imp.alphaIsTransparency = true;
+                    imp.wrapMode = TextureWrapMode.Repeat;
+                    break;
+                case Kind.Painting:
+                    imp.textureType = TextureImporterType.Default;
+                    imp.sRGBTexture = true;
+                    imp.alphaSource = TextureImporterAlphaSource.None;
+                    imp.wrapMode = TextureWrapMode.Clamp;
+                    break;
                 default:
                     imp.textureType = TextureImporterType.Default;
                     imp.sRGBTexture = true;
@@ -94,6 +112,8 @@ namespace HakoOnna.Art.EditorTools
                 case Kind.Normal: return imp.textureType == TextureImporterType.NormalMap;
                 case Kind.Mask: return imp.textureType == TextureImporterType.Default && !imp.sRGBTexture;
                 case Kind.Decal: return imp.alphaIsTransparency && imp.wrapMode == TextureWrapMode.Clamp;
+                case Kind.AlbedoAlpha: return imp.sRGBTexture && imp.alphaSource == TextureImporterAlphaSource.FromInput && imp.alphaIsTransparency;
+                case Kind.Painting: return imp.sRGBTexture && imp.wrapMode == TextureWrapMode.Clamp;
                 default: return imp.textureType == TextureImporterType.Default && imp.sRGBTexture;
             }
         }
@@ -262,7 +282,12 @@ namespace HakoOnna.Art.EditorTools
             Up(d.CeilingDark, CedarU, C(.14f, .11f, .09f), .5f);
             Up(d.Soffit, CedarU, C(.30f, .24f, .18f), .4f);
             Up(d.Tataki, MudDry, C(.30f, .27f, .23f), .5f);
-            Up(d.BathTile, Tiles, C(.34f, .40f, .42f), 1.2f);
+            // r3：浴室地砖原来 0.8 m 一张贴图，砖太碎；放大到 1.6 m
+            Up(d.BathTile, Tiles, C(.34f, .40f, .42f), 1.2f, 1f, new Vector2(1.6f, 1.6f), "r3");
+            // r3：黑漆原来是没有贴图、光滑度 0.75 的纯黑，夜里反射天空发蓝（仏間的盆提灯顶盖）。
+            // 换成磨旧的漆：底下透出木纹，哑一些
+            Up(d.Lacquer, Cabinet, C(.05f, .036f, .03f), 1.1f, .6f, new Vector2(.6f, .3f), "r3");
+            Up(d.Black, m => m.SetFloat("_Smoothness", .5f), "r3");
             Up(d.Post, Cabinet, C(.28f, .20f, .13f), 1f);
             Up(d.BeamDark, Cabinet, C(.12f, .085f, .06f), .8f);
             Up(d.TrimMid, Cabinet, C(.42f, .31f, .21f), 1f);
@@ -329,7 +354,8 @@ namespace HakoOnna.Art.EditorTools
             return n;
         }
 
-        static Mesh Build(Transform t, bool wall)
+        /// <summary>和 t 同形的立方体网格，UV 按米铺（容器预制体也用，见 ContainerPrefabBuilder.SaveUvMeshes）。</summary>
+        internal static Mesh Build(Transform t, bool wall)
         {
             var s = t.lossyScale;
             s = new Vector3(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));

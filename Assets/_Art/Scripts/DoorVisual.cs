@@ -5,11 +5,12 @@ using UnityEngine;
 namespace HakoOnna.Art
 {
     /// <summary>
-    /// 推拉门的表现层（美术负责，不含玩法逻辑）。
+    /// 门的表现层（美术负责，不含玩法逻辑）。
     ///
-    /// 门扇挂在门洞一侧墙面的上轨道上，沿墙滑动：
+    /// 推拉门：门扇挂在门洞一侧墙面的上轨道上，沿墙滑动：
     ///   开度 0 = 关（门扇盖住门洞），1 = 开（门扇停在门洞旁边的墙面上，门洞全宽可走）。
-    /// 每扇门扇是一个子物体（Leaf_*），带 BoxCollider 和运动学 Rigidbody：关着时挡人，开着时贴在墙上。
+    /// 铰链门（只有便所隔间那一扇）：门扇绕门轴转，开度 1 = 向外转开 90°。
+    /// 每扇门扇是一个子物体（Leaf_*），带 BoxCollider 和运动学 Rigidbody：关着时挡人，开着时贴在墙上（铰链门开着时贴着隔间板）。
     ///
     /// 程序（服务器权威）只需要：
     ///   · 设置 IsOpen（播放开 / 关动画）；中途加入、重连时用 SetOpenImmediate 直接到位；
@@ -27,8 +28,12 @@ namespace HakoOnna.Art
         {
             public Transform part;
             [Tooltip("完全打开时相对关闭位置的本地位移（沿墙）")] public Vector3 openOffset;
+            [Tooltip("铰链门：完全打开时绕门轴转的角度（本地欧拉角，门扇的原点就是门轴）；推拉门留 0")] public Vector3 openEuler;
             [HideInInspector] public Vector3 closedPos;
+            [HideInInspector] public Quaternion closedRot;
             [HideInInspector] public bool cached;
+
+            public bool Hinged => openEuler.sqrMagnitude > 1e-6f;
         }
 
         static readonly List<DoorVisual> all = new List<DoorVisual>();
@@ -118,6 +123,7 @@ namespace HakoOnna.Art
             {
                 if (l == null || l.part == null) continue;
                 l.closedPos = l.part.localPosition;
+                l.closedRot = l.part.localRotation;
                 l.cached = true;
             }
             opening = localOpening;
@@ -185,9 +191,15 @@ namespace HakoOnna.Art
             {
                 var l = leaves[i];
                 if (l == null || l.part == null || !l.cached) continue;
-                var along = l.openOffset.sqrMagnitude > 1e-8f ? l.openOffset.normalized : Vector3.right;
                 // 晃的时候相邻门扇反向，像在轨道里碰撞
                 float s = (i & 1) == 0 ? shake : -shake * .8f;
+                if (l.Hinged)
+                {
+                    // 铰链门：绕门轴转；晃 = 在门框里碰一下（约 1°）
+                    l.part.localRotation = l.closedRot * Quaternion.Euler(l.openEuler * t + l.openEuler.normalized * (s * 120f));
+                    continue;
+                }
+                var along = l.openOffset.sqrMagnitude > 1e-8f ? l.openOffset.normalized : Vector3.right;
                 l.part.localPosition = l.closedPos + l.openOffset * t + along * s;
             }
         }

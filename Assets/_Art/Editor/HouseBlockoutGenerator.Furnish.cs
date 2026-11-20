@@ -28,12 +28,18 @@ namespace HakoOnna.Art.EditorTools
             /// 不按天花 / 门楣规则抬高（暖帘、床の間这类）。
             /// </summary>
             public static bool Pinned;
+            /// <summary>
+            /// 为 true 时登记的件只在第一遍量尺寸（搬家求解的输入不变），第二遍不画、不放挡块：
+            /// 第三轮换掉的旧陈设（便所的旧洗手钵、小便器，旧洗脸台上的镜子和小物）。
+            /// </summary>
+            public static bool Ghost;
             static int next;
 
             public static void BeginPass(bool probing)
             {
                 Probing = probing;
                 Pinned = false;
+                Ghost = false;
                 next = 0;
                 if (probing) { ItemBounds = new List<Bounds>(); ItemPinned = new List<bool>(); ItemSolid = new List<bool>(); }
             }
@@ -59,7 +65,7 @@ namespace HakoOnna.Art.EditorTools
                 probe.Track = true;
                 probe.HasBounds = false;
                 mb.M = Probing || ItemXform == null || current >= ItemXform.Count ? Matrix4x4.identity : ItemXform[current];
-                main.Mute = !Probing && IsDropped(mb.M);
+                main.Mute = !Probing && (IsDropped(mb.M) || Ghost);
             }
 
             /// <summary>搬家后哪里都放不下、被撤掉的件：矩阵全零（m33 = 0）。</summary>
@@ -116,6 +122,27 @@ namespace HakoOnna.Art.EditorTools
             public void C(Material m, float x, float y0, float z, float r0, float r1, float h, int seg = 12) => Prim(() => mb.Cyl(m, new Vector3(x, y0, z), r0, r1, h, seg));
             public void Cr(Material m, Vector3 b, float r0, float r1, float h, Quaternion rot, int seg = 10) => Prim(() => mb.Cyl(m, b, r0, r1, h, seg, true, rot));
             public void S(Material m, float x, float y, float z, float rx, float ry, float rz, int seg = 10) => Prim(() => mb.Sphere(m, new Vector3(x, y, z), new Vector3(rx, ry, rz), seg));
+
+            /// <summary>
+            /// 外部 CC0 模型（ExternalModels）：转好、缩放好以后最低点落在 basePos，水平居中。
+            /// 和图元一样算一件（或属于外层 Push…Pop 那一件），跟着家具一起搬家、放大。
+            /// </summary>
+            public void Model(string id, Vector3 basePos, float yaw = 0f, float scale = 1f, string only = null, float pitch = 0f, float roll = 0f) =>
+                Prim(() => mb.Model(id, ExternalModels.Place(id, only, basePos, Quaternion.Euler(pitch, yaw, roll), scale), only));
+
+            /// <summary>模型在不转动时的尺寸（米，乘过 scale）；缺模型时为 0。</summary>
+            public static Vector3 ModelSize(string id, float scale = 1f, string only = null) => ExternalModels.LocalBounds(id, only).size * scale;
+
+            /// <summary>
+            /// 第一遍按 probe 量尺寸、第二遍画 real，两遍都算一件：旧陈设换成模型时用，
+            /// 搬家求解看到的还是原来的包围盒（容器位置不会因此变动）。probe 必须是原来那一件。
+            /// </summary>
+            public void Swap(System.Action probe, System.Action real)
+            {
+                Push(Vector3.zero);
+                if (Probing) probe(); else real();
+                Pop();
+            }
         }
 
         static readonly Quaternion AlongX = Quaternion.Euler(0, 0, -90); // 圆柱 +Y → +X
@@ -140,6 +167,10 @@ namespace HakoOnna.Art.EditorTools
                 foreach (var f in fills) f.fill(new Kit());
                 // 和代码生成的家具、容器、出生点一起分组，算出搬到新尺寸 + 放大的变换
                 Kit.ItemXform = SolveRelocation(Kit.ItemBounds, Kit.ItemPinned, Kit.ItemSolid, root);
+                // 第三轮：换掉的场景物体删掉；容器正面 1 m 内的旧陈设撤掉
+                RemoveReplacedProps(root);
+                ContainerFronts = ComputeContainerFronts(root);
+                ClearContainerFronts();
                 // 第二遍：带变换真正生成
                 Kit.BeginPass(false);
                 foreach (var f in fills)
@@ -148,10 +179,12 @@ namespace HakoOnna.Art.EditorTools
                     f.fill(k);
                     k.mb.Build(parent, "Furn_" + f.name);
                 }
+                var xform2 = Kit.ItemXform;
                 // 第三遍：按房间大小补家具（直接按新尺寸摆，避开上面已经占用的地方）
                 Kit.ItemXform = null;
                 Kit.BeginPass(false);
                 FurnishByRoom(parent);
+                ReportOverlaps(root, Kit.ItemBounds, xform2, Kit.ItemSolid);
             }
             finally
             {
@@ -432,22 +465,51 @@ namespace HakoOnna.Art.EditorTools
         }
 
         // ---------------------------------------------------------------- 次の間
+        /// <summary>
+        /// 次の間金屏风的一扇（局部 +x 是正面）。art = null 时画第二轮的样子（只在第一遍量尺寸时用）；
+        /// 否则正面贴古画的一条：四扇从左到右连续取画，每条按扇面比例取宽度、画面高度取满（不拉伸）。
+        /// </summary>
+        static void TsugiByobuPanel(Kit k, float x, float z, float yaw, int i, Material art)
+        {
+            k.Push(new Vector3(x, .55f, z), yaw);
+            k.Bb(D.GoldLeaf, 0, .02f, 0, .018f, 1.41f, .35f);
+            k.Bb(D.Lacquer, 0, 0, 0, .026f, .03f, .37f);
+            k.Bb(D.Lacquer, 0, 1.42f, 0, .026f, .03f, .37f);
+            k.Bb(D.Lacquer, 0, 0, .175f, .026f, 1.45f, .02f);
+            k.Bb(D.Lacquer, 0, 0, -.175f, .026f, 1.45f, .02f);
+            if (art == null)
+            {
+                k.Br(D.Ink, .011f, .55f + i * .12f, 0, .002f, .45f, .025f, 35f - i * 20f, 0, 0);
+                k.S(D.Pine, .011f, .95f + (i % 2) * .15f, (i - 1.5f) * .04f, .002f, .07f, .12f, 8);
+            }
+            else
+            {
+                const float qw = .34f, qh = 1.40f, u0 = .39f;
+                var cont = MetContent("65670");
+                var tex = art.GetTexture("_BaseMap");
+                float du = tex == null ? .0965f : qw / qh * cont.height * tex.height / tex.width;
+                // 画面朝局部 +x（转 90° 后画的 +x 落在扇面的 -z，也就是看画人的左边），所以 U 反着取
+                var uv = Rect.MinMaxRect(u0 + (i + 1) * du, cont.yMin, u0 + i * du, cont.yMax);
+                k.Push(new Vector3(.0095f, 0, 0), 90f);
+                PictureQuad(k, art, new Vector3(0, .725f, 0), qw, qh, uv);
+                k.Pop();
+            }
+            k.Pop();
+        }
+
         static void FurnTsugi(Kit k)
         {
             PendantLamp(k, 10.296f, 4.504f, 2.85f, .35f, 1);
-            // 金屏风（四扇，折成锯齿）：东北角贴北墙，正面朝南，给茶桌当背景（西北角让给长持）
+            // 金屏风（四扇，折成锯齿）：东北角贴北墙，正面朝南，给茶桌当背景（西北角让给长持）。
+            // 第三轮：画面换成 Met 65670（桜・梅・柳図屏風）中间偏右那一段（柳树干 + 两棵大樱树），四扇连成一幅；
+            // 原来手画的墨枝和松叶（远看是黑色八角形）不要了。Swap：第一遍仍按原样量尺寸，搬家结果不变。
+            var art = MetMat("65670");
             for (int i = 0; i < 4; i++)
             {
                 float x = 11.326f + .18f + i * .355f, z = 6.8375f + (i % 2 == 0 ? .045f : -.045f);
-                k.Push(new Vector3(x, .55f, z), (i % 2 == 0 ? 20f : -20f) + 90f);
-                k.Bb(D.GoldLeaf, 0, .02f, 0, .018f, 1.41f, .35f);
-                k.Bb(D.Lacquer, 0, 0, 0, .026f, .03f, .37f);
-                k.Bb(D.Lacquer, 0, 1.42f, 0, .026f, .03f, .37f);
-                k.Bb(D.Lacquer, 0, 0, .175f, .026f, 1.45f, .02f);
-                k.Bb(D.Lacquer, 0, 0, -.175f, .026f, 1.45f, .02f);
-                k.Br(D.Ink, .011f, .55f + i * .12f, 0, .002f, .45f, .025f, 35f - i * 20f, 0, 0);
-                k.S(D.Pine, .011f, .95f + (i % 2) * .15f, (i - 1.5f) * .04f, .002f, .07f, .12f, 8);
-                k.Pop();
+                float yaw = (i % 2 == 0 ? 20f : -20f) + 90f;
+                int pi = i;
+                k.Swap(() => TsugiByobuPanel(k, x, z, yaw, pi, null), () => TsugiByobuPanel(k, x, z, yaw, pi, art));
             }
             Blocker("Byobu", new Vector3(12.0385f, .55f, 6.8375f), 0, new Vector3(1.42f, 1.5f, .24f));
             // 茶桌一组（茶桌在 BuildProps）：屏风前面、离两面墙各 1 m 左右自由摆放，坐垫在南边面朝屏风；
@@ -576,8 +638,11 @@ namespace HakoOnna.Art.EditorTools
             k.Bb(P.Plaster, 19.45f, otoshi + .07f, 6.55f, 1.88f, ceil - otoshi - .07f, .03f);
             Kit.Pinned = false;
             k.C(D.Lacquer, 19.9f, .72f, 6.72f, .08f, .08f, .02f, 12);
-            k.C(D.Brass, 19.9f, .74f, 6.72f, .06f, .07f, .07f, 12);
-            k.C(D.Brass, 19.9f, .81f, 6.72f, .045f, .02f, .04f, 10);
+            // 第三轮：香炉换成古董花瓶（CC0 模型）插一枝枯枝。Swap 让搬家求解看到的还是原来的香炉，容器不动
+            k.Swap(() => k.C(D.Brass, 19.9f, .74f, 6.72f, .06f, .07f, .07f, 12),
+                () => k.Model("antique_ceramic_vase_01", new Vector3(19.9f, .74f, 6.72f), 35f, .8f));
+            k.Swap(() => k.C(D.Brass, 19.9f, .81f, 6.72f, .045f, .02f, .04f, 10),
+                () => k.Model("dead_quiver_branch_01", new Vector3(19.9f, .74f + .29f, 6.72f), 205f, 1.15f));
         }
 
         // ---------------------------------------------------------------- 居間

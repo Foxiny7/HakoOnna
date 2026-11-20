@@ -86,6 +86,7 @@ namespace HakoOnna.Art.EditorTools
         {
             DoorPlans = new List<DoorPlan>();
             ParkZones.Clear();
+            StallDoor = null; // 便所隔间的门在补家具时（BenjoStall）记下
             foreach (var o in DOps)
             {
                 if (o.kind == DoorKind.None || o.window || o.glass || o.leaves <= 0) continue;
@@ -310,7 +311,105 @@ namespace HakoOnna.Art.EditorTools
                 BuildGlassDoor(doors, structure, room, e, g, k);
                 glass++;
             }
-            Debug.Log($"[Hako Art] 门：{built} 扇推拉门（{leaves} 片门扇，默认开着），{glass} 组锁着的玻璃拉门");
+            bool stall = BuildStallDoor(doors);
+            Debug.Log($"[Hako Art] 门：{built} 扇推拉门（{leaves} 片门扇，默认开着），{glass} 组锁着的玻璃拉门" +
+                      (stall ? "，1 扇便所隔间的铰链门（默认开着）" : "，便所隔间的门没做（没找到隔间）"));
+        }
+
+        // =====================================================================
+        // 便所隔间的铰链门（开き戸，2026-11-19 用户定：做成 E 开关的门）
+        // =====================================================================
+        /// <summary>
+        /// 杉木框的板门：下半截竖板（板缝、下框受潮发黑），上部一小格竖格子糊着旧纸，两面铜拉手，里面一个铁挂钩。
+        /// 门扇 Leaf_0 的原点就是门轴：关着时门扇沿局部 +x，外面（南）一面 z = 0；开 = 绕 y 转 90°（向外转到隔间西板的延长线上）。
+        /// 和推拉门一样挂 DoorVisual（Doors/Door_Benjo_Stall），门扇带 BoxCollider + 运动学 Rigidbody，程序那边不用改就能接上。
+        /// </summary>
+        static bool BuildStallDoor(Transform parent)
+        {
+            var sd = StallDoor;
+            if (sd == null) return false;
+            var rootPos = new Vector3(sd.opening.center.x, sd.hinge.y, sd.opening.center.z);
+            var door = ArtKit.Empty(parent, "Door_Benjo_Stall", rootPos);
+            var leafPos = sd.hinge - rootPos;
+            var leaf = ArtKit.Empty(door, "Leaf_0", leafPos);
+            var mb = new MeshBatch();
+            var soft = new MeshBatch();
+            float W = sd.width, th = sd.thick, a = sd.y0 - sd.hinge.y, b = sd.y1 - sd.hinge.y;
+            void Bx(Material m, float x0, float x1, float y0, float y1, float z0, float z1) =>
+                mb.Box(m, new Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), new Vector3(x1 - x0, y1 - y0, z1 - z0));
+            const float sw = .05f, tr = .07f, br = .1f;
+            float wa = 1.28f, wb = 1.56f, wx0 = .12f, wx1 = W - .12f; // 上部小窗（离地高）
+            // 框：两根竖框、上框、下框（受潮发黑）、腰框
+            Bx(D.TrimMid, 0f, sw, a, b, 0f, th);
+            Bx(D.TrimMid, W - sw, W, a, b, 0f, th);
+            Bx(D.TrimMid, sw, W - sw, b - tr, b, 0f, th);
+            Bx(D.BeamDark, sw, W - sw, a, a + br, 0f, th);
+            Bx(D.TrimMid, sw, W - sw, .92f, .97f, 0f, th);
+            // 板：缩进 7 mm，窗的上下左右补满
+            float pz0 = .007f, pz1 = th - .007f;
+            Bx(D.TrimLight, sw, W - sw, a + br, .92f, pz0, pz1);
+            Bx(D.TrimLight, sw, W - sw, .97f, wa, pz0, pz1);
+            Bx(D.TrimLight, sw, W - sw, wb, b - tr, pz0, pz1);
+            Bx(D.TrimLight, sw, wx0, wa, wb, pz0, pz1);
+            Bx(D.TrimLight, wx1, W - sw, wa, wb, pz0, pz1);
+            // 板缝（两面）
+            for (float x = sw + .11f; x < W - sw - .04f; x += .11f)
+                foreach (var (z0, z1) in new[] { (pz0 - .0007f, pz0 - .0001f), (pz1 + .0001f, pz1 + .0007f) })
+                {
+                    Bx(D.RanmaDark, x - .002f, x + .002f, a + br, .92f, z0, z1);
+                    Bx(D.RanmaDark, x - .002f, x + .002f, .97f, wa, z0, z1);
+                }
+            // 小窗：窗框、竖格子（外面一侧）、中间糊的旧纸（单独一批不投影，破了一角）
+            Bx(D.TrimMid, wx0, wx1, wa - .012f, wa, 0f, th);
+            Bx(D.TrimMid, wx0, wx1, wb, wb + .012f, 0f, th);
+            for (float x = wx0 + .04f; x < wx1 - .02f; x += .045f) Bx(D.TrimMid, x - .006f, x + .006f, wa, wb, .002f, .014f);
+            float pm = th * .55f;
+            soft.Box(DM.ShojiOld, new Vector3((wx0 + wx1) / 2 + .03f, (wa + wb) / 2, pm), new Vector3(wx1 - wx0 - .06f, wb - wa, .0015f));
+            var scrap = new[] { new Vector3(wx0, wa, pm), new Vector3(wx0 + .06f, wa, pm), new Vector3(wx0 + .06f, wb, pm), new Vector3(wx0, wb - .09f, pm) };
+            var scrapUV = new[] { Vector2.zero, Vector2.right, Vector2.one, Vector2.up };
+            soft.Poly(DM.ShojiOld, scrap, scrapUV, Vector3.back);    // 左上角破了一块
+            soft.Poly(DM.ShojiOld, scrap, scrapUV, Vector3.forward);
+            // 铜拉手（两面）、里面的铁挂钩、门轴一侧门扇上的半边合页和合页轴
+            foreach (var (z0, z1) in new[] { (-.012f, 0f), (th, th + .012f) })
+            {
+                Bx(D.Brass, W - .085f, W - .06f, .84f, .98f, z0, z1);
+                float zb = z0 < 0f ? -.004f : th;
+                Bx(D.Brass, W - .09f, W - .055f, .83f, .85f, zb, zb + .004f);
+                Bx(D.Brass, W - .09f, W - .055f, .97f, .99f, zb, zb + .004f);
+            }
+            Bx(D.Iron, W - .045f, W - .03f, 1.14f, 1.17f, th, th + .01f);
+            Bx(D.Iron, W - .03f, W + .004f, 1.15f, 1.16f, th + .006f, th + .01f);
+            foreach (float hy in new[] { .28f, 1.53f })
+            {
+                Bx(D.Iron, 0f, .024f, hy, hy + .09f, -.004f, 0f);
+                mb.Cyl(D.Iron, new Vector3(0f, hy - .005f, -.004f), .007f, .007f, .1f, 8);
+            }
+            // 外面下半截一条发黄的水渍（半透明，上沿起伏）
+            const int ks = 8;
+            for (int i = 0; i < ks; i++)
+            {
+                float x0 = Mathf.Lerp(sw, W - sw, i / (float)ks), x1 = Mathf.Lerp(sw, W - sw, (i + 1f) / ks);
+                float t0 = a + br + .12f + .16f * Mathf.PerlinNoise(x0 * 6f, 3.1f), t1 = a + br + .12f + .16f * Mathf.PerlinNoise(x1 * 6f, 3.1f);
+                mb.Poly(DM.Stain, new[] { new Vector3(x0, a + br, pz0 - .0012f), new Vector3(x1, a + br, pz0 - .0012f), new Vector3(x1, t1, pz0 - .0012f), new Vector3(x0, t0, pz0 - .0012f) },
+                    new[] { new Vector2(x0, 0f), new Vector2(x1, 0f), new Vector2(x1, 1f), new Vector2(x0, 1f) }, Vector3.back);
+            }
+            mb.Build(leaf, "Leaf");
+            soft.Build(leaf, "Paper", false);
+            ClearStatic(leaf);
+
+            var bc = leaf.gameObject.AddComponent<BoxCollider>();
+            bc.center = new Vector3(W / 2, (a + b) / 2, th / 2);
+            bc.size = new Vector3(W - .01f, b - a - .03f, th);
+            var rb = leaf.gameObject.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            rb.useGravity = false;
+
+            var dv = door.gameObject.AddComponent<HakoOnna.Art.DoorVisual>();
+            var leaves = new[] { new HakoOnna.Art.DoorVisual.Leaf { part = leaf, openEuler = new Vector3(0f, 90f, 0f) } };
+            var closed = new Bounds(leafPos + bc.center, bc.size);
+            var opening = new Bounds(sd.opening.center - rootPos, sd.opening.size);
+            dv.Configure(leaves, opening, closed, false, true, .6f, .5f);
+            return true;
         }
 
         /// <summary>会动的门扇不能静态合批（MeshBatch.Build 默认标了 BatchingStatic / OccludeeStatic）。</summary>

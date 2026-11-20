@@ -21,6 +21,11 @@ namespace HakoOnna.Art.EditorTools
         public Material WindowGlass; // 透明（玻璃拉门）
         public Material BambooDry, MapleLeaf, Moss; // 庭院：晒干的竹篱笆、红叶、苔藓
         public Material TatamiWorn, StoneWall;       // 第二轮：发黄发黑的旧席子、切石基座（外墙、围墙）
+        public Material MirrorFog;                   // 第三轮：旧镜子上的一层灰雾（半透明）
+        public Material LeafDead, PaperOld, PaperText, Dirt; // 第三轮废弃感：枯叶、发黄的旧报纸、报纸上的字块、墙里的土
+        public Material Cobweb, WebStrand;           // 第三轮废弃感：蜘蛛网（半透明的网面 + 不透明的丝）
+        public Material Stain;                       // 第三轮废弃感：地上的水渍、霉斑（半透明的深色）
+        public Material DustSheet, DustSheetOld, DustSheetTop; // 第三轮：家具上盖的防尘布（灰白、发黄两种；顶面落了灰）
 
         [MenuItem("Hako/Art/2b 重建细节贴图和材质", priority = 21)]
         static void Rebuild()
@@ -134,6 +139,17 @@ namespace HakoOnna.Art.EditorTools
             d.Moss = Mat("MD_Moss", null, null, C(.10f, .16f, .055f), .08f, one);
             d.TatamiWorn = Mat("MD_TatamiWorn", tatami, tatamiN, C(.78f, .7f, .55f), .1f, new Vector2(2, 2), bump: .6f);
             d.StoneWall = Mat("MX_StoneWall", stone, stoneN, Color.white, .2f, one, bump: .5f);
+            d.MirrorFog = GlassMat("MD_MirrorFog", new Color(.34f, .32f, .28f, .55f), .25f);
+            d.LeafDead = Mat("MD_LeafDead", null, null, C(.23f, .15f, .07f), .15f, one);
+            d.PaperOld = Mat("MD_PaperOld", null, null, C(.60f, .55f, .43f), .05f, one);
+            d.PaperText = Mat("MD_PaperText", null, null, C(.42f, .39f, .33f), .05f, one);
+            d.Dirt = Mat("MD_WallClay", null, null, C(.30f, .24f, .17f), .05f, one);
+            d.Cobweb = GlassMat("MD_Cobweb", new Color(.78f, .77f, .74f, .1f), .05f); // 0.26 太实，像一块白三角
+            d.Stain = GlassMat("MD_FloorStain", new Color(.1f, .07f, .035f, .34f), .12f);
+            d.DustSheet = Mat("MD_DustSheet", null, null, C(.6f, .59f, .55f), .03f, one);
+            d.DustSheetOld = Mat("MD_DustSheetOld", null, null, C(.57f, .53f, .44f), .03f, one);
+            d.DustSheetTop = Mat("MD_DustSheetTop", null, null, C(.43f, .41f, .37f), .02f, one);
+            d.WebStrand = Mat("MD_WebStrand", null, null, C(.58f, .57f, .54f), .1f, one);
             // 第二轮：大部分材质换成 CC0 贴图（只升级一次，见 ExternalMats）
             ExternalMats.UpgradeDetail(d);
             AssetDatabase.SaveAssets();

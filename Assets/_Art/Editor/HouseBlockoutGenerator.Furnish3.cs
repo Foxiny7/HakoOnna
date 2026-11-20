@@ -50,11 +50,15 @@ namespace HakoOnna.Art.EditorTools
             int placed = 0, extra = 0, centered = 0;
             var missed = new List<string>();
             var perRoom = new List<string>();
+            FixtureWarnings.Clear();
+            RuinReport.Clear();
+            RuinShots.Clear();
+            SheetLog.Clear();
             foreach (var room in DRooms)
             {
                 if (!room.hasFloor || room.group == GFence || IsStairRoom(room) || room.id == "Kaidan" || room.id == "UraKaidan") continue;
                 var program = RoomProgram(room);
-                if (program.Count == 0) continue;
+                if (program.Count == 0 && !HasFixtures(room)) continue;
                 var rng = new System.Random(StableHash(room.id) ^ 0x2F6B1);
                 var ctx = MakeCtx(room);
                 var k = new Kit();
@@ -80,10 +84,14 @@ namespace HakoOnna.Art.EditorTools
                 placed += n;
                 extra += floorMore + wallMore;
                 perRoom.Add($"{room.id} 中{nc}+{n}+{floorMore}+{wallMore}");
+                Abandon(k, ctx); // 第三轮：碎纸、墙皮、落叶、蜘蛛网、物置塌顶（最后放，只占剩下的地）
                 k.mb.Build(parent, "Furn_Fill_" + room.id);
             }
             Debug.Log($"[Hako Art] 按房间补家具：中央家具组 {centered} 组 + 清单 {placed} 件 + 按空墙补 {extra} 件（{string.Join("，", perRoom)}）" +
                       (missed.Count > 0 ? $"；清单里放不下 {missed.Count} 件：{string.Join(" ", missed)}" : ""));
+            Debug.Log($"[Hako Art] 废弃感（碎屑堆数 + 蜘蛛网张数）：{string.Join("，", RuinReport)}");
+            Debug.Log($"[Hako Art] 防尘布 {SheetLog.Count} 块：{string.Join("，", SheetLog)}");
+            Debug.Log($"[Hako Art] 便所、風呂的固定设备：{(FixtureWarnings.Count == 0 ? "没有和旧陈设、门口、容器正面冲突" : string.Join("；", FixtureWarnings))}");
         }
 
         static readonly Piece FloorProbe = new Piece { name = "probe", w = .5f, d = .45f, h = 1.0f };
@@ -157,48 +165,50 @@ namespace HakoOnna.Art.EditorTools
             switch (room.id)
             {
                 case "Genkan":
-                    return Pieces(PTsuitate(), PBench(), PConsole(), PCoatRack(), PFlowerStand(), PPlant(1), PPlant(2),
-                        PPainting(1), PPainting(0), PClock());
+                    return Pieces(PTsuitate(), PBench(), PConsole(), PCoatRack(), PFlowerStand(), PBoots(), PPlant(1), PPlant(2),
+                        PPainting(1), PPainting(0), PClock(), PLanternHook());
                 case "Daidokoro":
                     return Pieces(PWorkTable(), PShelf(1.2f, 1.6f, 4, 0), PShelf(1.0f, 1.6f, 4, 0), PPump(), PShelf(1.4f, .9f, 2, 0),
-                        PUtensils(), PUtensils(), PPlant(3), PPainting(2));
+                        POilTins(), PStool(true), PMouseTrap(), PMouseTrap(), PUtensils(), PUtensils(), PPlant(3), PPainting(2));
                 case "Tsugi":
                     return Pieces(PShelf(1.0f, .9f, 2, 2), PAndon(), PZabutonStack(), PPlant(3), PScroll(room, 1), PPainting(0));
                 case "Butsuma":
-                    return Pieces(PByobu(false), PAndon(), PZabutonStack(), PPlant(2), PScroll(room, 0));
+                    return Pieces(PByobu(room, false), PAndon(), PZabutonStack(), PPlant(2), PScroll(room, 0));
                 case "Zashiki":
-                    return Pieces(PArmor(), PByobu(true), PKoto(), PAndon(), PAndon(), PZabutonStack(), PPlant(1), PHibachi(), PPainting(2));
+                    return Pieces(PArmor(), PByobu(room, true), PKoto(), PAndon(), PAndon(), PZabutonStack(), PPlant(1), PHibachi(), PPainting(2));
                 case "Ima":
                     return Pieces(PTV(), PShelf(1.0f, .9f, 2, 1), PAndon(), PZabutonStack(), PPlant(0), PHibachi(), PPainting(1), PScroll(room, 2));
                 case "Nando":
-                    return Pieces(PFutonStack(), PFutonStack(), PShelf(1.2f, 1.8f, 4, 2), PDressForm(), PSewing(), PSpinningWheel(), PStandMirror());
+                    return Pieces(PFutonStack(), PFutonStack(), PShelf(1.2f, 1.8f, 4, 2), PDressForm(), PSewing(), PSpinningWheel(), PStandMirror(),
+                        POilTins(), PMouseTrap());
                 case "Oku":
-                    return Pieces(PHina(), PByobu(false), PZabutonStack(), PPlant(2), PAndon(), PScroll(room, 3));
+                    return Pieces(PHina(), PByobu(room, false), PZabutonStack(), PPlant(2), PAndon(), PScroll(room, 3));
                 // 走廊、縁側：日式住宅的走廊基本是空的，只留一两件
                 case "Engawa":
-                    return Pieces(PVeranda(), PPlant(1), PPlant(3));
+                    return Pieces(PVeranda(), PPlant(1), PPlant(3), PWateringCan());
                 case "EngawaE":
-                    return Pieces(PBench(), PPlant(0));
+                    return Pieces(PBench(), PPlant(0), PBoots());
                 case "Rouka":
                     return Pieces(PConsole(), PPlant(3), PClock(), PPainting(0));
+                // 便所、風呂：隔间、洗手处、洗脸台、洗衣处都在 WetRooms 里按位置直接摆
                 case "Benjo":
-                    return Pieces(PShelf(.6f, 1.2f, 3, 5));
-                case "Furo": // 都在南边的脱衣处（浴室在隔墙北边，见 WetRooms）
-                    return Pieces(PWasher(), PShelf(.9f, 1.4f, 3, 5), PWashTubs(), PBench(), PStandMirror());
+                case "Furo":
+                    return Pieces();
                 case "Kura":
-                    return Pieces(PShelf(1.4f, 2.0f, 5, 4), PShelf(1.4f, 2.0f, 5, 4), PArmor(), PHina(), PRiceBales(), PRiceBales(),
-                        PSpinningWheel(), PDressForm(), PToolRack());
+                    return Pieces(PShelf(1.4f, 2.0f, 5, 4), PShelf(1.4f, 2.0f, 5, 4), PArmor(), PHina(), PLadder(), PRiceBales(), PRiceBales(),
+                        PSpinningWheel(), PDressForm(), PToolRack(), POilTins(), PSpade(), PStool(true), PMouseTrap(), PLanternHook());
                 case "Shinshitsu":
-                    return Pieces(PByobu(false), PFutonStack(), PStandMirror(), PAndon(), PZabutonStack(), PPlant(0), PScroll(room, 3), PPainting(0));
+                    return Pieces(PByobu(room, false), PFutonStack(), PStandMirror(), PAndon(), PZabutonStack(), PPlant(0), PScroll(room, 3), PPainting(0));
                 case "Washitsu2F":
-                    return Pieces(PByobu(true), PShelf(1.0f, .9f, 2, 1), PAndon(), PZabutonStack(), PPlant(2), PHibachi(), PScroll(room, 2));
+                    return Pieces(PByobu(room, true), PShelf(1.0f, .9f, 2, 1), PAndon(), PZabutonStack(), PPlant(2), PHibachi(), PScroll(room, 2));
                 case "Rouka2F":
                 case "Rouka2FN":
                     return Pieces(PConsole(), PPlant(1), PPainting(0));
                 case "Monooki":
-                    return Pieces(PFutonStack(), PShelf(1.2f, 1.8f, 4, 2), PDressForm(), PSewing(), PStandMirror(), PRockingHorse());
+                    return Pieces(PFutonStack(), PShelf(1.2f, 1.8f, 4, 2), PLadder(), PDressForm(), PSewing(), PStandMirror(), PRockingHorse(),
+                        POilTins(), PStool(true), PMouseTrap());
                 case "Kodomo":
-                    return Pieces(PShelf(1.2f, .9f, 2, 3), PShelf(1.0f, 1.4f, 3, 3), PRockingHorse(), PDrawings(), PDrawings(), PPlant(3), PPainting(0));
+                    return Pieces(PFallenShelf(), PShelf(1.2f, .9f, 2, 3), PShelf(1.0f, 1.4f, 3, 3), PRockingHorse(), PDrawings(), PDrawings(), PPlant(3), PPainting(0));
                 default:
                     return new List<Piece>();
             }
@@ -216,7 +226,7 @@ namespace HakoOnna.Art.EditorTools
         };
         static Piece PFlowerStand() => new Piece { name = "FlowerStand", w = .7f, d = .58f, h = 1.55f, blockH = 1.0f, corner = true, draw = DrawFlowerStand };
         static Piece PAndon() => new Piece { name = "Andon", w = .36f, d = .36f, h = .9f, blockH = .82f, corner = true, draw = (k, r) => DrawAndon(k) };
-        static Piece PByobu(bool gold) => new Piece { name = "Byobu", w = 2.25f, d = .45f, h = 1.6f, blockH = 1.6f, draw = (k, r) => DrawByobu(k, r, gold) };
+        static Piece PByobu(Room room, bool gold) => new Piece { name = "Byobu", w = 2.25f, d = .45f, h = 1.6f, blockH = 1.6f, draw = (k, r) => DrawByobu(k, r, gold, room) };
         static Piece PZabutonStack() => new Piece { name = "Zabutons", w = .6f, d = .62f, h = .48f, blockH = .42f, corner = true, draw = DrawZabutonStack };
         static Piece PFutonStack() => new Piece { name = "Futons", w = 1.1f, d = .78f, h = .78f, blockH = .7f, draw = DrawFutonStack };
         static Piece PShelf(float w, float h, int n, int content) =>
@@ -257,7 +267,7 @@ namespace HakoOnna.Art.EditorTools
         {
             const float w = .55f, h = 1.5f;
             float lift = IsTatami(room) ? NageshiY(room) - FloorY(room) - FurnitureScale * h - .03f : .8f;
-            return new Piece { name = "Scroll", w = w, d = .03f, h = h, lift = lift, wall = true, draw = (k, r) => HangingScroll(k, r, w, h, kind) };
+            return new Piece { name = "Scroll", w = w, d = .03f, h = h, lift = lift, wall = true, draw = (k, r) => HangingScroll(k, r, w, h, kind, room) };
         }
 
         static float NageshiY(Room room)
@@ -298,6 +308,8 @@ namespace HakoOnna.Art.EditorTools
                 x.Expand(new Vector3(.04f, 0f, .04f));
                 Hard(x);
             }
+            // 容器正面前 1 m 不放任何陈设（第三轮）
+            foreach (var f in ContainerFronts) Hard(f);
             c.hardFixed = c.hard.Count;
             foreach (var b in KeepOut)
             {
@@ -417,9 +429,18 @@ namespace HakoOnna.Art.EditorTools
             if (!found) return false;
 
             float S = FurnitureScale, yaw = WallYaw(bestE);
+            var sheet = p.wall ? null : SheetFor(c, p, bestE, bestS);
             k.PushS(OnWall(bestE, bestS, c.fl + p.lift, T + FillGap), new Vector3(0, yaw, 0), Vector3.one * S);
+            CoverNext = sheet != null;
             p.draw(k, rng);
+            CoverNext = false;
+            if (sheet != null) DustSheet(k, new System.Random(StableHash(room.id + "/" + p.name) ^ 0x5EE7), sheet);
             k.Pop();
+            if (sheet != null)
+            {
+                SheetLog.Add(room.id + "/" + p.name);
+                ShotAt($"sheet_{room.id}_{p.name}", c, OnWall(bestE, bestS, c.fl + Mathf.Min(.9f, S * p.h * .5f), T + FillGap + S * p.d / 2), 2.1f, .75f);
+            }
             if (!p.wall && p.blockH > 0f)
                 Blocker(room.id + "_" + p.name, OnWall(bestE, bestS, c.fl, T + FillGap + S * p.d / 2), yaw,
                     new Vector3(S * p.w, S * p.blockH, S * p.d));
@@ -526,24 +547,42 @@ namespace HakoOnna.Art.EditorTools
             k.Br(D.CeramicWhite, -pw * .1f, ph * .05f, z + .0008f, .006f, ph * .09f, .0015f, 0, 0, 12f);
         }
 
-        /// <summary>挂轴：局部底边 y=0，顶边 y=h。kind 0 书法 1 山水 2 圆相 3 幽霊画。</summary>
-        static void HangingScroll(Kit k, System.Random rng, float w, float h, int kind)
+        /// <summary>
+        /// 挂轴：局部底边 y=0，顶边 y=h。第三轮：画心用 Met 的 CC0 古画（按画面比例定宽高，不裁不拉，上下各一条金襕“一文字”）；
+        /// kind 3（幽霊画）和缺贴图时用手绘：0 书法 1 山水 2 圆相 3 幽霊画。
+        /// </summary>
+        static void HangingScroll(Kit k, System.Random rng, float w, float h, int kind, Room room = null)
         {
             k.B(D.Black, 0, h - .015f, .004f, .006f, .03f, .004f);
             k.Cr(D.Lacquer, new Vector3(-w / 2 - .01f, h - .04f, .012f), .009f, .009f, w + .02f, AlongX, 8);
             k.Bb(D.ClothIndigo, 0, .03f, .006f, w, h - .07f, .004f);
             float pw = w * .76f, ph = (h - .07f) * .7f, py = .03f + (h - .07f) * .56f;
-            k.B(D.Paper, 0, py, .0085f, pw, ph, .001f);
-            k.Push(new Vector3(0, py, 0));
-            const float z = .0095f;
-            switch (kind)
+            string oid = ScrollPainting(room, kind);
+            var art = oid != null ? MetMat(oid) : null;
+            if (art != null)
             {
-                case 0: Calligraphy(k, rng, pw, ph, z, 1); break;
-                case 1: InkLandscape(k, rng, pw, ph, z); break;
-                case 2: Enso(k, pw, ph, z); break;
-                default: Yurei(k, pw, ph, z); break;
+                var uv = MetContent(oid);
+                float a = MetAspect(art, uv);
+                float qw = Mathf.Min(pw * 1.08f, ph * a), qh = qw / a;
+                k.B(D.Gold, 0, py + qh / 2 + .028f, .0088f, qw + .02f, .045f, .001f);
+                k.B(D.Gold, 0, py - qh / 2 - .017f, .0088f, qw + .02f, .022f, .001f);
+                k.B(D.Paper, 0, py, .0083f, qw + .012f, qh + .012f, .001f);
+                PictureQuad(k, art, new Vector3(0, py, .0092f), qw, qh, uv);
             }
-            k.Pop();
+            else
+            {
+                k.B(D.Paper, 0, py, .0085f, pw, ph, .001f);
+                k.Push(new Vector3(0, py, 0));
+                const float z = .0095f;
+                switch (kind)
+                {
+                    case 0: Calligraphy(k, rng, pw, ph, z, 1); break;
+                    case 1: InkLandscape(k, rng, pw, ph, z); break;
+                    case 2: Enso(k, pw, ph, z); break;
+                    default: Yurei(k, pw, ph, z); break;
+                }
+                k.Pop();
+            }
             k.Cr(D.Lacquer, new Vector3(-w / 2 - .035f, .03f, .014f), .014f, .014f, w + .07f, AlongX, 10);
         }
 
@@ -675,7 +714,11 @@ namespace HakoOnna.Art.EditorTools
             k.Bb(D.ClothIndigo, -.32f, .145f, .2f, .26f, .05f, .2f);
             k.Bb(D.ClothRed, -.31f, .195f, .2f, .24f, .04f, .19f);
             k.C(D.CeramicBrown, .3f, .145f, .2f, .09f, .07f, .2f, 12);
+            // 盖着防尘布：桌面摆件照样“摆”（随机数照常用掉），只是不写网格
+            bool mute = k.mb.Mute;
+            if (CoverNext) k.mb.Mute = true;
             TableDeco(k, rng, rng.Next(4), H, Dp / 2);
+            k.mb.Mute = mute;
             k.Push(new Vector3(0, 1.38f, 0));
             Painting(k, rng, .82f, .58f, rng.Next(4));
             k.Pop();
@@ -722,10 +765,38 @@ namespace HakoOnna.Art.EditorTools
             }
         }
 
-        /// <summary>0 橡皮树 1 棕竹 2 竹 3 叶兰。叶子只往前、两侧长，不穿墙。</summary>
+        /// <summary>
+        /// 第三轮：全是枯死的盆栽（荒废很久）。0 素烧陶盆（模型）+ 枯树枝；1 蓝釉盆 + 一丛枯荨麻；
+        /// 2 竹子枯黄、叶子掉了一地；3 蓝釉盆 + 枯草，有时整盆翻倒、土撒出来。周围落着枯叶。
+        /// </summary>
         static void DrawPlant(Kit k, System.Random rng, int kind)
         {
             float cz = kind == 1 ? .32f : .3f;
+            bool tipped = kind == 3 && rng.Next(3) == 0;
+            if (tipped)
+            {
+                // 翻倒的盆：侧躺，土从盆口撒出来，枯草压在地上
+                k.Push(new Vector3(0, .2f, cz), Rf(rng, -40f, 40f), 0f, 82f);
+                k.C(D.CeramicBlue, 0, -.2f, 0, .16f, .21f, .4f, 16);
+                k.C(D.CeramicBlue, 0, .2f, 0, .22f, .22f, .03f, 16);
+                k.Pop();
+                k.S(D.Ground, -.3f, .01f, cz, .2f, .03f, .16f, 10);
+                k.S(D.Ground, -.45f, .005f, cz + .05f, .1f, .015f, .08f, 8);
+                for (int i = 0; i < 4; i++)
+                    k.Model("nettle_plant", new Vector3(-.35f - i * .06f, 0, cz + Rf(rng, -.12f, .12f)), Rf(rng, 0f, 360f), 2.6f,
+                        i % 2 == 0 ? "medium_a" : "small_a", 0f, Rf(rng, 60f, 85f));
+                DeadLeaves(k, rng, 10, .55f, cz);
+                return;
+            }
+            if (kind == 0)
+            {
+                // 素烧陶盆（Poly Haven planter_pot_clay）× 1.5 ≈ 40 cm 口径
+                k.Model("planter_pot_clay", new Vector3(0, 0, cz), Rf(rng, 0f, 360f), 1.5f);
+                k.C(D.Ground, 0, .3f, cz, .17f, .17f, .02f, 14);
+                k.Model("dead_quiver_branch_01", new Vector3(0, .26f, cz), Rf(rng, 0f, 360f), 2.6f);
+                DeadLeaves(k, rng, 9, .45f, cz);
+                return;
+            }
             var pot = kind == 1 || kind == 3 ? D.CeramicBlue : D.CeramicBrown;
             k.C(pot, 0, 0, cz, .16f, .21f, .4f, 16);
             k.C(pot, 0, .4f, cz, .22f, .22f, .03f, 16);
@@ -733,53 +804,59 @@ namespace HakoOnna.Art.EditorTools
             var c0 = new Vector3(0, .43f, cz);
             switch (kind)
             {
-                case 0:
-                    k.Cr(D.Bark, c0, .022f, .014f, 1.1f, Quaternion.Euler(2, 0, 3), 6);
-                    for (int i = 0; i < 16; i++)
-                    {
-                        float yaw = i * 137.5f, y = .62f + i * .055f;
-                        var spin = Quaternion.Euler(0, yaw, 0);
-                        var rot = spin * Quaternion.Euler(0, 0, -25f + (i % 3) * 10f);
-                        k.mb.Sphere(D.Leaf, new Vector3(0, y, cz) + spin * new Vector3(.11f, 0, 0), new Vector3(.11f, .012f, .055f), 8, rot);
-                    }
-                    break;
                 case 1:
-                    for (int i = 0; i < 9; i++)
+                    // 一丛枯荨麻（Poly Haven nettle_plant 的枯黄贴图），放大到半人高，往外耷拉
+                    string[] parts = { "tall_a", "tall_b", "medium_a", "medium_b", "tall_a" };
+                    for (int i = 0; i < parts.Length; i++)
                     {
-                        float yaw = 200f + i * 18f + Rf(rng, -5f, 5f), elev = Rf(rng, 55f, 75f), len = Rf(rng, .45f, .6f);
-                        var spin = Quaternion.Euler(0, yaw, 0);
-                        var dir = spin * Quaternion.Euler(0, 0, elev) * Vector3.right;
-                        k.Cr(D.Bark, c0, .008f, .005f, len, Quaternion.FromToRotation(Vector3.up, dir), 5);
-                        var tip = c0 + dir * len;
-                        for (int j = 0; j < 6; j++)
-                        {
-                            var lr = spin * Quaternion.Euler(0, 0, -30f + j * 12f + Rf(rng, -4f, 4f));
-                            k.mb.Box(D.Leaf, tip + lr * new Vector3(.09f, 0, 0), new Vector3(.18f, .006f, .03f), lr);
-                        }
+                        float a = i * 72f + Rf(rng, -15f, 15f);
+                        var off = Quaternion.Euler(0, a, 0) * new Vector3(.07f, 0, 0);
+                        k.Model("nettle_plant", c0 + off - new Vector3(0, .02f, 0), a, Rf(rng, 2.8f, 3.4f), parts[i], Rf(rng, -18f, 18f), Rf(rng, -14f, 14f));
                     }
+                    DeadLeaves(k, rng, 8, .5f, cz);
                     break;
                 case 2:
+                    // 竹子枯黄，叶子掉光了只剩几簇
                     for (int i = 0; i < 5; i++)
                     {
                         var p = c0 + new Vector3(Rf(rng, -.09f, .09f), 0, Rf(rng, -.06f, .09f));
                         float h = Rf(rng, 1.1f, 1.45f);
-                        var tilt = Quaternion.Euler(Rf(rng, 0f, 5f), 0, Rf(rng, -5f, 5f));
-                        k.Cr(D.Bamboo, p, .016f, .013f, h, tilt, 7);
-                        for (int j = 0; j < 3; j++)
+                        var tilt = Quaternion.Euler(Rf(rng, 0f, 9f), 0, Rf(rng, -9f, 9f));
+                        k.Cr(D.Straw, p, .016f, .013f, h, tilt, 7);
+                        if (rng.Next(3) == 0)
                         {
-                            var q = p + tilt * Vector3.up * (h * (.55f + .2f * j));
-                            k.S(D.BambooLeaf, q.x + Rf(rng, -.07f, .07f), q.y, q.z + Rf(rng, -.02f, .07f), .12f, .06f, .09f, 7);
+                            var q = p + tilt * Vector3.up * (h * .85f);
+                            k.S(D.Straw, q.x + Rf(rng, -.05f, .05f), q.y, q.z + Rf(rng, -.02f, .05f), .08f, .03f, .06f, 7);
                         }
                     }
+                    DeadLeaves(k, rng, 16, .6f, cz);
                     break;
                 default:
-                    for (int i = 0; i < 13; i++)
+                    // 枯草：叶子全耷拉下来
+                    for (int i = 0; i < 4; i++)
+                        k.Model("nettle_plant", c0 + new Vector3(Rf(rng, -.06f, .06f), -.02f, Rf(rng, -.06f, .06f)), Rf(rng, 0f, 360f),
+                            Rf(rng, 2.6f, 3.2f), i % 2 == 0 ? "medium_a" : "medium_b", Rf(rng, -10f, 10f));
+                    for (int i = 0; i < 9; i++)
                     {
-                        float yaw = i * 27.7f + Rf(rng, -6f, 6f), pitch = Rf(rng, 8f, 22f), len = Rf(rng, .5f, .75f);
+                        float yaw = i * 39.7f + Rf(rng, -6f, 6f), pitch = Rf(rng, 55f, 80f), len = Rf(rng, .35f, .5f);
                         var rot = Quaternion.Euler(0, yaw, 0) * Quaternion.Euler(pitch, 0, 0);
-                        k.mb.Box(D.Leaf, c0 + rot * new Vector3(0, len / 2, 0), new Vector3(.09f, len, .006f), rot);
+                        k.mb.Box(D.Straw, c0 + rot * new Vector3(0, len / 2, 0), new Vector3(.06f, len, .005f), rot);
                     }
+                    DeadLeaves(k, rng, 7, .45f, cz);
                     break;
+            }
+        }
+
+        /// <summary>盆周围的枯叶（扁的小椭球），半径 r 内随机撒 n 片。</summary>
+        static void DeadLeaves(Kit k, System.Random rng, int n, float r, float cz)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                float a = Rf(rng, 0f, Mathf.PI * 2), d = Rf(rng, .18f, r);
+                var p = new Vector3(Mathf.Cos(a) * d, .004f, cz + Mathf.Sin(a) * d * .7f);
+                if (p.z < .03f) p.z = .03f + Rf(rng, 0f, .05f);
+                k.mb.Sphere(rng.Next(3) == 0 ? D.Bark : D.Straw, p, new Vector3(Rf(rng, .025f, .045f), .003f, Rf(rng, .012f, .022f)), 6,
+                    Quaternion.Euler(0, Rf(rng, 0f, 360f), 0));
             }
         }
 
@@ -851,13 +928,20 @@ namespace HakoOnna.Art.EditorTools
             k.Pop();
         }
 
-        /// <summary>六曲屏风，折成锯齿立着。金屏画松枝，纸屏画远山和红日。</summary>
-        static void DrawByobu(Kit k, System.Random rng, bool gold)
+        /// <summary>
+        /// 屏风，折成锯齿立着。第三轮：画面用 Met 的 CC0 古画——照片是六曲屏风，取其中连续四扇，一扇对一扇（折缝对齐、不拉伸）；
+        /// 缺贴图时退回六扇手绘（金屏画松枝，纸屏画远山和红日）。
+        /// </summary>
+        static void DrawByobu(Kit k, System.Random rng, bool gold, Room room)
         {
-            const int n = 6;
-            const float pw = .38f, ph = 1.55f, z = .22f, ang = 22f;
+            var (oid, first) = ByobuPainting(room, gold);
+            var art = MetMat(oid);
+            int n = art != null ? 4 : 6;
+            float pw = art != null ? .55f : .38f;
+            const float ph = 1.55f, z = .22f, ang = 22f;
             float step = pw * Mathf.Cos(ang * Mathf.Deg2Rad);
             var face = gold ? D.GoldLeaf : D.Paper;
+            var content = MetContent(oid);
             for (int i = 0; i < n; i++)
             {
                 k.Push(new Vector3((i - (n - 1) / 2f) * step, 0, z), i % 2 == 0 ? ang : -ang);
@@ -867,7 +951,13 @@ namespace HakoOnna.Art.EditorTools
                 k.Bb(D.Lacquer, -pw / 2 + .012f, 0, 0, .024f, ph, .024f);
                 k.Bb(D.Lacquer, pw / 2 - .012f, 0, 0, .024f, ph, .024f);
                 const float fz = .0075f;
-                if (gold)
+                if (art != null)
+                {
+                    float sw = content.width / 6f;
+                    var uv = new Rect(content.xMin + (first + i) * sw, content.yMin, sw, content.height);
+                    PictureQuad(k, art, new Vector3(0, .035f + (ph - .07f) / 2, fz), pw - .03f, ph - .07f, uv);
+                }
+                else if (gold)
                 {
                     float y = ph * (.55f + .05f * Mathf.Sin(i * 1.3f));
                     k.Br(D.Bark, 0, y, fz, pw - .05f, .025f, .002f, 0, 0, i % 2 == 0 ? 6f : -6f);
@@ -1106,7 +1196,9 @@ namespace HakoOnna.Art.EditorTools
                 k.Bb(D.TrimMid, sx, 0, .21f, .1f, .04f, .4f);
             }
             k.Bb(D.TrimMid, 0, .1f, .21f, 1.24f, .05f, .04f);
-            switch (rng.Next(3))
+            int what = rng.Next(3);
+            if (CoverNext) return; // 盖着防尘布：凳面上的东西不画
+            switch (what)
             {
                 case 0:
                     k.Bb(D.ClothIndigo, -.4f, .47f, .21f, .5f, .05f, .38f);
@@ -1150,23 +1242,30 @@ namespace HakoOnna.Art.EditorTools
             k.C(D.Glass, Rf(rng, -.05f, .05f), .535f, .62f, .06f, .05f, .02f, 12);
         }
 
+        /// <summary>矮木台上放一台显像管电视（Poly Haven Television_01），顶上蕾丝垫、兔耳天线、两个瓷摆件。</summary>
         static void DrawTV(Kit k)
         {
-            foreach (float sx in new[] { -.3f, .3f })
-                foreach (float sz in new[] { .1f, .46f })
-                    k.Br(D.Post, sx, .14f, sz, .035f, .3f, .035f, sz < .3f ? -6f : 6f, 0, sx < 0 ? -6f : 6f);
-            k.Bb(D.TrimMid, 0, .28f, .29f, .78f, .56f, .52f);
-            k.Bb(D.Post, 0, .28f, .29f, .8f, .025f, .54f);
-            k.Bb(D.Post, 0, .835f, .29f, .8f, .025f, .54f);
-            k.B(D.Black, -.08f, .56f, .552f, .52f, .44f, .006f);
-            k.S(D.Glass, -.08f, .56f, .545f, .23f, .19f, .03f, 16);
-            k.B(D.Straw, .27f, .5f, .552f, .16f, .34f, .004f);
-            foreach (float y in new[] { .72f, .78f }) k.Cr(D.Brass, new Vector3(.27f, y, .553f), .022f, .022f, .025f, AlongZ, 10);
-            k.Bb(D.ClothWhite, 0, .86f, .29f, .5f, .004f, .32f);
-            k.C(D.Black, .15f, .864f, .25f, .05f, .05f, .03f, 10);
-            foreach (float s in new[] { -1f, 1f }) k.Cr(D.Iron, new Vector3(.15f, .89f, .25f), .004f, .003f, .5f, Quaternion.Euler(0, 0, s * 28f), 5);
-            k.S(D.CeramicWhite, -.2f, .9f, .3f, .04f, .04f, .035f, 8);
-            k.S(D.CeramicWhite, -.2f, .96f, .3f, .03f, .03f, .03f, 8);
+            const float top = .4f, z = .29f;
+            foreach (float sx in new[] { -.34f, .34f })
+                foreach (float sz in new[] { .08f, .5f })
+                    k.Br(D.Post, sx, (top - .03f) / 2, sz, .035f, top - .03f, .035f, sz < .3f ? -5f : 5f, 0, sx < 0 ? -5f : 5f);
+            k.Bb(D.TrimMid, 0, top - .03f, z, .82f, .03f, .56f);
+            k.Bb(D.TrimMid, 0, .1f, z, .74f, .02f, .48f);
+            k.Bb(D.Paper, -.16f, .12f, z + .02f, .26f, .025f, .2f);  // 下层压着几本旧杂志
+            k.Bb(D.ClothRed, -.15f, .145f, z + .03f, .24f, .006f, .19f);
+            k.Bb(D.ClothWhite, 0, top, z - .01f, .7f, .003f, .5f);    // 台面上的蕾丝垫
+            k.Model("Television_01", new Vector3(0, top + .003f, z + .02f), 0f);
+            float tv = top + .003f + Kit.ModelSize("Television_01").y;
+            // 盖着防尘布（CoverNext）：顶上的垫子、摆件不画，只剩兔耳天线从布里戳出来
+            if (!CoverNext)
+            {
+                k.Bb(D.ClothWhite, 0, tv, z, .46f, .003f, .3f);
+                k.C(D.Black, .15f, tv + .003f, .25f, .05f, .05f, .03f, 10);
+            }
+            foreach (float s in new[] { -1f, 1f }) k.Cr(D.Iron, new Vector3(.15f, tv + .03f, .25f), .004f, .003f, .5f, Quaternion.Euler(0, 0, s * 28f), 5);
+            if (CoverNext) return;
+            k.S(D.CeramicWhite, -.18f, tv + .04f, .3f, .04f, .04f, .035f, 8);
+            k.S(D.CeramicWhite, -.18f, tv + .1f, .3f, .03f, .03f, .03f, 8);
         }
 
         static void DrawWorkTable(Kit k, System.Random rng)
@@ -1177,10 +1276,13 @@ namespace HakoOnna.Art.EditorTools
                 foreach (float sz in new[] { .06f, Dp - .06f })
                     k.Bb(D.Post, sx * (W / 2 - .06f), 0, sz, .065f, H - .05f, .065f);
             k.Bb(D.TrimMid, 0, .14f, Dp / 2, W - .14f, .03f, Dp - .1f);
-            k.C(D.Iron, -.5f, .17f, .38f, .17f, .13f, .12f, 14);
+            // 下层：搪瓷锅（盖子掉在地上）、一摞碗、木桶
+            k.Model("pot_enamel_01", new Vector3(-.5f, .17f, .38f), Rf(rng, 0f, 360f), 1.1f, "base");
+            k.Model("pot_enamel_01", new Vector3(-.62f, 0f, Dp + .12f), Rf(rng, 0f, 360f), 1.1f, "lid", 0f, Rf(rng, 6f, 12f));
             for (int i = 0; i < 4; i++) k.C(D.CeramicWhite, 0, .17f + i * .04f, .36f, .05f, .08f, .04f, 12);
-            Oke(k, .5f, .17f, .38f, .15f, .2f);
-            k.Bb(D.TrimLight, -.35f, H, .4f, .5f, .035f, .3f);
+            k.Model("wooden_bucket_02", new Vector3(.5f, .17f, .38f), Rf(rng, 0f, 360f), .55f);
+            // 台面：旧砧板（Poly Haven wooden_cutting_board）
+            k.Model("wooden_cutting_board", new Vector3(-.35f, H, .4f), Rf(rng, -8f, 8f));
             k.Cr(D.ClothWhite, new Vector3(-.55f, H + .07f, .38f), .04f, .03f, .38f, AlongX, 10);
             k.S(D.Leaf, -.6f, H + .08f, .38f, .07f, .03f, .05f, 7);
             k.B(D.Iron, -.25f, H + .04f, .5f, .2f, .004f, .045f);
@@ -1260,6 +1362,7 @@ namespace HakoOnna.Art.EditorTools
             k.S(D.ClothWhite, 0, 1.38f, z, .19f, .07f, .11f, 12);
             k.C(D.TrimMid, 0, 1.43f, z, .045f, .035f, .1f, 10);
             k.C(D.Lacquer, 0, 1.53f, z, .05f, .05f, .02f, 10);
+            if (CoverNext) return; // 盖着防尘布：布条、珠针都在布底下（侧面那条红布还会戳出布外）
             k.Br(D.ClothRed, -.08f, 1.1f, z + .115f, .2f, .5f, .008f, 0, 0, 5f);
             k.Br(D.ClothRed, -.17f, .85f, z + .06f, .18f, .5f, .008f, 0, 30f, 0);
             for (int i = 0; i < 4; i++) k.S(D.Brass, .02f + i * .03f, 1.2f - i * .07f, z + .125f, .006f, .006f, .006f, 5);
@@ -1289,7 +1392,7 @@ namespace HakoOnna.Art.EditorTools
             k.B(D.Iron, -.19f, y + .06f, z + .02f, .005f, .06f, .005f);
             k.Cr(D.Brass, new Vector3(.17f, y + .2f, z), .07f, .07f, .03f, AlongX, 14);
             k.B(D.Gold, -.02f, y + .24f, z + .051f, .22f, .03f, .002f);
-            k.C(D.ClothRed, .02f, y + .28f, z, .015f, .015f, .04f, 8);
+            if (!CoverNext) k.C(D.ClothRed, .02f, y + .28f, z, .015f, .015f, .04f, 8); // 线轴（盖着布时不画，会戳穿布）
             k.Bb(D.ClothIndigo, -.2f, y, z + .14f, .3f, .004f, .2f);
         }
 

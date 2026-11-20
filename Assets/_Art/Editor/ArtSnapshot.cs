@@ -36,7 +36,8 @@ namespace HakoOnna.Art.EditorTools
             public float fov;
             public Mode mode;
             public bool raw; // 机位已是新坐标（场景里现找的，比如血字特写）
-            public Shot(string n, Mode m, Vector3 p, Vector3 l, float f = 70f) { name = n; mode = m; pos = p; look = l; fov = f; raw = false; }
+            public string closeDoor; // 拍这张时先把这扇门关上（Doors 下的名字），拍完再打开
+            public Shot(string n, Mode m, Vector3 p, Vector3 l, float f = 70f) { name = n; mode = m; pos = p; look = l; fov = f; raw = false; closeDoor = null; }
         }
 
         static bool IsMood(Mode m) => m == Mode.Mood || m == Mode.MoodX;
@@ -98,6 +99,34 @@ namespace HakoOnna.Art.EditorTools
             yield return new Shot("sealed_nando", Mode.Detail, new Vector3(21.6f, 2.05f, 15.6f), new Vector3(25.4f, 1.35f, 13.65f));
             yield return new Shot("doors_ima", Mode.Detail, new Vector3(16.5f, 2.05f, 15.5f), new Vector3(11f, 1.2f, 12f));
             yield return new Shot("doors_zashiki", Mode.Detail, new Vector3(30.5f, 2.05f, 8.8f), new Vector3(26f, 1.2f, 4.5f));
+            // 第三轮：便所、風呂隔成小间以后（新坐标）
+            yield return new Shot("wet_benjo_front", Mode.Detail, new Vector3(13.95f, 2.0f, 20.35f), new Vector3(11.3f, 1.55f, 23.3f));
+            yield return new Shot("wet_benjo_back", Mode.Detail, new Vector3(12.74f, 2.0f, 24.25f), new Vector3(13.4f, 1.0f, 28.9f));
+            yield return new Shot("wet_stall", Mode.Detail, new Vector3(12.55f, 2.0f, 26.2f), new Vector3(13.95f, .75f, 28.55f));
+            // 便所隔间的铰链门（第三轮）：开着（默认）、关上
+            yield return new Shot("rev_stall_open", Mode.Detail, new Vector3(12.35f, 1.95f, 25.05f), new Vector3(13.6f, 1.2f, 27.2f));
+            yield return new Shot("rev_stall_closed", Mode.Detail, new Vector3(12.35f, 1.95f, 25.05f), new Vector3(13.6f, 1.2f, 27.2f)) { closeDoor = "Door_Benjo_Stall" };
+            yield return new Shot("wet_senmen", Mode.Detail, new Vector3(16.65f, 2.0f, 24.2f), new Vector3(14.7f, 1.6f, 21.7f));
+            yield return new Shot("wet_datsui", Mode.Detail, new Vector3(18.0f, 2.0f, 20.6f), new Vector3(23.8f, 1.2f, 25.9f));
+            yield return new Shot("moodxw_benjo", Mode.MoodX, new Vector3(13.95f, 2.0f, 20.35f), new Vector3(11.3f, 1.55f, 23.3f)) { raw = true };
+            yield return new Shot("moodxw_senmen", Mode.MoodX, new Vector3(16.65f, 2.0f, 24.2f), new Vector3(14.7f, 1.6f, 21.7f)) { raw = true };
+            // 第三轮审图：容器（金具、按米铺的木纹）、古画屏风和挂轴、床の間的模型、红书包（新坐标）
+            yield return new Shot("rev_box_kura", Mode.Detail, new Vector3(16.9f, 1.85f, 40.4f), new Vector3(16.9f, .7f, 43.0f));
+            yield return new Shot("rev_box_wardrobe", Mode.Detail, new Vector3(19.6f, 1.85f, 37.6f), new Vector3(21.0f, 1.1f, 35.2f));
+            yield return new Shot("rev_box_oshiire", Mode.Detail, new Vector3(27.5f, 2.0f, 13.3f), new Vector3(27.5f, 1.3f, 10.9f));
+            yield return new Shot("rev_box_daidokoro", Mode.Detail, new Vector3(2.8f, 1.5f, 13.4f), new Vector3(1.0f, .7f, 11.6f));
+            yield return new Shot("rev_box_genkan", Mode.Detail, new Vector3(2.9f, 1.5f, 2.9f), new Vector3(1.0f, .7f, .9f));
+            yield return new Shot("rev_byobu_butsuma", Mode.Detail, new Vector3(21.0f, 1.9f, 7.0f), new Vector3(18.6f, 1.4f, 7.0f));
+            yield return new Shot("rev_byobu_tsugi", Mode.Detail, new Vector3(17.19f, 1.9f, 7.2f), new Vector3(17.19f, 1.3f, 9.74f));
+            yield return new Shot("rev_toko_zashiki", Mode.Detail, new Vector3(27.0f, 1.9f, 7.3f), new Vector3(27.0f, 1.3f, 9.8f));
+            yield return new Shot("rev_toko_2f", Mode.Detail, new Vector3(26.3f, 5.5f, 15.0f), new Vector3(28.8f, 4.8f, 15.25f));
+            yield return new Shot("rev_randoseru", Mode.Detail, new Vector3(21.4f, 5.4f, 22.0f), new Vector3(23.0f, 4.3f, 20.4f));
+            yield return new Shot("rev_ikou", Mode.Detail, new Vector3(12.73f, 5.6f, 12.4f), new Vector3(12.73f, 5.1f, 15.24f));
+            // 第三轮废弃感：物置塌顶（从南门进来看、从下面往上看）、便所天花角的蜘蛛网、座敷地上的碎屑
+            yield return new Shot("rev_collapse", Mode.Detail, new Vector3(13.7f, 5.9f, 20.5f), new Vector3(15.4f, 5.0f, 22.4f));
+            yield return new Shot("rev_collapse_up", Mode.Detail, new Vector3(14.4f, 5.5f, 21.2f), new Vector3(15.45f, 7.2f, 22.3f));
+            yield return new Shot("rev_web_benjo", Mode.Detail, new Vector3(13.2f, 2.6f, 22.6f), new Vector3(11.1f, 3.7f, 20.2f));
+            yield return new Shot("rev_debris_zashiki", Mode.Detail, new Vector3(30.0f, 2.3f, 4.0f), new Vector3(31.0f, .55f, 7.0f));
             // 第二轮：游戏里的暗度（和同名 Interior 机位一样，只换光）
             yield return new Shot("moodx_genkan", Mode.MoodX, new Vector3(1.2f, 1.55f, 1.2f), new Vector3(7f, 1.0f, 6f));
             yield return new Shot("moodx_daidokoro", Mode.MoodX, new Vector3(6.6f, 1.55f, 8.0f), new Vector3(1.0f, 1.0f, 13.0f));
@@ -166,6 +195,9 @@ namespace HakoOnna.Art.EditorTools
             foreach (var ps in dust) ps.Simulate(14f, true, true, true);
             var shots = new List<Shot>(Shots());
             shots.AddRange(DecalShots());
+            // 第三轮：废弃感里随机摆的东西（水渍、破障子、蜘蛛网），生成时记下的位置
+            foreach (var (name, pos, look) in HouseBlockoutGenerator.RuinShots)
+                shots.Add(new Shot("rev_" + name, Mode.Detail, pos, look) { raw = true });
             int count = 0;
             try
             {
@@ -220,7 +252,12 @@ namespace HakoOnna.Art.EditorTools
                         else { pos = HouseBlockoutGenerator.MapOldPoint(s.pos); look = HouseBlockoutGenerator.MapOldPoint(s.look); }
                         camGo.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(look - pos, Vector3.up));
                     }
-                    Render(cam, s.name, w, h);
+                    HakoOnna.Art.DoorVisual closed = null;
+                    if (s.closeDoor != null)
+                        foreach (var dv in Object.FindObjectsByType<HakoOnna.Art.DoorVisual>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+                            if (dv.name == s.closeDoor) { closed = dv; dv.SetOpenImmediate(false); }
+                    try { Render(cam, s.name, w, h); }
+                    finally { if (closed != null) closed.SetOpenImmediate(closed.StartsOpen); }
                     count++;
                 }
             }

@@ -65,6 +65,9 @@ namespace HakoOnna.Art.EditorTools
         static void FurnWetRooms(Kit k)
         {
             PendantLamp(k, 9.009f, 17.4f, 2.85f, .45f, 2);
+            // 第三轮：拖鞋、洗手钵、厕纸架、小便器、洗面台的镜子和台面小物都在 WetRooms 里按新隔间重做。
+            // 这里只量尺寸（搬家求解的输入不变，容器不会动），不画、不放挡块。
+            Kit.Ghost = true;
             Slippers(k, 9.0f, .55f, 14.62f, 0, D.PlasticRed);
             // 洗手钵
             k.Push(new Vector3(7.802f, 1.35f, 16.4f), 90f);
@@ -80,6 +83,7 @@ namespace HakoOnna.Art.EditorTools
             k.B(D.TrimMid, 0, 0, .05f, .18f, .12f, .1f);
             k.Cr(D.Paper, new Vector3(-.065f, -.07f, .07f), .05f, .05f, .13f, AlongX, 12);
             k.Pop();
+            Kit.Ghost = false;
 
             PendantLamp(k, 14.15f, 17.4f, 2.85f, .45f, 2);
             // すのこ
@@ -98,13 +102,15 @@ namespace HakoOnna.Art.EditorTools
                 k.C(D.Brass, sx, .41f, .05f, .025f, .025f, .02f, 8);
             }
             k.Pop();
-            // 洗面台上方的镜子 + 台面小物
+            // 洗面台上方的镜子 + 台面小物（第三轮换成 WetRooms 的昭和洗脸台，这里只量尺寸）
+            Kit.Ghost = true;
             k.Push(new Vector3(11.2f, .55f, 14.236f));
             k.B(D.TrimLight, 0, 1.2f, .006f, .5f, .6f, .012f);
             k.B(D.Mirror, 0, 1.2f, .013f, .44f, .54f, .002f);
             k.Pop();
             k.C(D.CeramicWhite, 10.85f, 1.31f, 15.05f, .05f, .05f, .02f, 12);
             k.C(D.Glass, 11.6f, 1.31f, 15.2f, .035f, .04f, .1f, 10);
+            Kit.Ghost = false;
             // 浴桶：半边盖着木板，另一半是黑水
             for (int i = 0; i < 8; i++) k.Bb(D.TrimLight, 15.763f + i * .105f, 1.22f, 19.99f, .1f, .02f, .98f);
             k.B(D.Water, 16.95f, 1.19f, 19.99f, .7f, .004f, .75f);
@@ -178,12 +184,14 @@ namespace HakoOnna.Art.EditorTools
             k.B(D.Glass, 17.15f, .6135f, 16.84f, .1f, .001f, .06f);
             k.B(D.Black, 17.15f, .614f, 16.84f, .005f, .0015f, .05f);
 
-            // 便所：西墙小便器（朝颜）
+            // 便所：西墙小便器（朝颜）——第三轮在 WetRooms 里重做，这里只量尺寸
+            Kit.Ghost = true;
             k.C(D.CeramicWhite, 7.97f, 1.0f, 18.5f, .07f, .17f, .32f, 16);
             k.C(D.Black, 7.97f, 1.3f, 18.5f, .15f, .15f, .002f, 16);
             k.C(D.CeramicWhite, 7.95f, .55f, 18.5f, .028f, .028f, .45f, 8);
             k.C(D.Brass, 7.86f, 1.32f, 18.5f, .012f, .012f, .7f, 6);
             Blocker("Urinal", new Vector3(7.98f, .55f, 18.5f), 0f, new Vector3(.34f, .85f, .36f));
+            Kit.Ghost = false;
         }
 
         // ---------------------------------------------------------------- 土蔵
@@ -296,8 +304,11 @@ namespace HakoOnna.Art.EditorTools
             k.Cr(D.Lacquer, new Vector3(-.28f, -1.11f, .015f), .013f, .013f, .56f, AlongX, 8);
             k.Pop();
             Kit.Pinned = false;
-            k.C(D.CeramicBlue, 20.3f, F + .17f, 10.4f, .06f, .04f, .25f, 12);
-            k.S(D.Leaf, 20.3f, F + .5f, 10.4f, .1f, .12f, .08f, 7);
+            // 第三轮：床の間的花瓶换成古董花瓶（CC0 模型）+ 枯枝；Swap 保持搬家求解的输入不变
+            k.Swap(() => k.C(D.CeramicBlue, 20.3f, F + .17f, 10.4f, .06f, .04f, .25f, 12),
+                () => k.Model("antique_ceramic_vase_01", new Vector3(20.3f, F + .17f, 10.4f), 120f, .7f));
+            k.Swap(() => k.S(D.Leaf, 20.3f, F + .5f, 10.4f, .1f, .12f, .08f, 7),
+                () => k.Model("dead_quiver_branch_01", new Vector3(20.3f, F + .17f + .26f, 10.4f), 80f, 1.05f));
             Blocker("Toko2F", new Vector3(20.30f, F, 9.9f), 0, new Vector3(.41f, .17f, 1.9f));
             k.Push(new Vector3(13.8f, F, 11.99f), 180f);
             var lv = ShelfUnit(k, 1.2f, 1.8f, .3f, 4, D.TrimMid);
@@ -327,11 +338,15 @@ namespace HakoOnna.Art.EditorTools
 
             // 子供部屋
             PendantLamp(k, 14.8f, 16.4f, C2, .5f, 0);
-            k.Push(new Vector3(15.72f, F, 14.5f), 10f);
-            k.Bb(D.PlasticRed, 0, 0, 0, .25f, .3f, .17f);
-            k.Br(D.PlasticRed, 0, .24f, .095f, .25f, .14f, .02f, -15f, 0, 0);
-            k.B(D.Brass, 0, .16f, .11f, .04f, .03f, .01f);
-            k.Pop();
+            // 第三轮：红书包改成倒在地上、盖子翻开、里面空了、东西撒了一地（一看就是已经被翻过的，不像能搜的盒子）
+            k.Swap(() =>
+            {
+                k.Push(new Vector3(15.72f, F, 14.5f), 10f);
+                k.Bb(D.PlasticRed, 0, 0, 0, .25f, .3f, .17f);
+                k.Br(D.PlasticRed, 0, .24f, .095f, .25f, .14f, .02f, -15f, 0, 0);
+                k.B(D.Brass, 0, .16f, .11f, .04f, .03f, .01f);
+                k.Pop();
+            }, () => EmptiedRandoseru(k, new Vector3(15.72f, F, 14.5f), 10f, new System.Random(1972)));
             k.C(D.Iron, 16.2f, 3.77f, 14.55f, .06f, .06f, .02f, 12);
             k.Cr(D.Iron, new Vector3(16.2f, 3.79f, 14.55f), .008f, .008f, .32f, Quaternion.Euler(20, 0, 0), 6);
             k.Cr(D.Iron, new Vector3(16.2f, 4.04f, 14.66f), .03f, .09f, .1f, Quaternion.Euler(150, 0, 0), 12);

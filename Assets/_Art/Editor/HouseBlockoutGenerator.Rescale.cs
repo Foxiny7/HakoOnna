@@ -237,7 +237,8 @@ namespace HakoOnna.Art.EditorTools
         }
 
         /// <summary>
-        /// 物体的世界包围盒：渲染器 + 实心 BoxCollider。
+        /// 物体的世界包围盒：渲染器 + 实心 BoxCollider。容器金具（Fit_*）不算——
+        /// 它们只是贴在箱面上的薄片，算进去会让搬家求解把容器挪 1–2 cm。
         /// 碰撞体按自己的 transform 算——刚实例化再挪位置的 Collider.bounds 还停在原点
         /// （autoSyncTransforms 关着），直接用会把整屋的东西连成一组。
         /// </summary>
@@ -249,7 +250,8 @@ namespace HakoOnna.Art.EditorTools
                 if (b.size == Vector3.zero) return;
                 if (acc == null) acc = b; else { var x = acc.Value; x.Encapsulate(b); acc = x; }
             }
-            foreach (var r in t.GetComponentsInChildren<Renderer>()) if (r.enabled) Add(r.bounds);
+            foreach (var r in t.GetComponentsInChildren<Renderer>())
+                if (r.enabled && !ContainerPrefabBuilder.IsFitting(r)) Add(r.bounds);
             foreach (var c in t.GetComponentsInChildren<BoxCollider>()) if (c.enabled && !c.isTrigger) Add(BoxWorldBounds(c));
             return acc;
         }

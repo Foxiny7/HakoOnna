@@ -16,7 +16,7 @@ namespace HakoOnna.Art.EditorTools
             {
                 // 室内陈设的挡块和它挡的东西一起搬家、放大（见 Rescale）
                 var m = Kit.Claim(BlockerBounds(floorPos, yaw, size));
-                if (Kit.Probing || Kit.IsDropped(m)) return;
+                if (Kit.Probing || Kit.IsDropped(m) || Kit.Ghost) return;
                 floorPos = m.MultiplyPoint3x4(floorPos);
                 // 矩阵只有平移、绕竖轴转 90° 的倍数和等比放大
                 size *= new Vector3(m.m00, m.m10, m.m20).magnitude;
