@@ -60,7 +60,7 @@ namespace HakoOnna.Multiplayer
             beam.range = 16;
             beam.spotAngle = 55;
             beam.innerSpotAngle = 25;
-            beam.intensity = 5;
+            beam.intensity = 25;
             beam.color = new Color(1f, .95f, .84f);
             beam.shadows = LightShadows.Soft;
             beam.enabled = false;

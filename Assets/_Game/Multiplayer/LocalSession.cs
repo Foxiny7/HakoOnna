@@ -16,6 +16,9 @@ namespace HakoOnna.Multiplayer
         public const string HouseScene = "Assets/_Art/Scenes/House_Blockout.unity";
         public const ushort Port = 7777;
 
+        [SerializeField, Tooltip("Use gray ambient lighting for movement tests when starting the scene.")]
+        private bool debugAmbientFill;
+
         private readonly Dictionary<ulong, int> spawnSlots = new Dictionary<ulong, int>();
         private NetworkManager manager;
         private Transform[] spawnPoints;
@@ -48,11 +51,13 @@ namespace HakoOnna.Multiplayer
             foreach (var container in Containers)
                 ConfigureDrawer(container);
             ZashikiArt.DressAlcove(GameObject.Find("House_Blockout/Props/Zashiki_Tokonoma").transform);
-            // Ambient fill belongs to this graybox playtest so movement remains easy to inspect.
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = Color.gray;
+            if (debugAmbientFill)
+            {
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+                RenderSettings.ambientLight = Color.gray;
+            }
             var ambient = new UnityEngine.Rendering.SphericalHarmonicsL2();
-            ambient.AddAmbientLight(Color.gray);
+            ambient.AddAmbientLight(RenderSettings.ambientLight);
             RenderSettings.ambientProbe = ambient;
             var spawns = GameObject.Find("House_Blockout/Gameplay/ExplorerSpawnPoints").transform;
             spawnPoints = new Transform[spawns.childCount];

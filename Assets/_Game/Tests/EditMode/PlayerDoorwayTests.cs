@@ -24,13 +24,15 @@ namespace HakoOnna.Tests
             EditorSceneManager.ClosePreviewScene(house);
         }
 
-        [TestCase(true)]
-        [TestCase(false)]
-        public void CanTargetEntranceFrameFromEitherSide(bool open)
+        [TestCase("Door_Outside_Genkan", true)]
+        [TestCase("Door_Outside_Genkan", false)]
+        [TestCase("Door_Benjo_Stall", true)]
+        [TestCase("Door_Benjo_Stall", false)]
+        public void CanTargetDoorFrameFromEitherSide(string doorName, bool open)
         {
             var doors = house.GetRootGameObjects().SelectMany(root =>
                 root.GetComponentsInChildren<HakoOnna.Art.DoorVisual>()).ToArray();
-            int entrance = System.Array.FindIndex(doors, d => d.name == "Door_Outside_Genkan");
+            int entrance = System.Array.FindIndex(doors, d => d.name == doorName);
             Assert.That(entrance, Is.GreaterThanOrEqualTo(0));
             var door = doors[entrance];
             try
