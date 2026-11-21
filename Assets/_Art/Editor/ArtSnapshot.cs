@@ -309,7 +309,9 @@ namespace HakoOnna.Art.EditorTools
             tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
             tex.Apply();
             RenderTexture.active = prev;
-            File.WriteAllBytes(Path.Combine(OutDir, file + ".png"), tex.EncodeToPNG());
+            // 截图正被别的程序打开（看图软件、预览）时写不进去：跳过这一张，别让整次生成以失败退出
+            try { File.WriteAllBytes(Path.Combine(OutDir, file + ".png"), tex.EncodeToPNG()); }
+            catch (IOException e) { Debug.LogWarning($"[Hako Art] 截图 {file}.png 写不进去（文件被占用？），跳过：{e.Message}"); }
             cam.targetTexture = null;
             Object.DestroyImmediate(tex);
             rt.Release();

@@ -13,7 +13,11 @@ namespace HakoOnna.Art.EditorTools
     /// </summary>
     public static partial class HouseBlockoutGenerator
     {
-        const string DetailMeshPath = "Assets/_Art/Generated/HouseDetail_Meshes.asset";
+        const string DetailMeshPath = "Assets/_Art/Generated/HouseDetail_Meshes.asset"; // 旧的单个文件（第四轮到了 225 MB），存盘时删掉
+        const string DetailMeshDir = "Assets/_Art/Generated";
+        const string DetailMeshPrefix = "HouseDetail_Meshes_";
+        // GitHub 拒收单个超过 100 MB 的文件（50 MB 以上会警告）：网格按生成顺序装进几个文件，每个估算不超过 45 MB
+        const long DetailMeshBudget = 45L * 1024 * 1024;
         static DetailMats D;
         static Palette P;
         static List<Room> DRooms;
@@ -60,16 +64,41 @@ namespace HakoOnna.Art.EditorTools
 
         static void SaveDetailMeshes()
         {
-            ArtKit.EnsureFolder("Assets/_Art/Generated");
+            ArtKit.EnsureFolder(DetailMeshDir);
             AssetDatabase.DeleteAsset(DetailMeshPath);
-            if (MeshBatch.Created.Count > 0)
+            foreach (var f in System.IO.Directory.GetFiles(DetailMeshDir, DetailMeshPrefix + "*.asset"))
+                AssetDatabase.DeleteAsset(f.Replace('\\', '/'));
+            // 顶点压紧（法线 16 位、切线 8 位），再按生成顺序分装，一个文件满 45 MB 就换下一个
+            int packed = 0;
+            foreach (var m in MeshBatch.Created)
+                if (MeshPack.Compact(m)) packed++;
+            var sizes = new List<long>();
+            string path = null;
+            long used = 0;
+            foreach (var m in MeshBatch.Created)
             {
-                AssetDatabase.CreateAsset(MeshBatch.Created[0], DetailMeshPath);
-                for (int i = 1; i < MeshBatch.Created.Count; i++)
-                    AssetDatabase.AddObjectToAsset(MeshBatch.Created[i], DetailMeshPath);
+                long est = MeshPack.EstimateTextBytes(m);
+                if (path == null || (used > 0 && used + est > DetailMeshBudget))
+                {
+                    if (path != null) sizes.Add(used);
+                    path = $"{DetailMeshDir}/{DetailMeshPrefix}{sizes.Count:00}.asset";
+                    AssetDatabase.CreateAsset(m, path);
+                    used = est;
+                }
+                else
+                {
+                    AssetDatabase.AddObjectToAsset(m, path);
+                    used += est;
+                }
+            }
+            if (path != null)
+            {
+                sizes.Add(used);
                 AssetDatabase.SaveAssets();
             }
-            Debug.Log($"[Hako Art] 细节网格 {MeshBatch.Created.Count} 个 → {DetailMeshPath}");
+            var mb = new List<string>();
+            foreach (var s in sizes) mb.Add((s / 1048576f).ToString("0"));
+            Debug.Log($"[Hako Art] 细节网格 {MeshBatch.Created.Count} 个（压紧 {packed} 个）→ {sizes.Count} 个文件 {DetailMeshDir}/{DetailMeshPrefix}NN.asset，估算 {string.Join(" / ", mb)} MB");
             MeshBatch.Created.Clear();
         }
 

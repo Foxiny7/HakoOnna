@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -9,7 +10,8 @@ namespace HakoOnna.Art.EditorTools
 {
     /// <summary>
     /// 按材质合并的网格构建器。顶点经 M 变换到世界坐标；UV 以米为单位（贴图平铺写在材质上）。
-    /// 生成的 Mesh 记录在 Created 里，最后统一存成一个资源文件，避免把网格数据塞进场景文件。
+    /// 生成的 Mesh 记录在 Created 里，最后统一存成资源文件（Generated/HouseDetail_Meshes_NN.asset，每个 45 MB 以内），
+    /// 避免把网格数据塞进场景文件。
     /// </summary>
     internal sealed class MeshBatch
     {
@@ -246,6 +248,101 @@ namespace HakoOnna.Art.EditorTools
         void SpawnModels(Transform holder, bool shadows)
         {
             foreach (var (id, only, m) in models) ExternalModels.Spawn(id, holder, m, only, shadows);
+        }
+    }
+
+    /// <summary>
+    /// 存盘前把生成网格的顶点压紧。项目是文本序列化，网格数据按十六进制写进 .asset，一个顶点 48 字节就是 96 个字符。
+    /// 位置、UV 保持 32 位浮点（UV 按米铺、数值大，半精度会错位）；法线改 16 位定点、切线改 8 位定点（48 → 32 字节）。
+    /// 只认位置 / 法线 / 切线 / UV0 这几种 32 位浮点通道，有别的通道（顶点色、第二套 UV……）的网格原样不动。
+    /// </summary>
+    internal static class MeshPack
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        struct PNTU { public Vector3 p; public short nx, ny, nz, nw; public sbyte tx, ty, tz, tw; public Vector2 uv; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct PNU { public Vector3 p; public short nx, ny, nz, nw; public Vector2 uv; }
+
+        const MeshUpdateFlags Quiet = MeshUpdateFlags.DontRecalculateBounds | MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontNotifyMeshUsers;
+
+        static short S16(float v) => (short)Mathf.RoundToInt(Mathf.Clamp(v, -1f, 1f) * 32767f);
+        static sbyte S8(float v) => (sbyte)Mathf.RoundToInt(Mathf.Clamp(v, -1f, 1f) * 127f);
+
+        public static bool Compact(Mesh m)
+        {
+            if (m == null || m.vertexCount == 0) return false;
+            bool hasN = false, hasT = false, hasUV = false;
+            foreach (var a in m.GetVertexAttributes())
+            {
+                if (a.stream != 0 || a.format != VertexAttributeFormat.Float32) return false;
+                switch (a.attribute)
+                {
+                    case VertexAttribute.Position: break;
+                    case VertexAttribute.Normal: hasN = true; break;
+                    case VertexAttribute.Tangent: hasT = true; break;
+                    case VertexAttribute.TexCoord0: if (a.dimension != 2) return false; hasUV = true; break;
+                    default: return false;
+                }
+            }
+            if (!hasN || !hasUV) return false;
+            var v = m.vertices;
+            var n = m.normals;
+            var uv = m.uv;
+            var t = hasT ? m.tangents : null;
+            int count = v.Length;
+            // 先清空再换格式：直接改格式 Unity 会试着转换旧数据（32 位浮点 → 16 位定点不支持，报 Unsupported conversion）
+            var fmt = m.indexFormat;
+            int subs = m.subMeshCount;
+            var idx = new int[subs][];
+            var topo = new MeshTopology[subs];
+            var baseV = new int[subs];
+            for (int s = 0; s < subs; s++)
+            {
+                idx[s] = m.GetIndices(s, false);
+                topo[s] = m.GetTopology(s);
+                baseV[s] = (int)m.GetBaseVertex(s);
+            }
+            m.Clear(false);
+            var pos = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3);
+            var nrm = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.SNorm16, 4);
+            var tex = new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, 2);
+            if (hasT)
+            {
+                var d = new PNTU[count];
+                for (int i = 0; i < count; i++)
+                    d[i] = new PNTU
+                    {
+                        p = v[i], nx = S16(n[i].x), ny = S16(n[i].y), nz = S16(n[i].z),
+                        tx = S8(t[i].x), ty = S8(t[i].y), tz = S8(t[i].z), tw = (sbyte)(t[i].w < 0f ? -127 : 127), uv = uv[i],
+                    };
+                m.SetVertexBufferParams(count, pos, nrm, new VertexAttributeDescriptor(VertexAttribute.Tangent, VertexAttributeFormat.SNorm8, 4), tex);
+                m.SetVertexBufferData(d, 0, 0, count, 0, Quiet);
+            }
+            else
+            {
+                var d = new PNU[count];
+                for (int i = 0; i < count; i++)
+                    d[i] = new PNU { p = v[i], nx = S16(n[i].x), ny = S16(n[i].y), nz = S16(n[i].z), uv = uv[i] };
+                m.SetVertexBufferParams(count, pos, nrm, tex);
+                m.SetVertexBufferData(d, 0, 0, count, 0, Quiet);
+            }
+            m.indexFormat = fmt;
+            m.subMeshCount = subs;
+            for (int s = 0; s < subs; s++) m.SetIndices(idx[s], topo[s], s, false, baseV[s]);
+            m.RecalculateBounds(); // 整体和每个子网格的包围盒（位置还是 32 位浮点，和压紧前一样）
+            return true;
+        }
+
+        /// <summary>这个网格写成文本 .asset 大概多少字节：顶点、索引都是十六进制（一字节两个字符），另加一点 YAML 头。</summary>
+        public static long EstimateTextBytes(Mesh m)
+        {
+            if (m == null) return 0;
+            long idx = 0;
+            for (int s = 0; s < m.subMeshCount; s++) idx += (long)m.GetIndexCount(s);
+            long stride = m.vertexCount > 0 ? m.GetVertexBufferStride(0) : 0;
+            int ib = m.indexFormat == IndexFormat.UInt32 ? 4 : 2;
+            return 2L * (stride * m.vertexCount + idx * ib) + 4096 + 256L * m.subMeshCount;
         }
     }
 
