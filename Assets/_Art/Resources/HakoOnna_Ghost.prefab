@@ -1,0 +1,147 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3376280345223142348
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7520910021039957082}
+  m_Layer: 0
+  m_Name: Face
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7520910021039957082
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3376280345223142348}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.4516115, y: 0.2554954, z: 0.13673684, w: 0.84384376}
+  m_LocalPosition: {x: -0.000000035390258, y: 0.06757107, z: -0.00000008195638}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6047468811057439970}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &603288089637944586
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -5738699129695093562, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_UpdateWhenOffscreen
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_Name
+      value: HakoOnna_Ghost
+      objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      propertyPath: m_CullingMode
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 6607804874090535400, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7520910021039957082}
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3079399287619774691}
+  m_SourcePrefab: {fileID: 100100000, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+--- !u!1 &332745770247307355 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  m_PrefabInstance: {fileID: 603288089637944586}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3079399287619774691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 332745770247307355}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51f95e3f20dc62545a8906f412adf36d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: HakoOnna.Art::HakoOnna.Art.HakoOnnaGhost
+  poses:
+  - {fileID: -4994078168802296314, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: 7310823379723030517, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: 8779050652267482376, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: -2820724447956961052, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: -7859335996916375752, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: 8245395653775680510, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: -7991496387888177209, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: -7878696831583567032, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  lunges:
+  - {fileID: 448152512829953081, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: -2827498936560770099, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: 1451340180660933264, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: 8013982930253915318, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: -7199327306973944277, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: -3408414253773126433, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: 2089179135785102854, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  - {fileID: -8216620364086913529, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  face: {fileID: 7520910021039957082}
+  previewKind: -1
+  previewLunge: 0
+--- !u!4 &6047468811057439970 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6607804874090535400, guid: a5a023ac36390e046b6fac3193a3c246, type: 3}
+  m_PrefabInstance: {fileID: 603288089637944586}
+  m_PrefabAsset: {fileID: 0}

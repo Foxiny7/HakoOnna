@@ -185,16 +185,70 @@ House_Blockout
 
 表里 3 处“钉死的旧门”只是装饰模型（`Dressing/Architecture/Sealed_*`）：没有 `DoorVisual`，也没有碰撞，挡人的是后面的墙，`DoorVisual.FromCollider` 打到这里返回 null。玩家对着它按 E 要不要有反应：待定。
 
-### 开箱死亡演出（计划中，美术资产还没做）
-2026-11-19 用户确认了新的开箱死亡演出，细节见 `Docs/HakoOnna_ArtBible_V0.1.md` 第 4.3 节。美术资产做好之前，`PlayGrab()` 保持现状。以后需要程序配合的地方，具体参数做的时候再一起定：
+### 开箱死亡演出（箱女模型第一版已进 Unity，2026-11-21）
+2026-11-19 用户确认了新的开箱死亡演出，细节见 `Docs/HakoOnna_ArtBible_V0.1.md` 第 4.3 节（2026-11-21 改成开门的一瞬间就突脸：藏匿姿势只是第一帧，不停留；她张开血盆大口，双手伸出开口抓住探索者的头，把人拖进容器）。
+
+**箱女模型（第一版）**：预制体 `Assets/_Art/Resources/HakoOnna_Ghost.prefab`，组件 `HakoOnna.Art.HakoOnnaGhost`（`HakoOnna.Multiplayer` 已经引用了 `HakoOnna.Art`）。美术文件不要改，有问题告诉美术。
+
+- `HakoOnnaGhost.Spawn(box)`：box = 容器 Visual 上的 `ContainerVisual`；她出现在这个容器的藏匿姿势。
+- `ghost.Lunge = t`：0 = 藏匿姿势，1 = 突脸终点（她的胯还在容器里，双手抓住探索者的头两侧），设了立刻生效。
+- `ghost.Face`：两眼中间，跟着头动，+Z 从脸朝外。
+
+- `Spawn` 按容器根节点的名字（`<房间>_<类型>_<序号>`）认出 8 种容器（认不出会抛异常），把她挂到容器根节点下（箪笥挂在 `Drawer_0` 下，跟着抽屉动），位置 0、缩放 1/1.25。**不要再移动、旋转、缩放她**，只设 `Lunge`；姿势本来就是按场景里放大 1.25 倍的容器摆好的。
+- 突脸终点时她的眼睛离检视镜头 0.25~0.45 m（每种容器不同），差的距离由镜头往她那边拽来补，停在离两眼 0.2 m（美术设定 4.3）。这时两只手在画面左右两边；倒着的脸（洋服箪笥、箪笥抽屉）例外，手从画面上方伸过来。
+- 0 到 1 之间目前是两个姿势直接插值，中间“骨头掰回原位”的过渡帧还没做；还没做张嘴（模型没有下巴骨和口腔）。以后美术改动只换模型和动作，`Spawn`、`Face`、`Lunge` 的用法不变。
+- 编辑器里看：选中场景里的容器，菜单“Hako/Art/箱女：放进选中的容器（预览，不存进场景）”，再拖她身上的 Preview Lunge。
+
+#### 接入步骤（2026-11-21：把 `OccupiedOpening` 的原型圆柱换成箱女）
+
+时长都是起点值（4.3 里写的是待定），看过再调。
+
+**1. `OccupiedOpening.Play`**（看这次演出的每个客户端都跑）
+- 删掉原型：`HakoOnnaPlayer/Body` 圆柱、红色 glow 灯、`GrabFace` 和两个眼睛球，以及 `bounds / height / start / end / direction` 那套移动。
+- 签名加 `bool hiderInside`，在 `LocalSession.PlayOccupied` 里算好传进来：`FindObjectsByType<NetworkHider>(FindObjectsSortMode.None).Any(h => h.IsOwner && h.Current == id)`。
+- 现在的顺序是“记零件 → 关 → 记关 → 开 → 记开 → 关”。在“记开”之后、最后那次 `SetOpenImmediate(false)` 之前生成她，量出突脸终点的眼睛位置：
+  ```csharp
+  var ghost = HakoOnnaGhost.Spawn(box);   // 一定在 parts 记完之后：箪笥里的她挂在 Drawer_0 下，不能进 parts
+  ghost.Lunge = 1f;
+  var lungeEyes = ghost.Face.position;     // 门 / 抽屉全开时，突脸终点两眼的位置
+  ghost.Lunge = 0f;
+  box.SetOpenImmediate(false);             // 原来就有的这一行；箪笥里的她跟着抽屉回去
+  ```
+- `hiderInside` 时把 `ghost` 下所有 `Renderer` 的 `enabled` 设成 false：箱女玩家自己的镜头在箱子里，会在模型里面。她这时看到什么画面：待定。
+- 补光：`ShowOccupiedOpening` 一开始就收走了受害者的手电（`lampOn = false`、清空物品），没有灯她在黑屋里看不见。在 `ghost.Face` 下挂一盏 Spot：`localPosition = (0, -0.12, 0.45)`，`localRotation = Quaternion.LookRotation(new Vector3(0, .12f, -.45f))`（从脸前下方往脸上打），spotAngle 70，innerSpotAngle 35，range 2，color (0.82, 0.88, 1)（冷白，不改她纸白的肤色），不投影，intensity 每帧 = 3 × open（门关着时不亮）。
+- `victim.TrackGrabFace(face)` 换成 `victim.TrackGrab(ghost.Face, lungeEyes)`（见 2）。
+- 循环跑到 t = 1.7 s（原来 1.4），每帧：
+  ```csharp
+  float open = Mathf.SmoothStep(0, 1, t / .22f) * (1 - Mathf.SmoothStep(0, 1, (t - 1.25f) / .45f));
+  float rise = Mathf.SmoothStep(0, 1, (t - .12f) / .24f);
+  ghost.Lunge = rise * (1 - Mathf.SmoothStep(0, 1, (t - 1.1f) / .3f));   // 1.1 s 起缩回去（受害者已经黑屏，只有旁边的人看得到）
+  victim.SetGrabPull(rise);                                              // 镜头只往前拽，不跟着缩回
+  faceLight.intensity = 3f * open;
+  ```
+  零件插值照旧用 `open`。t ≥ 0.12：`shriek = foley?.Shriek(ghost.Face)`（原来传圆柱）；t ≥ 1.1：`victim.BlackOut(1.8f)`；t ≥ 1.25：`foley?.Close()`（原来 0.95）。
+- `finally`：`Object.Destroy(ghost.gameObject)`（补光是她的子物体，一起删），其余照旧。
+
+**2. `NetworkPlayer`**（下面三个方法都只在 `IsOwner` 时生效）
+- `TrackGrab(Transform face, Vector3 lungeEyes)`：记下这一刻镜头的位置 P0 和朝向 R0（这时还停在检视姿势）；终点 `P1 = lungeEyes + (P0 - lungeEyes).normalized * 0.2f`，`R1 = Quaternion.LookRotation(lungeEyes - P1, R0 * Vector3.up)`；pull = 0；照旧清掉移动输入。
+- `SetGrabPull(float pull)`。`LateUpdate` 里抓人时镜头 = `Vector3.Lerp(P0, P1, pull)`、`Quaternion.Slerp(R0, R1, pull)`，pitch / yaw 从这个朝向算（代替现在“站着的眼睛看着脸”）。抓人期间隐藏受害者自己的第一人称手臂（`arms`），免得挡脸。
+- `BlackOut(float seconds)`：`OnGUI` 里最后画一张盖住全屏的黑图，持续 seconds。黑屏结束接现有的转化流程（规则不变）。
+- 镜头近裁剪面现在是 0.04，0.2 m 的脸不会被切；不要调大。
+
+**3. `LocalNetworkSmokeCheck.LateUpdate`**：不再找 `GrabFace`，改成 `FindFirstObjectByType<HakoOnnaGhost>()` 的 `Face`；条件改成距离 0.2 ± 0.02 m、镜头朝向和连线夹角 < 1°；去掉 `face.forward` 那条（她的脸是摆出来的，不保证正对镜头）。
+
+**看效果**：用 TestBox 开一个有箱女的容器。0.12 s 她扑出来；0.36 s 脸停在镜头前 0.2 m，双手在画面左右两边（洋服箪笥和箪笥抽屉例外）；1.1 s 黑屏 1.8 s。8 种容器都开一遍。门开到一半她就开始扑，头几帧手可能穿过门板（过渡帧还没做）。
+
+**这一步不做**：旁边的人看到受害者的身体被拖进容器（等探索者模型）；箱人（模型还没做，先都用箱女）；张嘴和过渡帧（美术之后换模型，用法不变）。
+
+以后需要程序配合的地方，具体参数做的时候再一起定：
 - 镜头高度：`GameConfig` 的 `EyeHeight` 从 1.45 改到约 1.58（探索者模型约 1.70 m，2026-11-18 确认）。这一条现在就可以改。
 - `PlayGrab()` 要知道扑出来的是谁：箱女，或者哪一位玩家变成的箱人（箱人用死者自己的探索者模型）。同一个容器里箱女和箱人都在时，播箱女的。
 - 隐藏信息：演出用的模型只在服务器确认死亡后生成，由服务器把变体下发给要显示这次演出的客户端。受害者和附近看得到这个容器的人都要看到，不要提前同步到探索者端。
-- 受害者的镜头在演出期间交给演出：被往开口拽，停在离她的脸约 0.2 m，然后黑屏，黑屏结束后进入现有的转化流程。
+- 受害者的镜头在演出期间交给演出：已写进上面的接入步骤 2。
 - 旁边的人看到第三人称版本：她扑出来，把受害者的探索者模型拖进容器，门或盖关上。
 - 演出期间隐藏容器里物品的显示（只是画面，物品照样留在容器里）。
 - 声音：骨头断裂的声音放在现有的 `grab` 键里。跳脸恐怖音效以后再加，到时会在 DevPlan 第 6 节申请新键。
-- 时长都是待定：从开门到黑屏结束大约 3 秒。
+- 时长都是待定：接入步骤里的数值（门 0.22 s 开完、0.12 s 起扑、1.1 s 黑屏 1.8 s，共约 2.9 s）是起点。
 - 对藏有箱女的容器使用错误弱点道具而死亡时，也播同样的演出（2026-11-19 确认）：没有读条，容器是关着的，由演出自己把门或盖猛地打开，所以同样不要设置 `IsOpen`。
 - 猎杀中被处决的演出：待定。
 
