@@ -40,6 +40,7 @@ namespace HakoOnna.Art.EditorTools
     /// <item>金具一律叫 Fit_*：搬家求解、容器正面禁区、血字避让量容器尺寸时跳过它们（WorldBounds），
     ///   所以加金具不会让容器挪位置。</item>
     /// <item>不加挂锁：容器看起来都要是能打开的。</item>
+    /// <item>2026-11-20：長持的两道铁箍改成只贴前后两面的 Fit_Band，箱内不再有挡身体的实心板。</item>
     /// </list>
     /// </summary>
     public static class ContainerPrefabBuilder
@@ -114,14 +115,14 @@ namespace HakoOnna.Art.EditorTools
         }
 
         /// <summary>
-        /// 还是灰盒（Visual 下有 Shell 生成的 Back），并且碰撞体尺寸和 Sizes 不一致、或者还没有第三轮的金具组 → 需要重建。
-        /// 手动换过模型的预制体不动。
+        /// 还是灰盒（Visual 下有 Shell 生成的 Back），并且碰撞体尺寸和 Sizes 不一致、或者还没有第三轮的金具组、
+        /// 或者長持还是穿过箱内的旧铁条（Band_L）→ 需要重建。手动换过模型的预制体不动。
         /// </summary>
         static bool NeedsRebuild(GameObject prefab, Vector3 size)
         {
             var visual = prefab.transform.Find("Visual");
             if (visual == null || visual.Find("Back") == null) return false;
-            if (visual.Find(FittingsName) == null) return true;
+            if (visual.Find(FittingsName) == null || visual.Find("Band_L") != null) return true;
             var col = visual.Find("Collision")?.GetComponent<BoxCollider>();
             return col != null && (col.size - size).sqrMagnitude > 1e-6f;
         }
@@ -275,13 +276,7 @@ namespace HakoOnna.Art.EditorTools
                     Shell(visual, w, h, d, body, pal.Interior, top: false, front: true);
                     var pivot = ArtKit.Empty(visual, "Lid_Pivot", new Vector3(0f, h, -d / 2f));
                     ArtKit.Box(pivot, "Lid", new Vector3(0f, 0.0175f, d / 2f), new Vector3(w + 0.02f, 0.035f, d + 0.02f), body, false);
-                    if (kind == ContainerKind.Nagamochi)
-                    {
-                        // 金属包角，让長持在暗处有辨识度
-                        ArtKit.Box(visual, "Band_L", new Vector3(-w / 2f + 0.15f, h / 2f, 0f), new Vector3(0.04f, h + 0.005f, d + 0.005f), pal.Rust, false);
-                        ArtKit.Box(visual, "Band_R", new Vector3(w / 2f - 0.15f, h / 2f, 0f), new Vector3(0.04f, h + 0.005f, d + 0.005f), pal.Rust, false);
-                        NagamochiFittings(fit, pivot, w, h, d);
-                    }
+                    if (kind == ContainerKind.Nagamochi) NagamochiFittings(fit, pivot, w, h, d, pal.Rust);
                     else if (kind == ContainerKind.Tsuzura) TsuzuraFittings(fit, pivot, w, h, d);
                     else KomebitsuFittings(fit, pivot, w, h, d, b, rng);
                     parts.Add(new ContainerVisual.MovingPart { part = pivot, openEuler = new Vector3(-105f, 0f, 0f) });
@@ -538,9 +533,9 @@ namespace HakoOnna.Art.EditorTools
 
         /// <summary>
         /// 長持：盖子上接着箱身铁箍的铁条、盖角包铁、前沿垂下的搭扣（跟着盖子）；箱身八角包铁、前面带钥匙孔的锁板；
-        /// 两头平贴的穿竿方环（只凸出 2 cm）。
+        /// 两头平贴的穿竿方环（只凸出 2 cm）；箱身前后两面的两道铁箍（band 材质，让長持在暗处有辨识度）。
         /// </summary>
-        static void NagamochiFittings(Transform fit, Transform lid, float w, float h, float d)
+        static void NagamochiFittings(Transform fit, Transform lid, float w, float h, float d, Material band)
         {
             var iron = D.Iron;
             foreach (float sx in new[] { -1f, 1f })
@@ -572,6 +567,12 @@ namespace HakoOnna.Art.EditorTools
                 foreach (float z in new[] { -0.093f, 0.093f })
                     Rod(fit, "PoleRing", new Vector3(xr, h - 0.19f, z), 0.014f, 0.134f, Quaternion.identity, iron);
             }
+
+            // 两道铁箍只贴前、后两面，顶上接盖子的 LidBand。2026-11-20 以前是整块穿过箱内的实心板（Band_L / Band_R）：
+            // 掀开盖子就看得见，箱女的藏匿姿势也只能塞在两块板之间
+            foreach (float sx in new[] { -1f, 1f })
+                foreach (float sz in new[] { -1f, 1f })
+                    Plate(fit, "Band", new Vector3(sx * (w / 2f - 0.15f), h / 2f, sz * (d / 2f + 0.002f)), new Vector3(0.04f, h, 0.004f), band);
         }
 
         /// <summary>葛籠：黑漆的口沿、底边、四条竖棱和盖沿（盖沿跟着盖子），正面一个白色家纹（丸に梅鉢）。</summary>

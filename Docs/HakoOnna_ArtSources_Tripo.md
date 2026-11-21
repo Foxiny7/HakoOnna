@@ -51,9 +51,10 @@
 | 探索者 B | ≤ 20k | 是 | `realistic young woman, urban explorer, olive field jacket, jeans, hiking boots, short hair, A-pose, full body, game character, PBR` |
 | 探索者 C | ≤ 20k | 是 | `realistic young man, hoodie and denim jacket, beanie hat, work trousers, A-pose, full body, game character, PBR` |
 | 探索者 D | ≤ 20k | 是 | `realistic young woman, long raincoat, ponytail, black trousers, rubber boots, A-pose, full body, game character, PBR` |
-| 箱女 | ≤ 30k | 是 | `pale thin little girl about 7 years old, very messy uneven hacked shoulder-length black hair with clumps sticking out, faded dark red simple child kimono with soft sash, torn hem, barefoot, grey-white skin with faint paper fold creases, completely black eyes, japanese horror ghost, A-pose, full body, realistic, PBR` |
+| 箱女 | ≤ 30k | 是 | `pale thin little girl about 7 years old, paper-white skin with a faint grey-blue undertone, grime smudges, faint paper fold creases, slightly hollow cheeks, very long soaked glossy straight black hair with a centre parting, swept behind the shoulders, thin wet strands of fringe over the forehead, pale milky clouded eyes in dark sunken sockets, blank cold stare, dark wine-red cracked lips, plain deep crimson child kimono, narrow sash knotted small at the back, narrow sleeves, irregularly torn frayed hem at mid-shin, barefoot, long thin bony fingers with swollen knuckles, japanese horror ghost, A-pose, full body, realistic, PBR` |
 
 **说明：**
+- 箱女推荐走图生模型：按 `HakoOnna_Character_ImagePrompts.md` 做图 0 三视图，裁成三张传到 Tripo 多视角；上表的文字提示词只是备用。头发先拨到肩后，挂在胸前的湿发帘以后在 Blender 里用发片加。
 - 第一人称手臂用探索者模型本身：在 Unity 里只显示手臂部分，不用单独生成。
 - 箱女需要“四肢着地奔跑”“关节反折”这类非标准动作。Tripo 的自动绑定只能保证标准人形骨骼，这些动作要另外找动画或手调。可以先用 Mixamo 的标准动画占位。
 - 箱女的 8 个藏匿姿势和跳脸的脸都要手调、手工雕刻，Tripo 只出基础模型（见美术设定文档 6.2、6.5）。
