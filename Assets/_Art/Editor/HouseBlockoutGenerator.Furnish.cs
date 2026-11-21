@@ -224,9 +224,13 @@ namespace HakoOnna.Art.EditorTools
         static void Zabuton(Kit k, float x, float y, float z, float yaw, Material m)
         {
             k.Push(new Vector3(x, y, z), yaw);
-            k.Bb(m, 0, 0, 0, .52f, .05f, .55f);
-            k.Bb(m, 0, .05f, 0, .46f, .025f, .49f);
-            k.B(D.Black, 0, .076f, 0, .02f, .004f, .02f);
+            // 第四轮：两块方块叠的坐垫换成四边圆鼓、中间缝住的软座布団（Soft.cs）；Swap：搬家求解看到的还是原来的方块
+            k.Swap(() =>
+            {
+                k.Bb(m, 0, 0, 0, .52f, .05f, .55f);
+                k.Bb(m, 0, .05f, 0, .46f, .025f, .49f);
+                k.B(D.Black, 0, .076f, 0, .02f, .004f, .02f);
+            }, () => SoftZabuton(k.mb, new Vector3(0f, SoftTatamiLift, 0f), 0f, m, Mathf.Repeat(x * 7.3f + z * 3.1f, 50f)));
             k.Pop();
         }
 
@@ -423,8 +427,20 @@ namespace HakoOnna.Art.EditorTools
             float top = 2.31f * OpeningTopScale - .04f, nw = 3.6f * OpeningWidthScale, pw = nw / 3;
             Kit.Pinned = true;
             k.Cr(D.TrimMid, new Vector3(nx - nw / 2 - .03f, top + .02f, nz), .012f, .012f, nw + .06f, AlongX, 8);
-            for (int i = 0; i < 3; i++) k.B(D.ClothIndigo, nx - pw + i * pw, top - .32f, nz, pw - .03f, .64f, .006f);
-            foreach (float sz in new[] { -1f, 1f }) k.S(D.ClothWhite, nx, top - .3f, nz + sz * .0035f, .12f, .12f, .001f, 14);
+            // 第四轮：三片平板换成有竖褶、下摆不齐的布（Soft.cs HangCloth）；白色家纹圆片贴不住起褶的布，不画了（Swap 里第一遍照旧量尺寸）
+            for (int i = 0; i < 3; i++)
+            {
+                float cx = nx - pw + i * pw, sd = i * 1.7f + .3f;
+                bool shot = i == 1;
+                k.Swap(() => k.B(D.ClothIndigo, cx, top - .32f, nz, pw - .03f, .64f, .006f), () =>
+                {
+                    HangCloth(k.mb, D.ClothIndigo, D.ClothIndigo, new Vector3(cx - (pw - .03f) / 2f, top, nz), Quaternion.identity,
+                        new HangSpec { width = pw - .03f, length = .64f, thick = .004f, foldAmp = .008f, foldLen = .14f, hem = .006f, seed = sd });
+                    if (shot) KitShot(k, "noren", new Vector3(cx, top - .35f, nz), 2.0f, -.25f);
+                });
+            }
+            foreach (float sz in new[] { -1f, 1f })
+                k.Swap(() => k.S(D.ClothWhite, nx, top - .3f, nz + sz * .0035f, .12f, .12f, .001f, 14), () => { });
             Kit.Pinned = false;
             // 灶台上的瓶子、铁壶
             k.C(D.CeramicBrown, .3f, .86f, 11.1f, .045f, .045f, .2f, 10);
@@ -450,7 +466,13 @@ namespace HakoOnna.Art.EditorTools
             k.S(D.Iron, .13f, 1.2f, 12.52f, .045f, .03f, .045f, 8);
             k.B(D.TrimLight, .12f, 1.39f, 12.52f, .012f, .36f, .012f);
             k.B(D.Brass, .095f, 1.42f, 12.7f, .01f, .24f, .11f);
-            k.B(D.ClothWhite, .1f, 1.36f, 12.86f, .008f, .44f, .14f);
+            // 第四轮：抹布搭在挂杆上（Soft.cs TowelOnBar），原来是一块竖着的薄板
+            k.Swap(() => k.B(D.ClothWhite, .1f, 1.36f, 12.86f, .008f, .44f, .14f),
+                () =>
+                {
+                    TowelOnBar(k.mb, D.ClothWhite, D.ClothWhite, new Vector3(.13f, 1.6f, 12.93f), Quaternion.Euler(0f, 90f, 0f), .14f, .4f, .12f, .012f, 2.3f);
+                    KitShot(k, "dishcloth", new Vector3(.13f, 1.4f, 12.6f), 1.5f, .1f);
+                });
 
             // 北墙高处晾着的萝卜干
             k.Cr(D.Bamboo, new Vector3(3.3f, 2.4f, 13.97f), .018f, .018f, 2.1f, AlongX, 8);
@@ -516,19 +538,29 @@ namespace HakoOnna.Art.EditorTools
             // 离墙超过 SnapReach 不会被推到墙边，也躲开北门、东门的留空区
             // 火钵 + 铁壶：茶桌西边，转 180° 让火箸朝着茶桌
             k.Push(new Vector3(10.529f, .55f, 5.738f), 180f);
-            k.C(D.CeramicBlue, 0, 0, 0, .19f, .22f, .29f, 16);
-            k.C(D.Ash, 0, .29f, 0, .19f, .19f, .004f, 16);
-            foreach (float a in new[] { 0f, 120f, 240f })
+            // 第四轮审图：原来是蓝圆柱 + 方块五徳 + 球形铁壶，换成车削的褐釉陶火钵（DrawHibachi 的中心在局部 z=.27，往回挪）。
+            // Swap：第一遍仍按原来的圆柱量尺寸，搬家结果不变；挡块不变
+            k.Swap(() =>
             {
-                var p = Quaternion.Euler(0, a, 0) * new Vector3(.08f, 0, 0);
-                k.Bb(D.Iron, p.x, .294f, p.z, .015f, .06f, .015f);
-            }
-            k.S(D.Iron, 0, .41f, 0, .1f, .07f, .1f, 12);
-            k.C(D.Iron, 0, .47f, 0, .04f, .03f, .02f, 10);
-            k.Cr(D.Iron, new Vector3(.08f, .40f, 0), .012f, .007f, .1f, Quaternion.Euler(0, 0, -55), 6);
-            k.Br(D.Iron, 0, .53f, 0, .16f, .01f, .012f, 0, 0, 0);
-            k.Cr(D.Brass, new Vector3(-.15f, .295f, -.08f), .005f, .004f, .3f, Quaternion.Euler(10, 0, -70), 5);
-            k.Cr(D.Brass, new Vector3(-.15f, .295f, -.05f), .005f, .004f, .3f, Quaternion.Euler(14, 0, -70), 5);
+                k.C(D.CeramicBlue, 0, 0, 0, .19f, .22f, .29f, 16);
+                k.C(D.Ash, 0, .29f, 0, .19f, .19f, .004f, 16);
+                foreach (float a in new[] { 0f, 120f, 240f })
+                {
+                    var p = Quaternion.Euler(0, a, 0) * new Vector3(.08f, 0, 0);
+                    k.Bb(D.Iron, p.x, .294f, p.z, .015f, .06f, .015f);
+                }
+                k.S(D.Iron, 0, .41f, 0, .1f, .07f, .1f, 12);
+                k.C(D.Iron, 0, .47f, 0, .04f, .03f, .02f, 10);
+                k.Cr(D.Iron, new Vector3(.08f, .40f, 0), .012f, .007f, .1f, Quaternion.Euler(0, 0, -55), 6);
+                k.Br(D.Iron, 0, .53f, 0, .16f, .01f, .012f, 0, 0, 0);
+                k.Cr(D.Brass, new Vector3(-.15f, .295f, -.08f), .005f, .004f, .3f, Quaternion.Euler(10, 0, -70), 5);
+                k.Cr(D.Brass, new Vector3(-.15f, .295f, -.05f), .005f, .004f, .3f, Quaternion.Euler(14, 0, -70), 5);
+            }, () =>
+            {
+                k.Push(new Vector3(0f, 0f, -.27f));
+                DrawHibachi(k);
+                k.Pop();
+            });
             k.Pop();
             Blocker("Hibachi", new Vector3(10.529f, .55f, 5.738f), 0, new Vector3(.46f, .32f, .46f));
             Zabuton(k, 11.339f, .55f, 5.038f, 0, D.ClothPurple);
@@ -692,11 +724,23 @@ namespace HakoOnna.Art.EditorTools
             k.C(D.CeramicBrown, -.55f, lv[0], 0, .1f, .08f, .25f, 12);
             k.C(D.CeramicBrown, -.3f, lv[0], 0, .08f, .06f, .2f, 12);
             k.C(D.CeramicBlue, .45f, lv[0], 0, .11f, .07f, .3f, 12);
-            k.Cr(D.ClothWhite, new Vector3(-.68f, lv[1] + .11f, .02f), .11f, .11f, .62f, AlongX, 12);
-            k.Cr(D.ClothIndigo, new Vector3(.02f, lv[1] + .11f, .02f), .11f, .11f, .62f, AlongX, 12);
-            k.Bb(D.ClothPurple, -.45f, lv[2], 0, .38f, .08f, .28f);
-            k.Bb(D.ClothRed, -.45f, lv[2] + .08f, 0, .36f, .07f, .27f);
-            k.Bb(D.ClothWhite, .2f, lv[2], 0, .42f, .12f, .28f);
+            // 第四轮：圆柱的布卷、方块的叠布换成软网格（布卷看得到最外一层的布边，叠布四角圆、一边塌）；Swap：搬家照旧
+            k.Swap(() =>
+            {
+                k.Cr(D.ClothWhite, new Vector3(-.68f, lv[1] + .11f, .02f), .11f, .11f, .62f, AlongX, 12);
+                k.Cr(D.ClothIndigo, new Vector3(.02f, lv[1] + .11f, .02f), .11f, .11f, .62f, AlongX, 12);
+                k.Bb(D.ClothPurple, -.45f, lv[2], 0, .38f, .08f, .28f);
+                k.Bb(D.ClothRed, -.45f, lv[2] + .08f, 0, .36f, .07f, .27f);
+                k.Bb(D.ClothWhite, .2f, lv[2], 0, .42f, .12f, .28f);
+            }, () =>
+            {
+                SoftRoll(k.mb, D.ClothWhite, null, new Vector3(-.37f, lv[1], .02f), Quaternion.identity, .62f, .11f, seed: 1.3f);
+                SoftRoll(k.mb, D.ClothIndigo, null, new Vector3(.33f, lv[1], .02f), Quaternion.identity, .62f, .11f, seed: 4.1f);
+                FoldedCloth(k.mb, D.ClothPurple, new Vector3(-.45f, lv[2], 0f), 2f, .38f, .08f, .28f, 2.2f);
+                FoldedCloth(k.mb, D.ClothRed, new Vector3(-.45f, lv[2] + .08f, 0f), -4f, .36f, .07f, .27f, 3.7f);
+                FoldedCloth(k.mb, D.ClothWhite, new Vector3(.2f, lv[2], 0f), 3f, .42f, .12f, .28f, 5.9f);
+                KitShot(k, "nando_shelf", new Vector3(0f, lv[1] + .15f, 0f), 1.9f, .15f);
+            });
             k.Bb(D.Paper, -.45f, lv[3], 0, .3f, .1f, .22f);
             // 玻璃柜里的日本人形
             k.Bb(D.Lacquer, .35f, lv[3], 0, .3f, .03f, .24f);
@@ -720,8 +764,17 @@ namespace HakoOnna.Art.EditorTools
             k.Bb(D.Post, 0, 0, 0, .5f, .34f, .34f);
             k.Bb(D.Lacquer, 0, .34f, -.06f, .36f, .66f, .04f);
             k.B(D.Mirror, 0, .72f, -.038f, .3f, .54f, .004f);
-            k.Bb(D.ClothPurple, 0, .58f, -.06f, .4f, .5f, .09f);
-            k.Br(D.ClothPurple, .12f, .62f, -.01f, .08f, .2f, .01f, 0, 0, 8f);
+            // 第四轮：盖镜子的紫布从一块方块换成搭在镜框顶上、前面垂下来起褶的布（Soft.cs TowelOnBar）；Swap：搬家照旧
+            k.Swap(() =>
+            {
+                k.Bb(D.ClothPurple, 0, .58f, -.06f, .4f, .5f, .09f);
+                k.Br(D.ClothPurple, .12f, .62f, -.01f, .08f, .2f, .01f, 0, 0, 8f);
+            }, () =>
+            {
+                TowelOnBar(k.mb, D.ClothPurple, D.ClothPurple, new Vector3(-.21f, .976f, -.06f), Quaternion.identity, .42f, .43f, .1f, .024f, 3.1f,
+                    foldAmp: .012f, thick: .004f, skew: .06f);
+                KitShot(k, "kyodai", new Vector3(0f, .75f, 0f), 1.4f, .3f);
+            });
             k.Bb(D.Lacquer, .12f, .34f, .1f, .12f, .01f, .04f);
             k.C(D.CeramicWhite, -.12f, .34f, .08f, .03f, .025f, .06f, 10);
             k.Pop();
@@ -735,11 +788,28 @@ namespace HakoOnna.Art.EditorTools
             }
             k.Bb(D.Lacquer, 0, 1.58f, 0, 1.75f, .04f, .045f);
             k.Bb(D.Lacquer, 0, 1.15f, 0, 1.44f, .03f, .035f);
-            k.Bb(D.ClothRed, 0, .22f, .03f, .62f, 1.36f, .03f);
-            foreach (float sx in new[] { -.55f, .55f }) k.Bb(D.ClothRed, sx, 1.08f, .03f, .5f, .5f, .025f);
-            k.Bb(D.Gold, 0, .5f, .047f, .62f, .05f, .004f);
-            k.Bb(D.ClothWhite, -.05f, 1.3f, .047f, .04f, .28f, .004f);
-            k.Bb(D.ClothWhite, .05f, 1.3f, .047f, .04f, .28f, .004f);
+            // 第四轮：振袖从几块薄板换成挂在衣桁上、有竖褶、下摆微张的布（身、两袖、白衿、金线一道；Soft.cs HangCloth）；Swap：搬家照旧
+            k.Swap(() =>
+            {
+                k.Bb(D.ClothRed, 0, .22f, .03f, .62f, 1.36f, .03f);
+                foreach (float sx in new[] { -.55f, .55f }) k.Bb(D.ClothRed, sx, 1.08f, .03f, .5f, .5f, .025f);
+                k.Bb(D.Gold, 0, .5f, .047f, .62f, .05f, .004f);
+                k.Bb(D.ClothWhite, -.05f, 1.3f, .047f, .04f, .28f, .004f);
+                k.Bb(D.ClothWhite, .05f, 1.3f, .047f, .04f, .28f, .004f);
+            }, () =>
+            {
+                HangCloth(k.mb, D.ClothRed, D.ClothRed, new Vector3(-.31f, 1.58f, .044f), Quaternion.identity,
+                    new HangSpec { width = .62f, length = 1.36f, thick = .006f, foldAmp = .007f, foldLen = .16f, flare = .04f, hem = .008f, seed = 1.9f });
+                foreach (float sx in new[] { -.55f, .55f })
+                    HangCloth(k.mb, D.ClothRed, D.ClothRed, new Vector3(sx - .25f, 1.58f, .03f), Quaternion.identity,
+                        new HangSpec { width = .5f, length = .5f, thick = .005f, foldAmp = .006f, foldLen = .12f, hem = .01f, seed = 2.7f + sx });
+                foreach (float sx in new[] { -.05f, .05f })
+                    HangCloth(k.mb, D.ClothWhite, D.ClothWhite, new Vector3(sx - .02f, 1.44f, .052f), Quaternion.identity,
+                        new HangSpec { width = .04f, length = .28f, thick = .002f, foldAmp = 0f, hem = 0f });
+                HangCloth(k.mb, D.Gold, D.Gold, new Vector3(-.315f, .55f, .053f), Quaternion.identity,
+                    new HangSpec { width = .63f, length = .05f, thick = .002f, foldAmp = 0f, hem = 0f });
+                KitShot(k, "kimono", new Vector3(0f, .95f, 0f), 2.4f, .15f);
+            });
             k.Pop();
             Blocker("Iko", new Vector3(21.6f, .55f, 8.6f), 0, new Vector3(1.5f, 1.65f, .45f));
             // 行灯

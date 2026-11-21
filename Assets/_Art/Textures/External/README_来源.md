@@ -1,4 +1,4 @@
-# 外部资源来源（第二轮贴图，第三轮模型和古画，2026-11-19）
+# 外部资源来源（第二轮贴图，第三轮模型和古画，2026-11-19；第四轮贴图和模型，2026-11-20）
 
 这里的贴图全部是 **CC0（公有领域）**：可以商用、可以改、不用署名。记下来源是为了以后换分辨率、追溯和替换。
 材质怎么接、颜色怎么校准见 `Assets/_Art/Editor/ExternalMats.cs`；处理脚本在 `Assets/_Art/Tools~/`（Unity 不导入这个文件夹）。
@@ -126,3 +126,64 @@ make_textures.py 生成：血字四句（ここから出して / 開けるな / 
 | dl_ph_models.py | 按 Poly Haven API 的文件清单下载模型（1K FBX + 1K 贴图），校验 md5，只从 dl.polyhaven.org 下 |
 | dl_met.py | 从 Met 开放资源 API 下载原图：藏品必须 `isPublicDomain = true`，图片必须是这件藏品自己的 |
 | prep_models.py | 把下载的模型贴图整理成项目用的（mask、带 alpha 的漫反射），古画缩到 2048 px |
+
+---
+
+# 第四轮（2026-11-20）：布、瓷、金属、纸的贴图，床桌椅模型，院子杂草
+
+和前两轮一样，全部是 **CC0（公有领域）**。下载清单用户批准过（2026-11-20）。贴图由 `Tools~/prep_tex_r4.py` 合成（拼大块、做旧、mask），
+在 `ExternalMats.cs` 的 `UpgradeDetailR4` / `Upgrade` 里接到材质上（材质上记 `HakoArtRev = r4`，只升级一次）。
+
+## Poly Haven 贴图（https://polyhaven.com/a/<id> ，1K）
+
+| 源 id | 合成后的贴图（`PolyHaven/`） | 用在哪 |
+|---|---|---|
+| rough_linen | linen_aged；ticking_aged（加蓝灰窄条纹、床垫上一大片黄渍） | 白布、蓝布、防尘布；洋床的条纹床垫 |
+| crepe_satin | crepe_aged | 红色绉绸（振袖、红布） |
+| velour_velvet | velour_aged | 紫色天鹅绒（拝み座布団、镜台的盖布）、地毯 |
+| terry_cloth | terry_aged | 毛巾（白、蓝） |
+| fabric_pattern_05（col_01） | check_aged | 格子被面、二楼和室的坐垫、叠起来的被子里的一条 |
+| fabric_pattern_07（col_1 / col_03） | gingham_red_aged / gingham_green_aged | 子供部屋的红格子被子、晾的连衣裙；奥の間的客用被子 |
+| reed_roof_04 | reed_roof_04 | 稻草、草席 |
+| green_metal_rust | green_metal_rust | 洗衣机的绿漆铁皮 |
+| rusty_metal_04 | rusty_metal_04 | 锈铁皮（囲炉裏的内衬） |
+
+## ambientCG 贴图（https://ambientcg.com/view?id=<id> ，1K-JPG）
+
+| 源 id | 合成后的贴图（`ambientCG/`） | 用在哪 |
+|---|---|---|
+| Porcelain001 | ceramic_aged（加开片、污垢） | 白 / 蓝 / 褐色瓷器、屋脊瓦、屋顶 |
+| Smear004 + Fingerprints002 | mirror_old、black_smudged、plastic_smudged | 旧镜子；玻璃、黑漆；灯罩、红塑料、蜡烛 |
+| PaintedMetal012 | enamel_chipped | 搪瓷（洗衣机的桶等） |
+| Metal048B | gold_dirty | 金、金箔 |
+| Metal017 | bronze_old | 铜（水龙头、铭牌、毛巾杆） |
+| Paper003 | paper_white | 白纸、障子纸、纸灯罩 |
+| Paper006 | paper_aged | 发黄的旧纸、写了字的纸 |
+
+## Poly Haven 模型（第四轮新下的，1K FBX + 1K 贴图）
+
+| id | 用在哪 |
+|---|---|
+| old_bed_frame | 寝室的两张单人铁床、子供部屋的铁床（按床宽非等比缩放） |
+| painted_wooden_table | 台所的餐桌 |
+| painted_wooden_chair_01 | 台所餐桌的两把椅子 |
+| painted_wooden_chair_02 | 子供部屋学生桌的椅子 |
+| SchoolDesk_01 | 子供部屋并排的两张学生桌 |
+| side_table_01 | 寝室的床头小桌 |
+| wicker_basket_01 | 脱衣所的洗衣筐 |
+
+第三轮备用的 nettle_plant、weed_plant_02、dry_branches_medium_01 这一轮用在院子杂草（房子和土蔵的墙根、院墙内侧、竹篱笆脚下）。
+
+## 处理过的地方（第四轮）
+
+- **拼大块**：布的原图一块只有 0.27–0.37 m，水渍、霉点一眼就看出重复；按 n×n 拼成 0.8–1.9 m 一块（2048 px）再做旧。做旧（水渍、霉点、开片、黄斑）都用周期噪声，拼缝看不出来。
+- **素色布**：原图去色、只留织纹，颜色在 Unity 里用 _BaseColor 上（白 / 蓝 / 红 / 紫 / 两种毛巾），一张图给几种布用；格子布保留原色。
+- **mask**：和前两轮一样（R = 金属度，G = AO，B = 0，A = 光滑度，最大 512 px）。
+- **暂存**：下载的原文件在 `Assets/_Art/Import~/r4/`（Unity 不导入）。验收后可以删掉。
+
+## 脚本（第四轮新增，`Assets/_Art/Tools~/`）
+
+| 脚本 | 做什么 |
+|---|---|
+| dl_acg.py | 按 ambientCG API 的清单下载 1K-JPG 压缩包，只解出贴图（校验来源、大小、文件名） |
+| prep_tex_r4.py | 合成第四轮的布、瓷、金属、纸贴图（拼大块、做旧、mask），打印每张的平均色和一块的米数 |

@@ -145,6 +145,14 @@ namespace HakoOnna.Art.EditorTools
             k.PushS(foot, new Vector3(0, yaw, 0), Vector3.one * S);
             draw();
             k.Pop();
+            // 第四轮审图：洗衣机、毛巾、洗衣筐、洗手钵、洗脸台（正面偏 20° 看）
+            float lookY = name switch { "Washer" => .75f, "TowelBar" => 1.05f, "Basket" => .3f, "HandBasin" => .8f, "Washstand" => .85f, _ => -1f };
+            if (lookY > 0f)
+            {
+                var q = Quaternion.Euler(0f, yaw, 0f);
+                ShotDir($"{c.room.id}_{name}", foot + q * new Vector3(0f, lookY * S, .3f * S), q * Quaternion.Euler(0f, 20f, 0f) * Vector3.forward,
+                    name == "Basket" ? 1.5f : 1.8f, name == "Basket" ? .9f : .45f);
+            }
             if (block.y <= 0f) return;
             var rot = Quaternion.Euler(0, yaw, 0);
             var size = block * S;
@@ -325,9 +333,8 @@ namespace HakoOnna.Art.EditorTools
             OldMirror(k, rng, new Vector3(0, 1.24f, 0), .34f, .42f, D.TrimLight);
             k.Cr(D.TrimLight, new Vector3(.3f, .98f, .075f), .01f, .01f, .3f, AlongX, 6);
             foreach (float sx in new[] { .31f, .59f }) k.B(D.TrimMid, sx, .98f, .04f, .02f, .03f, .08f);
-            k.Br(D.ClothWhite, .45f, .83f, .08f, .22f, .29f, .008f, 3f, 0, 0);
-            k.B(D.ClothWhite, .45f, .985f, .075f, .22f, .014f, .022f);
-            k.B(D.Straw, .41f, .78f, .086f, .07f, .09f, .001f); // 毛巾上的黄渍
+            // 第四轮：毛巾搭在杆上（前后两片、起褶；Soft.cs TowelOnBar），原来是两块薄板 + 一块黄渍
+            TowelOnBar(k.mb, D.Towel, D.Towel, new Vector3(.34f, .98f, .075f), Quaternion.identity, .22f, .27f, .2f, .01f, 1.7f);
         }
 
         /// <summary>朝顔（小便器）：白瓷喇叭口挂在墙上，下面排水管进地；铜冲水管从上面下来接阀门；两边各一块木隔板。</summary>
@@ -432,6 +439,7 @@ namespace HakoOnna.Art.EditorTools
             // 天花板吊下来的晾衣竿，衣服一直没收（衣服下沿离地 1.8 m 左右，人走得过去）；下面一筐旧衣服
             float lx = r.xMin + 7.1f, lz = zc - 3.0f;
             LaundryLine(k, rng, new Vector3(lx, fl + 2.42f, lz), 2.1f, c.ceil);
+            ShotToward("laundry_line", new Vector3(lx, fl + 1.95f, lz), 2.3f, -.35f, 15f);
             FixtureAt(k, c, "Basket", new Vector3(lx - .35f, fl, lz - .05f), 0f, new Vector3(.52f, .42f, .42f), () => DrawLaundryBasket(k, rng));
             // 南墙（门东边）：两个捆死的苹果木箱叠着 + 一个侧倒、空着的
             FixtureAt(k, c, "Crates", new Vector3(r.xMin + 8.0f, fl, z0 + FillGap), 0f, new Vector3(1.1f, .62f, .5f), () => DrawCrates(k, rng));
@@ -469,41 +477,48 @@ namespace HakoOnna.Art.EditorTools
             foreach (float sx in new[] { -len / 2 + .18f, len / 2 - .18f })
                 k.Cr(D.Straw, new Vector3(sx, 0, 0), .006f, .006f, ceil - center.y, Quaternion.identity, 6);
             float x = -len / 2 + .3f;
+            // 第四轮：衣服都换成有褶的软布（Soft.cs）。随机数照旧（每件的长短、歪的角度不变；原来霉斑的那个随机数空耗掉）
             // 毛巾：搭在竿上，前后两片
             for (int i = 0; i < 2; i++, x += .42f)
             {
-                var m = i == 0 ? D.ClothWhite : D.ClothIndigo;
+                var m = i == 0 ? D.Towel : D.TowelBlue;
                 float l = Rf(rng, .32f, .42f), sw = Rf(rng, -4f, 4f);
-                k.Br(m, x, -.02f - l / 2, .021f, .3f, l, .006f, sw, 0, 0);
-                k.Br(m, x, -.02f - l * .4f, -.021f, .3f, l * .8f, .006f, -sw, 0, 0);
-                k.Cr(m, new Vector3(x - .15f, 0, 0), .024f, .024f, .3f, AlongX, 8);
-                k.Br(D.Ash, x + Rf(rng, -.08f, .08f), -.02f - l + .05f, .0245f, .09f, .07f, .002f, sw, 0, 0); // 霉斑
+                TowelOnBar(k.mb, m, m, new Vector3(x - .15f, 0f, 0f), Quaternion.Euler(sw, 0f, 0f), .3f, l, l * .8f, .017f, i * 2.3f + .7f, foldAmp: .01f);
+                Rf(rng, -.08f, .08f);
             }
-            // 衣架上的汗衫
+            // 衣架上的汗衫：身子一片、两只短袖斜着
             x += .05f;
             Hanger(k, new Vector3(x, 0, 0), Rf(rng, -8f, 8f), false);
             k.Push(new Vector3(x, -.07f, 0), 0f, Rf(rng, -3f, 3f), Rf(rng, -4f, 4f));
-            k.Bb(D.ClothWhite, 0, -.6f, 0, .4f, .56f, .012f);
+            HangPanel(k, D.ClothWhite, new Vector3(0f, -.32f, 0f), .4f, .56f, 0f, new HangSpec { thick = .004f, foldAmp = .008f, foldLen = .1f, flare = .03f, hem = .006f, seed = 1.3f });
             foreach (float s in new[] { -1f, 1f })
-                k.Br(D.ClothWhite, s * .24f, -.13f, 0, .16f, .09f, .011f, 0, 0, s * -28f);
-            k.Br(D.Ash, .06f, -.42f, .0065f, .12f, .14f, .002f, 0, 0, 20f);
+                HangPanel(k, D.ClothWhite, new Vector3(s * .24f, -.13f, -.004f), .16f, .09f, s * -28f, new HangSpec { thick = .004f, foldAmp = .004f, foldLen = .06f, hem = .004f, seed = 2f + s });
             k.Pop();
-            // 小孩的红裙子（短一点，下摆张开）
+            // 小孩的红格子裙（短一点，下摆张开）
             x += .5f;
             Hanger(k, new Vector3(x, 0, 0), Rf(rng, -10f, 10f), false);
             k.Push(new Vector3(x, -.07f, 0), 0f, Rf(rng, -4f, 4f), Rf(rng, -6f, 6f));
-            k.Bb(D.ClothRed, 0, -.24f, 0, .24f, .2f, .011f);
-            k.Bb(D.ClothRed, 0, -.46f, 0, .34f, .22f, .011f);
-            k.Br(D.ClothWhite, 0, -.05f, .0062f, .1f, .03f, .002f, 0, 0, 0); // 白领子
+            HangPanel(k, D.GinghamRed, new Vector3(0f, -.14f, 0f), .24f, .2f, 0f, new HangSpec { thick = .004f, foldAmp = .004f, foldLen = .07f, hem = .003f, seed = 3.1f });
+            HangPanel(k, D.GinghamRed, new Vector3(0f, -.35f, .003f), .3f, .23f, 0f, new HangSpec { thick = .004f, foldAmp = .012f, foldLen = .07f, flare = .35f, hem = .01f, seed = 4.2f });
+            k.Br(D.ClothWhite, 0, -.05f, .0072f, .1f, .03f, .002f, 0, 0, 0); // 白领子
             k.Pop();
             // 用衣夹夹着的一双袜子
             x += .32f;
             foreach (float s in new[] { -.05f, .05f })
             {
-                k.Br(D.ClothWhite, x + s, -.11f, 0, .05f, .2f, .008f, 0, 0, Rf(rng, -5f, 5f));
+                HangPanel(k, D.ClothWhite, new Vector3(x + s, -.11f, 0f), .05f, .2f, Rf(rng, -5f, 5f), new HangSpec { thick = .006f, foldAmp = .003f, foldLen = .05f, hem = .004f, twist = 8f, seed = 5f + s * 10f });
                 k.B(D.TrimLight, x + s, -.005f, 0, .014f, .06f, .03f);
             }
             k.Pop();
+        }
+
+        /// <summary>一片垂布（Soft.cs HangCloth）：c = 布的中心，w × h，绕 z 歪 roll 度（顶边跟着歪）。</summary>
+        static void HangPanel(Kit k, Material m, Vector3 c, float w, float h, float roll, HangSpec s)
+        {
+            var q = Quaternion.Euler(0f, 0f, roll);
+            s.width = w;
+            s.length = h;
+            HangCloth(k.mb, m, m, c + q * new Vector3(-w / 2f, h / 2f, 0f), q, s);
         }
 
         /// <summary>铁丝衣架（三角 + 钩子）。p = 挂钩挂在竿上的点；onFloor = 掉在地上平躺着。</summary>
@@ -522,15 +537,36 @@ namespace HakoOnna.Art.EditorTools
         static void DrawLaundryBasket(Kit k, System.Random rng)
         {
             const float z = .21f;
-            k.C(D.BambooDry, 0, 0, z, .19f, .22f, .34f, 16);
-            k.C(D.Black, 0, .335f, z, .205f, .205f, .004f, 16);
-            k.Cr(D.Bamboo, new Vector3(0, .34f, z), .225f, .225f, .02f, Quaternion.identity, 16); // 筐沿
-            var cloth = new[] { D.ClothWhite, D.ClothIndigo, D.ClothWhite, D.ClothRed, D.ClothPurple };
+            const string basket = "wicker_basket_01";
+            var cloth = new[] { D.ClothWhite, D.ClothIndigo, D.Towel, D.ClothRed, D.ClothPurple };
+            if (!ExternalModels.Has(basket))
+            {
+                k.C(D.BambooDry, 0, 0, z, .19f, .22f, .34f, 16);
+                k.C(D.Black, 0, .335f, z, .205f, .205f, .004f, 16);
+                k.Cr(D.Bamboo, new Vector3(0, .34f, z), .225f, .225f, .02f, Quaternion.identity, 16); // 筐沿
+                for (int i = 0; i < 6; i++)
+                    k.S(cloth[i % cloth.Length], Rf(rng, -.09f, .09f), .33f + Rf(rng, 0f, .06f), z + Rf(rng, -.09f, .09f),
+                        Rf(rng, .08f, .13f), Rf(rng, .035f, .06f), Rf(rng, .07f, .12f), 8);
+                k.Br(D.ClothIndigo, .2f, .26f, z + .1f, .03f, .2f, .16f, 0, 0, -8f);
+                return;
+            }
+            // 第四轮：竹筐换成 CC0 的椭圆藤编筐（wicker_basket_01），筐里一堆软的旧衣服（随机数照旧），一件搭在筐沿上垂到外面
+            const float sc = 1.3f;
+            var size = Kit.ModelSize(basket, sc);
+            k.Model(basket, new Vector3(0f, 0f, z), 0f, sc);
             for (int i = 0; i < 6; i++)
-                k.S(cloth[i % cloth.Length], Rf(rng, -.09f, .09f), .33f + Rf(rng, 0f, .06f), z + Rf(rng, -.09f, .09f),
-                    Rf(rng, .08f, .13f), Rf(rng, .035f, .06f), Rf(rng, .07f, .12f), 8);
-            // 一件搭在筐沿外面，垂下来
-            k.Br(D.ClothIndigo, .2f, .26f, z + .1f, .03f, .2f, .16f, 0, 0, -8f);
+            {
+                float px = Rf(rng, -.09f, .09f), py = Rf(rng, 0f, .06f), pz = Rf(rng, -.09f, .09f);
+                float rx = Rf(rng, .08f, .13f), ry = Rf(rng, .035f, .06f), rz = Rf(rng, .07f, .12f);
+                var s = new PuffSpec
+                {
+                    w = 1.8f * rx, d = 1.7f * rz, hTop = ry, hBot = .012f, corner = Mathf.Min(rx, rz) * .7f, rampTop = ry * 1.6f, rampBot = .012f,
+                    dome = .15f, wrinkle = .012f, pucker = .003f, crumple = .011f, sinkX = ry * .2f, seed = i * 1.9f + .4f, nx = 18, nz = 18,
+                };
+                Puff(k.mb, cloth[i % cloth.Length], cloth[i % cloth.Length], new Vector3(px, .03f + py * 1.3f + i * .012f, z + pz * .6f), Quaternion.Euler(0f, i * 37f, 0f), s);
+            }
+            TowelOnBar(k.mb, D.ClothIndigo, D.ClothIndigo, new Vector3(size.x / 2f - .012f, size.y - .012f, z - .07f), Quaternion.Euler(0f, -90f, 0f),
+                .14f, .07f, Mathf.Min(.14f, size.y - .02f), .012f, 3.3f, foldAmp: .01f);
         }
 
         /// <summary>
@@ -634,20 +670,32 @@ namespace HakoOnna.Art.EditorTools
         /// 有几块掉了露出灰浆；两个铜水龙头；一条木搁板（杯子、牙刷、干裂的肥皂、倒了的瓶子）；上面一面发黑、起雾、带裂纹的旧镜子。
         /// 设计尺寸 = 世界尺寸 / FurnitureScale（台面 0.72 → 0.9 m）。
         /// </summary>
+        /// <summary>洗脸盆剖面：盆底外面在 y = 0，台面在 y = .16；口沿的平边半径 .29，盖住台面方洞（半宽 .2）的四个角。</summary>
+        static readonly Vector2[] WashBasinProfile =
+        {
+            new Vector2(0f, 0f), new Vector2(.1f, 0f), new Vector2(.155f, .025f), new Vector2(.19f, .075f), new Vector2(.203f, .155f),
+            new Vector2(.288f, .157f), new Vector2(.293f, .163f), new Vector2(.288f, .169f), new Vector2(.215f, .17f), new Vector2(.205f, .166f),
+            new Vector2(.188f, .1f), new Vector2(.15f, .045f), new Vector2(.09f, .021f), new Vector2(0f, .018f),
+        };
+
         static void DrawShowaWashstand(Kit k, System.Random rng)
         {
             const float W = 1.0f, Dp = .55f, H = .72f, slab = .09f, bz = .3f;
             foreach (float sx in new[] { -1f, 1f })
                 k.Bb(D.BathTile, sx * (W / 2 - .06f), 0, Dp / 2, .12f, H - slab, Dp - .04f);
-            k.Bb(D.BathTile, 0, H - slab, Dp / 2, W, slab, Dp);
+            // 第四轮：台面开一个方洞，洗脸盆是车削出来的凹盆（口沿的平边盖住方洞四个角），原来是台面上平放的两片圆片
+            const float hole = .2f;
+            k.Bb(D.BathTile, 0, H - slab, (bz - hole) / 2, W, slab, bz - hole);
+            k.Bb(D.BathTile, 0, H - slab, (bz + hole + Dp) / 2, W, slab, Dp - bz - hole);
+            foreach (float sx in new[] { -1f, 1f })
+                k.Bb(D.BathTile, sx * (W / 2 + hole) / 2, H - slab, bz, W / 2 - hole, slab, 2 * hole);
             k.Bb(D.CeramicWhite, 0, H - .02f, Dp - .012f, W + .012f, .03f, .028f);
-            // 洗脸盆
-            k.C(D.CeramicWhite, 0, H - .17f, bz, .13f, .2f, .17f, 20);
-            k.C(D.CeramicWhite, 0, H, bz, .215f, .215f, .01f, 20);
-            k.C(D.Ash, 0, H + .002f, bz, .18f, .18f, .01f, 20);
-            k.C(D.Iron, 0, H + .004f, bz, .028f, .028f, .01f, 10);
+            // 洗脸盆：盆底一层干掉的灰泥、铁漏水口
+            Lathe(k.mb, D.CeramicWhite, new Vector3(0f, H - .16f, bz), Quaternion.identity, WashBasinProfile, 32);
+            k.C(D.Ash, 0, H - .142f, bz, .1f, .1f, .002f, 20);
+            k.C(D.Iron, 0, H - .141f, bz, .028f, .028f, .003f, 12);
             // 存水弯
-            k.C(D.Iron, 0, .3f, bz, .021f, .021f, H - .17f - .3f, 8);
+            k.C(D.Iron, 0, .3f, bz, .021f, .021f, H - .155f - .3f, 8);
             k.S(D.Iron, 0, .3f, bz, .03f, .03f, .03f, 8);
             k.Cr(D.Iron, new Vector3(0, .3f, bz), .021f, .021f, bz, Quaternion.Euler(-90f, 0, 0), 8);
             // 瓷砖墙裙 + 掉了瓷砖的地方
@@ -683,11 +731,9 @@ namespace HakoOnna.Art.EditorTools
             const float y = 1.25f;
             k.Cr(D.TrimLight, new Vector3(-.32f, y, .07f), .012f, .012f, .64f, AlongX, 6);
             foreach (float sx in new[] { -.3f, .3f }) k.B(D.TrimMid, sx, y, .04f, .025f, .035f, .08f);
-            k.Br(D.ClothWhite, -.14f, y - .19f, .075f, .26f, .37f, .008f, 2f, 0, 0);
-            k.B(D.ClothWhite, -.14f, y + .005f, .07f, .26f, .015f, .025f);
-            k.B(D.Straw, -.1f, y - .26f, .081f, .09f, .12f, .001f);
-            k.Br(D.ClothIndigo, .17f, y - .3f, .08f, .22f, .62f, .008f, 4f, 0, 14f);
-            k.B(D.ClothIndigo, .12f, y + .004f, .07f, .1f, .015f, .025f);
+            // 第四轮：两条毛巾换成搭在杆上的软布（Soft.cs TowelOnBar）；蓝的那条前长后短、往右滑，快掉下来了
+            TowelOnBar(k.mb, D.Towel, D.Towel, new Vector3(-.27f, y, .07f), Quaternion.identity, .26f, .37f, .24f, .012f, 2.2f);
+            TowelOnBar(k.mb, D.TowelBlue, D.TowelBlue, new Vector3(.06f, y, .07f), Quaternion.identity, .22f, .58f, .07f, .012f, 4.6f, skew: .22f);
         }
     }
 }

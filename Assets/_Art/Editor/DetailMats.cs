@@ -26,6 +26,8 @@ namespace HakoOnna.Art.EditorTools
         public Material Cobweb, WebStrand;           // 第三轮废弃感：蜘蛛网（半透明的网面 + 不透明的丝）
         public Material Stain;                       // 第三轮废弃感：地上的水渍、霉斑（半透明的深色）
         public Material DustSheet, DustSheetOld, DustSheetTop; // 第三轮：家具上盖的防尘布（灰白、发黄两种；顶面落了灰）
+        public Material Towel, TowelBlue, Ticking, Check, GinghamRed, GinghamGreen; // 第四轮：毛巾、床垫条纹布、格子被面
+        public Material Enamel, PaintGreen, RustSheet;                              // 第四轮：掉瓷的搪瓷、绿漆铁皮、锈铁皮
 
         [MenuItem("Hako/Art/2b 重建细节贴图和材质", priority = 21)]
         static void Rebuild()
@@ -150,6 +152,16 @@ namespace HakoOnna.Art.EditorTools
             d.DustSheetOld = Mat("MD_DustSheetOld", null, null, C(.57f, .53f, .44f), .03f, one);
             d.DustSheetTop = Mat("MD_DustSheetTop", null, null, C(.43f, .41f, .37f), .02f, one);
             d.WebStrand = Mat("MD_WebStrand", null, null, C(.58f, .57f, .54f), .1f, one);
+            // 第四轮：先建成纯色，ExternalMats.UpgradeDetailR4 接上贴图
+            d.Towel = Mat("MD_TowelTerry", null, null, C(.72f, .70f, .63f), .05f, one);
+            d.TowelBlue = Mat("MD_TowelTerryBlue", null, null, C(.22f, .32f, .46f), .05f, one);
+            d.Ticking = Mat("MD_MattressTicking", null, null, C(.74f, .72f, .66f), .05f, one);
+            d.Check = Mat("MD_FutonCheck", null, null, C(.52f, .53f, .45f), .05f, one);
+            d.GinghamRed = Mat("MD_FutonGinghamRed", null, null, C(.50f, .34f, .31f), .05f, one);
+            d.GinghamGreen = Mat("MD_FutonGinghamGreen", null, null, C(.42f, .47f, .37f), .05f, one);
+            d.Enamel = Mat("MD_EnamelChipped", null, null, C(.80f, .79f, .75f), .7f, one);
+            d.PaintGreen = Mat("MD_PaintedMetalGreen", null, null, C(.26f, .33f, .24f), .5f, one);
+            d.RustSheet = Mat("MD_RustySheet", null, null, C(.33f, .24f, .18f), .3f, one);
             // 第二轮：大部分材质换成 CC0 贴图（只升级一次，见 ExternalMats）
             ExternalMats.UpgradeDetail(d);
             AssetDatabase.SaveAssets();

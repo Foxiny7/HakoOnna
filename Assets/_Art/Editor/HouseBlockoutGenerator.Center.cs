@@ -445,8 +445,10 @@ namespace HakoOnna.Art.EditorTools
                     k.Bb(D.TrimLight, 0, -.4f, .215f, .4f, .4f, .025f);
                     k.Pop();
                 }
-                k.Cr(D.ClothRed, new Vector3(-.85f, .11f, -.6f), .11f, .11f, 1.5f, AlongX, 12);
-                k.Cr(D.Straw, new Vector3(-.75f, .09f, -.4f), .09f, .09f, 1.3f, AlongX, 10);
+                // 第四轮：卷起来的地毯、草席换成软卷（看得到最外一层的布边、压在地上的一面压扁；Soft.cs SoftRoll）
+                SoftRoll(k.mb, P.Carpet, null, new Vector3(-.1f, 0f, -.6f), Quaternion.Euler(0f, 2f, 0f), 1.5f, .11f, seed: 2.7f);
+                SoftRoll(k.mb, D.Straw, null, new Vector3(-.1f, 0f, -.4f), Quaternion.Euler(0f, 2f, 0f), 1.3f, .09f, .1f, .08f, 5.3f);
+                KitShot(k, "stored_pile", new Vector3(-.1f, .25f, -.3f), 2.0f, .8f);
                 float fx = W / 2 + .38f;
                 k.C(D.Iron, fx, 0, 0, .14f, .15f, .035f, 16);
                 k.C(D.Iron, fx, .035f, 0, .016f, .016f, .62f, 8);
@@ -486,7 +488,9 @@ namespace HakoOnna.Art.EditorTools
                     k.Bb(D.TrimLight, 0, -.4f, .215f, .4f, .4f, .025f);
                     k.Pop();
                 }
-                k.Cr(D.ClothRed, new Vector3(-.45f, .11f, -.08f), .11f, .11f, .9f, AlongX, 12);
+                // 第四轮：桌下横放的一卷地毯换成软卷（Soft.cs SoftRoll）
+                SoftRoll(k.mb, P.Carpet, null, new Vector3(0f, 0f, -.08f), Quaternion.Euler(0f, 3f, 0f), .9f, .11f, seed: 3.9f);
+                KitShot(k, "stored_pile_small", new Vector3(0f, .25f, -.05f), 1.7f, .7f);
                 k.Pop();
             };
             set.blocks.Add((new Vector3(0, 0, -.03f), new Vector3(W, 1.15f, Dp)));
@@ -679,12 +683,11 @@ namespace HakoOnna.Art.EditorTools
             set.draw = (k, r) =>
             {
                 k.Push(new Vector3(-.2f, 0, 0), Rf(r, -3f, 3f));
-                k.Bb(D.ClothWhite, 0, 0, 0, 1.0f, .09f, 2.0f);
-                var m = r.Next(2) == 0 ? D.ClothIndigo : D.ClothRed;
-                k.Bb(m, 0, .09f, -.22f, 1.04f, .07f, 1.5f);
-                k.Cr(m, new Vector3(-.52f, .125f, .53f), .035f, .035f, 1.04f, AlongX, 8);
-                k.Bb(D.ClothWhite, 0, .155f, .5f, 1.0f, .012f, .1f);
-                k.Bb(D.ClothWhite, 0, .09f, .78f, .5f, .11f, .3f);
+                // 第四轮：几块方块的被褥换成软的一套（敷布団、掀到腰的掛布団两边垂到榻榻米上、压出头印的枕头；Soft.cs LaidFutonSoft）。
+                // 被子掀开了：睡在这里的人起来走了。随机数照旧
+                var m = r.Next(2) == 0 ? D.ClothIndigo : D.GinghamRed;
+                LaidFutonSoft(k.mb, new Vector3(0f, SoftTatamiLift, 0f), 0f, m, D.ClothWhite, D.ClothWhite, 41, true);
+                KitShot(k, "laid_futon", new Vector3(0f, .1f, 0f), 2.1f, 1.1f);
                 k.Pop();
                 k.Push(new Vector3(.52f, 0, .75f - .18f));
                 DrawAndon(k);

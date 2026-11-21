@@ -156,8 +156,15 @@ namespace HakoOnna.Art.EditorTools
             // 西墙毛巾杆
             k.Cr(D.Brass, new Vector3(10.42f, 1.95f, 18.05f), .01f, .01f, .7f, AlongZ, 8);
             foreach (float z in new[] { 18.07f, 18.73f }) k.B(D.Brass, 10.4f, 1.95f, z, .05f, .015f, .015f);
-            k.B(D.ClothWhite, 10.43f, 1.72f, 18.25f, .012f, .46f, .26f);
-            k.B(D.ClothIndigo, 10.432f, 1.76f, 18.55f, .012f, .38f, .24f);
+            // 第四轮：两条毛巾搭在杆上（前后两片、起褶；Soft.cs TowelOnBar），原来是两块竖着的薄板；Swap：搬家照旧
+            k.Swap(() => k.B(D.ClothWhite, 10.43f, 1.72f, 18.25f, .012f, .46f, .26f),
+                () => TowelOnBar(k.mb, D.Towel, D.Towel, new Vector3(10.42f, 1.95f, 18.38f), Quaternion.Euler(0f, 90f, 0f), .26f, .44f, .22f, .01f, 1.4f));
+            k.Swap(() => k.B(D.ClothIndigo, 10.432f, 1.76f, 18.55f, .012f, .38f, .24f),
+                () =>
+                {
+                    TowelOnBar(k.mb, D.TowelBlue, D.TowelBlue, new Vector3(10.42f, 1.95f, 18.67f), Quaternion.Euler(0f, 90f, 0f), .24f, .36f, .3f, .01f, 3.8f, skew: -.12f);
+                    KitShot(k, "furo_towels", new Vector3(10.42f, 1.72f, 18.4f), 1.5f, -.05f);
+                });
 
             // 更衣处（东墙）：长凳、衣钩、浴衣、毛巾、体重秤、草席
             k.Push(new Vector3(17.76f, .55f, 15.6f), 270f);
@@ -168,17 +175,39 @@ namespace HakoOnna.Art.EditorTools
                 k.Bb(D.TrimMid, sx, .1f, 0, .05f, .04f, .24f);
             }
             k.Bb(D.TrimMid, 0, .1f, 0, 1.16f, .04f, .04f);
-            k.Bb(D.ClothIndigo, -.3f, .42f, .02f, .34f, .06f, .26f);
-            k.Bb(D.ClothWhite, -.3f, .48f, .02f, .32f, .014f, .06f);
-            k.Bb(D.ClothWhite, .28f, .42f, 0f, .3f, .05f, .22f);
-            k.Bb(D.ClothWhite, .29f, .47f, 0f, .28f, .045f, .2f);
+            // 第四轮：叠好的浴衣、腰带、两条毛巾换成四角圆、一边塌的软块（Soft.cs FoldedCloth）；Swap：搬家照旧
+            k.Swap(() =>
+            {
+                k.Bb(D.ClothIndigo, -.3f, .42f, .02f, .34f, .06f, .26f);
+                k.Bb(D.ClothWhite, -.3f, .48f, .02f, .32f, .014f, .06f);
+                k.Bb(D.ClothWhite, .28f, .42f, 0f, .3f, .05f, .22f);
+                k.Bb(D.ClothWhite, .29f, .47f, 0f, .28f, .045f, .2f);
+            }, () =>
+            {
+                FoldedCloth(k.mb, D.ClothIndigo, new Vector3(-.3f, .42f, .02f), 4f, .34f, .06f, .26f, 1.7f);
+                FoldedCloth(k.mb, D.ClothWhite, new Vector3(-.3f, .477f, .02f), 6f, .32f, .014f, .06f, 2.9f);
+                FoldedCloth(k.mb, D.Towel, new Vector3(.28f, .42f, 0f), -3f, .3f, .05f, .22f, 4.4f);
+                FoldedCloth(k.mb, D.Towel, new Vector3(.29f, .468f, 0f), 7f, .28f, .045f, .2f, 6.1f);
+                KitShot(k, "datsui_bench", new Vector3(0f, .45f, 0f), 1.4f, .55f);
+            });
             k.Pop();
             Blocker("DatsuijoBench", new Vector3(17.76f, .55f, 15.6f), 0f, new Vector3(.34f, .42f, 1.3f));
             k.B(D.TrimMid, 17.915f, 2.05f, 15.6f, .05f, .08f, 1.3f);
             foreach (float z in new[] { 15.1f, 15.6f, 16.1f }) k.Cr(D.Brass, new Vector3(17.89f, 2.0f, z), .01f, .008f, .07f, Quaternion.Euler(0, 0, 70), 6);
-            k.B(D.ClothIndigo, 17.905f, 1.62f, 15.1f, .02f, .76f, .42f);
-            k.B(D.ClothWhite, 17.893f, 1.93f, 15.1f, .006f, .1f, .44f);
-            k.B(D.ClothWhite, 17.905f, 1.78f, 16.1f, .012f, .42f, .3f);
+            // 第四轮：挂钩上的浴衣（下摆张开、竖褶）、白衿、毛巾换成垂布（Soft.cs HangCloth）；Swap：搬家照旧
+            k.Swap(() => k.B(D.ClothIndigo, 17.905f, 1.62f, 15.1f, .02f, .76f, .42f),
+                () =>
+                {
+                    HangCloth(k.mb, D.ClothIndigo, D.ClothIndigo, new Vector3(17.9f, 2.0f, 15.1f - .21f), Quaternion.Euler(0f, -90f, 0f),
+                        new HangSpec { width = .42f, length = .76f, thick = .006f, foldAmp = .018f, foldLen = .11f, flare = .14f, sway = .02f, hem = .012f, seed = 2.4f });
+                    KitShot(k, "datsui_hooks", new Vector3(17.9f, 1.65f, 15.6f), 1.9f, .05f);
+                });
+            k.Swap(() => k.B(D.ClothWhite, 17.893f, 1.93f, 15.1f, .006f, .1f, .44f),
+                () => HangCloth(k.mb, D.ClothWhite, D.ClothWhite, new Vector3(17.887f, 1.98f, 15.1f - .22f), Quaternion.Euler(0f, -90f, 0f),
+                    new HangSpec { width = .44f, length = .1f, thick = .003f, foldAmp = .003f, foldLen = .11f, hem = 0f, seed = 2.4f }));
+            k.Swap(() => k.B(D.ClothWhite, 17.905f, 1.78f, 16.1f, .012f, .42f, .3f),
+                () => HangCloth(k.mb, D.Towel, D.Towel, new Vector3(17.902f, 1.99f, 16.1f - .15f), Quaternion.Euler(0f, -90f, 0f),
+                    new HangSpec { width = .3f, length = .42f, thick = .006f, foldAmp = .012f, foldLen = .09f, flare = -.08f, hem = .01f, seed = 5.2f }));
             k.Bb(D.Straw, 17.15f, .552f, 15.6f, .6f, .006f, .9f);
             k.Bb(D.CeramicWhite, 17.15f, .558f, 16.75f, .28f, .055f, .34f);
             k.B(D.Glass, 17.15f, .6135f, 16.84f, .1f, .001f, .06f);
@@ -320,7 +349,17 @@ namespace HakoOnna.Art.EditorTools
             PendantLamp(k, 9.652f, 16.4f, C2, .5f, 2);
             k.Push(new Vector3(11.315f, F, 15.05f), 270f);
             lv = ShelfUnit(k, 1.3f, 1.7f, .37f, 3, D.TrimMid);
-            for (int i = 0; i < 4; i++) k.Bb(i % 2 == 0 ? D.ClothPurple : D.ClothRed, -.32f, lv[0] + i * .06f, 0, .5f, .06f, .3f);
+            // 第四轮：摞着的四块包袱布换成软块（Soft.cs FoldedCloth），上下错开一点；Swap：搬家照旧
+            k.Swap(() =>
+            {
+                for (int i = 0; i < 4; i++) k.Bb(i % 2 == 0 ? D.ClothPurple : D.ClothRed, -.32f, lv[0] + i * .06f, 0, .5f, .06f, .3f);
+            }, () =>
+            {
+                for (int i = 0; i < 4; i++)
+                    FoldedCloth(k.mb, i % 2 == 0 ? D.ClothPurple : D.ClothRed, new Vector3(-.32f + (i % 3 - 1) * .012f, lv[0] + i * .059f, (i % 2) * .008f),
+                        (i * 5 % 7) - 3f, .5f, .06f, .3f, 1.3f + i * 2.1f);
+                KitShot(k, "monooki_shelf", new Vector3(-.1f, lv[0] + .25f, 0f), 1.6f, .35f);
+            });
             k.C(D.CeramicBrown, .35f, lv[0], 0, .1f, .08f, .22f, 12);
             for (int i = 0; i < 3; i++) k.Cr(D.Paper, new Vector3(-.6f, lv[1] + .03f, -.08f + i * .07f), .03f, .03f, .55f, AlongX, 8);
             k.Bb(D.TrimMid, .3f, lv[1], 0, .32f, .2f, .18f);

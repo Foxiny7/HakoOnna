@@ -80,6 +80,14 @@ namespace HakoOnna.Art.EditorTools
             S("wooden_ladder_02"),
             S("wooden_stool_01"),
             S("wooden_stool_02"),
+            // 第四轮（2026-11-20）：换掉代码拼的方块家具——铁床架、桌椅、学生桌、床头小桌、洗衣筐
+            S("old_bed_frame", tint: new Color(.74f, .71f, .67f, 1f), smooth: .65f),
+            S("painted_wooden_chair_01", smooth: .6f),
+            S("painted_wooden_chair_02", smooth: .6f),
+            S("painted_wooden_table", smooth: .6f),
+            S("SchoolDesk_01", smooth: .6f),
+            S("side_table_01", smooth: .6f),
+            S("wicker_basket_01", tint: new Color(.74f, .70f, .64f, 1f), smooth: .6f),
         };
 
         public static IEnumerable<string> Ids => Specs.Select(s => s.id).Distinct();
@@ -305,6 +313,24 @@ namespace HakoOnna.Art.EditorTools
             }
             boundsCache[key] = b;
             return b;
+        }
+
+        /// <summary>模型在根节点坐标系里的全部顶点（和 LocalBounds 同一个坐标系；第四轮量床头、椅背朝哪边用）。</summary>
+        public static List<Vector3> LocalVerts(string id, string only = null)
+        {
+            var list = new List<Vector3>();
+            var go = Copy(id, only);
+            if (go == null) return list;
+            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.transform.localScale = Vector3.one;
+            foreach (var mf in go.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null) continue;
+                var l2w = mf.transform.localToWorldMatrix;
+                foreach (var v in mf.sharedMesh.vertices) list.Add(l2w.MultiplyPoint3x4(v));
+            }
+            Object.DestroyImmediate(go);
+            return list;
         }
 
         public static Vector3 Corner(int i) => new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1);

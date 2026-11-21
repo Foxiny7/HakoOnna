@@ -52,8 +52,7 @@ namespace HakoOnna.Art.EditorTools
             var perRoom = new List<string>();
             FixtureWarnings.Clear();
             RuinReport.Clear();
-            RuinShots.Clear();
-            SheetLog.Clear();
+            SheetLog.Clear(); // RuinShots 在 BuildDetails 开头清（院子、第二遍陈设也记第四轮审图机位）
             foreach (var room in DRooms)
             {
                 if (!room.hasFloor || room.group == GFence || IsStairRoom(room) || room.id == "Kaidan" || room.id == "UraKaidan") continue;
@@ -441,6 +440,8 @@ namespace HakoOnna.Art.EditorTools
                 SheetLog.Add(room.id + "/" + p.name);
                 ShotAt($"sheet_{room.id}_{p.name}", c, OnWall(bestE, bestS, c.fl + Mathf.Min(.9f, S * p.h * .5f), T + FillGap + S * p.d / 2), 2.1f, .75f);
             }
+            else if (p.name == "Zabutons" || p.name == "Futons") // 第四轮审图：软座布団、叠起来的被子（各拍第一处）
+                ShotDir(p.name, OnWall(bestE, bestS, c.fl + S * p.h * .45f, T + FillGap + S * p.d / 2), Quaternion.Euler(0f, 25f, 0f) * Inward(bestE), 1.9f, .7f);
             if (!p.wall && p.blockH > 0f)
                 Blocker(room.id + "_" + p.name, OnWall(bestE, bestS, c.fl, T + FillGap + S * p.d / 2), yaw,
                     new Vector3(S * p.w, S * p.blockH, S * p.d));
@@ -985,33 +986,41 @@ namespace HakoOnna.Art.EditorTools
         static void DrawZabutonStack(Kit k, System.Random rng)
         {
             var m = rng.Next(3) switch { 0 => D.ClothPurple, 1 => D.ClothIndigo, _ => D.ClothRed };
+            // 第四轮：一摞软座布団（四边圆鼓、中间缝住；下面几块压扁一些；Soft.cs SoftZabuton）。随机数照旧：错位、转角不变
+            float y = 0f;
             for (int i = 0; i < 6; i++)
             {
-                k.Push(new Vector3(Rf(rng, -.02f, .02f), i * .068f, .31f + Rf(rng, -.02f, .02f)), Rf(rng, -4f, 4f));
-                k.Bb(m, 0, 0, 0, .52f, .045f, .55f);
-                k.Bb(m, 0, .045f, 0, .47f, .02f, .5f);
-                k.B(D.Black, 0, .066f, 0, .02f, .004f, .02f);
-                k.Pop();
+                float dx = Rf(rng, -.02f, .02f), dz = Rf(rng, -.02f, .02f), yaw = Rf(rng, -4f, 4f);
+                float squash = .012f * (5 - i) / 5f;
+                SoftZabuton(k.mb, new Vector3(dx, y, .31f + dz), yaw, m, i * 2.3f + 1.1f, .52f, .55f, squash);
+                y += .027f + (.04f - squash) * .97f;
             }
         }
 
         static void DrawFutonStack(Kit k, System.Random rng)
         {
-            Material[] mats = { D.ClothWhite, D.ClothIndigo, D.ClothRed, D.ClothPurple };
+            // 第四轮：叠成三折的厚被子（四边圆、一边塌、摞起来互相压着；Soft.cs FoldedFuton），被面素色旧布 + 一条格子；
+            // 上面两个软的荞麦壳枕头。随机数照旧
+            Material[] mats = { D.ClothWhite, D.ClothIndigo, D.Check, D.ClothPurple };
             float y = 0;
             int off = rng.Next(4);
             for (int i = 0; i < 4; i++)
             {
                 float t = i == 0 ? .18f : .14f;
                 var m = mats[(i + off) % mats.Length];
-                k.Push(new Vector3(Rf(rng, -.025f, .025f), y, .38f), Rf(rng, -2f, 2f));
-                k.Bb(m, 0, 0, 0, 1.0f, t, .66f);
-                k.Cr(m, new Vector3(-.5f, t / 2, .33f), t / 2, t / 2, 1.0f, AlongX, 10);
-                k.Pop();
-                y += t;
+                float dx = Rf(rng, -.025f, .025f), yaw = Rf(rng, -2f, 2f);
+                FoldedFuton(k.mb, m, new Vector3(dx, y, .38f), yaw, t, i * 1.9f + off);
+                y += t * .96f;
             }
-            k.Cr(D.ClothWhite, new Vector3(-.4f, y + .06f, .32f), .06f, .06f, .45f, AlongX, 10);
-            k.Cr(D.ClothWhite, new Vector3(.02f, y + .06f, .36f), .06f, .06f, .4f, AlongX, 10);
+            var ps = new PuffSpec
+            {
+                w = .45f, d = .28f, hTop = .05f, hBot = .045f, corner = .09f, rampTop = .11f, rampBot = .09f, dome = .3f,
+                wrinkle = .006f, pucker = .004f, seed = off * 1.3f, nx = 14, nz = 10,
+            };
+            Puff(k.mb, D.ClothWhite, D.ClothWhite, new Vector3(-.17f, y - .01f, .33f), Quaternion.Euler(0f, 6f, 0f), ps);
+            ps.w = .4f;
+            ps.seed += 2.1f;
+            Puff(k.mb, D.ClothWhite, D.ClothWhite, new Vector3(.22f, y - .01f, .37f), Quaternion.Euler(0f, -9f, 0f), ps);
         }
 
         /// <summary>开放木架。content：0 厨房 1 书 2 布料杂物 3 玩具 4 土蔵杂物 5 毛巾脸盆。</summary>
@@ -1495,41 +1504,90 @@ namespace HakoOnna.Art.EditorTools
             k.B(D.ClothRed, .42f, .4f, fz, .04f, .04f, .002f);
         }
 
+        /// <summary>圆火鉢剖面：鼓肚、卷口，里面的灰面在 y = .23（灰堆另画）。</summary>
+        static readonly Vector2[] HibachiProfile =
+        {
+            new Vector2(0f, 0f), new Vector2(.15f, 0f), new Vector2(.168f, .008f), new Vector2(.198f, .055f), new Vector2(.214f, .13f),
+            new Vector2(.21f, .21f), new Vector2(.196f, .262f), new Vector2(.19f, .282f), new Vector2(.194f, .29f), new Vector2(.188f, .298f),
+            new Vector2(.176f, .296f), new Vector2(.17f, .285f), new Vector2(.172f, .24f), new Vector2(.165f, .23f), new Vector2(0f, .23f),
+        };
+
+        /// <summary>
+        /// 第四轮：圆火鉢（青瓷鼓肚、卷口；原来是一个圆柱 + 一个球）。里面一堆灰，五徳（铁圈三脚）上坐一把铁壶，两根铜火箸斜插在灰里。
+        /// 局部：正面 +z，背面贴 z = 0。
+        /// </summary>
         static void DrawHibachi(Kit k)
         {
-            const float z = .27f;
-            k.C(D.CeramicBlue, 0, 0, z, .19f, .22f, .29f, 16);
-            k.C(D.Ash, 0, .29f, z, .19f, .19f, .004f, 16);
-            foreach (float a in new[] { 0f, 120f, 240f })
+            const float z = .27f, floor = .23f, ringY = .33f, ringR = .085f;
+            var mb = k.mb;
+            // 第四轮审图：纯蓝釉在手电下像塑料桶，改成褐釉陶火钵（信乐烧那种，昭和人家最常见）
+            Lathe(mb, D.CeramicBrown, new Vector3(0f, 0f, z), Quaternion.identity, HibachiProfile, 32);
+            var ash = new PuffSpec
             {
-                var p = Quaternion.Euler(0, a, 0) * new Vector3(.08f, 0, 0);
-                k.Bb(D.Iron, p.x, .294f, z + p.z, .015f, .06f, .015f);
+                w = .34f, d = .34f, hTop = .03f, hBot = .001f, corner = .17f, rampTop = .12f, rampBot = .01f,
+                dome = .9f, wrinkle = .004f, pucker = 0f, seed = 4.4f, nx = 14, nz = 14,
+            };
+            Puff(mb, D.Ash, D.Ash, new Vector3(0f, floor, z), Quaternion.identity, ash);
+            var ring = new List<Vector3>();
+            for (int i = 0; i < 16; i++)
+            {
+                float a = i * Mathf.PI * 2f / 16f;
+                ring.Add(new Vector3(Mathf.Cos(a) * ringR, ringY, z + Mathf.Sin(a) * ringR));
             }
-            k.S(D.Iron, 0, .41f, z, .1f, .07f, .1f, 12);
-            k.C(D.Iron, 0, .47f, z, .04f, .03f, .02f, 10);
-            k.Cr(D.Iron, new Vector3(.08f, .4f, z), .012f, .007f, .1f, Quaternion.Euler(0, 0, -55f), 6);
-            k.Br(D.Iron, 0, .53f, z, .16f, .01f, .012f, 0, 0, 0);
-            k.Cr(D.Brass, new Vector3(-.15f, .295f, z - .08f), .005f, .004f, .3f, Quaternion.Euler(10, 0, -70), 5);
+            Tube(mb, D.Iron, ring, .005f, 6, true);
+            for (int i = 0; i < 3; i++)
+            {
+                float a = i * Mathf.PI * 2f / 3f + .5f, bx = Mathf.Cos(a) * .11f, bz = Mathf.Sin(a) * .11f;
+                Tube(mb, D.Iron, new[] { new Vector3(Mathf.Cos(a) * ringR, ringY, z + Mathf.Sin(a) * ringR), new Vector3(bx, floor + PuffTop(ash, bx, bz) - .01f, z + bz) }, .005f, 6);
+            }
+            Tetsubin(mb, new Vector3(0f, ringY - .012f, z), 35f);
+            Tube(mb, D.Brass, new[] { new Vector3(-.09f, floor + .02f, z - .05f), new Vector3(-.19f, .52f, z - .1f) }, .0035f, 5);
+            Tube(mb, D.Brass, new[] { new Vector3(-.075f, floor + .02f, z - .06f), new Vector3(-.17f, .52f, z - .125f) }, .0035f, 5);
         }
 
-        /// <summary>昭和的绞干式洗衣机：搪瓷桶 + 顶上两根滚筒。</summary>
+        static readonly Vector2[] WasherTub =
+        {
+            new Vector2(0f, 0f), new Vector2(.235f, 0f), new Vector2(.252f, .012f), new Vector2(.262f, .1f), new Vector2(.268f, .5f),
+            new Vector2(.272f, .52f), new Vector2(.285f, .53f), new Vector2(.289f, .545f), new Vector2(.281f, .556f), new Vector2(.268f, .555f),
+            new Vector2(.262f, .54f), new Vector2(.256f, .1f), new Vector2(.244f, .052f), new Vector2(.225f, .042f), new Vector2(0f, .042f),
+        };
+        static readonly Vector2[] WasherKnob =
+            { new Vector2(0f, 0f), new Vector2(.026f, 0f), new Vector2(.028f, .004f), new Vector2(.028f, .016f), new Vector2(.024f, .022f), new Vector2(0f, .022f) };
+
+        /// <summary>
+        /// 昭和的绞干式洗衣机（第四轮重做，原来是圆柱 + 方块）：绿漆铁皮的电机座（四条铁腿、正面定时旋钮和铜铭牌），
+        /// 上面一只掉瓷的搪瓷桶（卷边口沿，里面半桶脏水），背面立着绞干机——两根黑橡胶滚筒、顶梁、压紧螺杆和 T 形把手，
+        /// 右边一把摇柄；桶沿上搭着一块没拧干的布，电机座侧面一根排水管拖到地上。局部：正面 +z，背面贴 z=0。
+        /// </summary>
         static void DrawWasher(Kit k)
         {
-            const float z = .31f;
-            foreach (float sx in new[] { -.2f, .2f })
-                foreach (float sz in new[] { -.2f, .2f })
-                    k.Bb(D.Iron, sx, 0, z + sz, .03f, .26f, .03f);
-            k.C(D.CeramicWhite, 0, .25f, z, .26f, .27f, .56f, 18);
-            k.C(D.Black, 0, .8f, z, .275f, .275f, .015f, 18);
-            k.C(D.Water, 0, .815f, z, .24f, .24f, .002f, 18);
-            foreach (float sx in new[] { -.21f, .21f }) k.Bb(D.Iron, sx, .8f, z - .17f, .03f, .32f, .05f);
-            k.Cr(D.Black, new Vector3(-.19f, .95f, z - .17f), .035f, .035f, .38f, AlongX, 12);
-            k.Cr(D.Black, new Vector3(-.19f, 1.025f, z - .17f), .035f, .035f, .38f, AlongX, 12);
-            k.Bb(D.Iron, 0, 1.11f, z - .17f, .46f, .03f, .05f);
-            k.Cr(D.Iron, new Vector3(.22f, .99f, z - .17f), .01f, .01f, .14f, AlongX, 6);
-            k.Cr(D.Iron, new Vector3(.36f, .99f, z - .17f), .008f, .008f, .12f, Quaternion.identity, 6);
-            k.C(D.TrimLight, .36f, 1.1f, z - .17f, .014f, .014f, .06f, 6);
-            k.Cr(D.Black, new Vector3(.27f, .35f, z + .05f), .012f, .012f, .35f, Quaternion.Euler(0, 0, -150f), 6);
+            const float z = .31f, zw = z - .17f;
+            var mb = k.mb;
+            // 电机座和桶一样宽（0.58；原来 0.5，桶口沿伸出来一圈像顶着个盆）
+            foreach (float sx in new[] { -.25f, .25f })
+                foreach (float sz in new[] { -.25f, .25f })
+                    BevelBox(mb, D.Iron, new Vector3(sx, .035f, z + sz), new Vector3(.03f, .07f, .03f), .004f);
+            BevelBox(mb, D.PaintGreen, new Vector3(0f, .17f, z), new Vector3(.58f, .2f, .58f), .02f);
+            mb.Box(D.Brass, new Vector3(-.1f, .2f, z + .2905f), new Vector3(.12f, .05f, .002f));
+            Lathe(mb, D.Black, new Vector3(.12f, .2f, z + .289f), Quaternion.Euler(90f, 0f, 0f), WasherKnob, 16);
+            Lathe(mb, D.Enamel, new Vector3(0f, .27f, z), Quaternion.identity, WasherTub, 28);
+            mb.Cyl(D.Water, new Vector3(0f, .65f, z), .259f, .259f, .002f, 28);
+            foreach (float sx in new[] { -.21f, .21f })
+                BevelBox(mb, D.PaintGreen, new Vector3(sx, .975f, zw), new Vector3(.03f, .35f, .05f), .006f);
+            foreach (float y in new[] { .95f, 1.025f })
+                mb.Cyl(D.Black, new Vector3(-.195f, y, zw), .035f, .035f, .39f, 16, true, AlongX);
+            BevelBox(mb, D.PaintGreen, new Vector3(0f, 1.135f, zw), new Vector3(.46f, .03f, .05f), .006f);
+            mb.Cyl(D.Iron, new Vector3(0f, 1.15f, zw), .008f, .008f, .03f, 8);
+            BevelBox(mb, D.Iron, new Vector3(0f, 1.183f, zw), new Vector3(.1f, .012f, .012f), .003f);
+            BevelBox(mb, D.PaintGreen, new Vector3(.24f, .99f, zw), new Vector3(.03f, .1f, .07f), .006f);
+            Tube(mb, D.Iron, new[] { new Vector3(.25f, .99f, zw), new Vector3(.31f, .99f, zw), new Vector3(.31f, 1.1f, zw + .01f) }, .008f, 6);
+            mb.Cyl(D.TrimLight, new Vector3(.31f, 1.1f, zw + .01f), .014f, .014f, .07f, 10, true, AlongX);
+            TowelOnBar(mb, D.ClothWhite, D.ClothWhite, new Vector3(-.08f, .813f, z + .275f), Quaternion.identity, .16f, .22f, .1f, .014f, 2.9f, foldAmp: .012f);
+            Tube(mb, D.Black, new[]
+            {
+                new Vector3(.24f, .12f, z + .12f), new Vector3(.3f, .1f, z + .16f), new Vector3(.34f, .04f, z + .2f),
+                new Vector3(.36f, .014f, z + .26f), new Vector3(.38f, .012f, z + .29f),
+            }, .014f, 8);
         }
 
         static void DrawWashTubs(Kit k, System.Random rng)

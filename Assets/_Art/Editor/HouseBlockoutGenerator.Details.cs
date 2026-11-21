@@ -23,6 +23,7 @@ namespace HakoOnna.Art.EditorTools
         static void BuildDetails(Transform root, Transform structure, Transform props, List<Room> rooms, List<Opening> openings, Palette pal)
         {
             MeshBatch.Created.Clear();
+            RuinShots.Clear(); // 审图机位：院子、第二遍陈设、按房间补的家具、换样子的家具都往里记
             D = DetailMats.Load();
             DM.Load();
             P = pal; DRooms = rooms; DOps = openings;
@@ -47,6 +48,8 @@ namespace HakoOnna.Art.EditorTools
             BuildSealedDoorways(arch);
             // 污渍、血字要等家具、门扇都到位了再找地方（Grime.cs）
             BuildGrime(dressing, root);
+            // 第四轮：床、桌椅、灶台、浴桶、坐垫换成模型和软网格（只换子物体，根节点、碰撞体、Firebox 不动；Refit.cs）
+            RefitFixtures(root);
             // 灰盒立方体（墙、楼板、门框、代码生成的家具）换成按米铺 UV 的同形网格，贴图不再被拉伸；
             // 座敷床の間交给 ZashikiArt（运行时换模型），容器是预制体，都不动
             var wallMats = new HashSet<Material> { P.Plaster, P.WallPlaster, P.WallSoot, P.WallKura, P.Fence, P.Ground };

@@ -31,6 +31,9 @@ namespace HakoOnna.Art.EditorTools
 
         public static Tex Tatami, Clay, PaintedPlaster, WhitePlaster, DarkPlanks, Weathered, CedarU, Cabinet, Table;
         public static Tex Bamboo, StoneWall, MudLeaves, MudDry, GroundGrey, PineBark, Rust, Tiles, Wicker;
+        // 第四轮：旧布（素色 + 格子）、毛巾、床垫布、瓷、搪瓷、旧镜子、带污渍的金属 / 塑料 / 纸（Tools~/prep_tex_r4.py 合成，全部无缝）
+        public static Tex Linen, Crepe, Velour, Terry, Check, GinghamRed, GinghamGreen, Ticking, Reed, GreenMetal, RustyMetal;
+        public static Tex Ceramic, MirrorOld, BlackSmudge, PlasticSmudge, Enamel, GoldDirty, BronzeOld, PaperWhite, PaperAged;
         static bool loaded;
 
         // =====================================================================
@@ -159,6 +162,13 @@ namespace HakoOnna.Art.EditorTools
             return new Tex { albedo = Load(d + "Color.jpg"), normal = Load(d + "NormalGL.jpg"), mask = Load(d + "mask.png"), metres = new Vector2(m, m), avgLin = new Vector3(r, g, b) };
         }
 
+        /// <summary>第四轮合成的贴图：sub/name/name_diff.jpg、_nor_gl.jpg、_mask.png，正方形，一张 = m 米。</summary>
+        static Tex R4(string sub, string name, float m, float r, float g, float b)
+        {
+            string d = $"{Root}/{sub}/{name}/{name}_";
+            return new Tex { albedo = Load(d + "diff.jpg"), normal = Load(d + "nor_gl.jpg"), mask = Load(d + "mask.png"), metres = new Vector2(m, m), avgLin = new Vector3(r, g, b) };
+        }
+
         public static void Load()
         {
             if (loaded && Tatami != null && Tatami.albedo != null) return;
@@ -182,6 +192,27 @@ namespace HakoOnna.Art.EditorTools
             Rust = PH("rust_coarse_01", "diff_1k.jpg", "nor_gl_1k.jpg", "mask.png", 2.2f, 2.2f, .1282f, .0430f, .0148f);
             Tiles = ACG("Tiles019", .8f, .1295f, .2032f, .2968f);
             Wicker = ACG("Wicker010B", .6f, .1607f, .1188f, .0850f);
+            // 第四轮：尺寸、平均色由 Tools~/prep_tex_r4.py 算出
+            Linen = R4("PolyHaven", "linen_aged", 1.3535f, .5936f, .5906f, .5857f);
+            Crepe = R4("PolyHaven", "crepe_aged", .7896f, .5928f, .5898f, .5849f);
+            Velour = R4("PolyHaven", "velour_aged", .8526f, .5964f, .5943f, .5897f);
+            Terry = R4("PolyHaven", "terry_aged", 1.1013f, .6344f, .6309f, .6236f);
+            Check = R4("PolyHaven", "check_aged", 1f, .3026f, .3098f, .2292f);
+            GinghamRed = R4("PolyHaven", "gingham_red_aged", .8f, .3502f, .1530f, .1287f);
+            GinghamGreen = R4("PolyHaven", "gingham_green_aged", .8f, .2087f, .2777f, .1600f);
+            Ticking = R4("PolyHaven", "ticking_aged", 1.8949f, .4580f, .4544f, .4486f);
+            Reed = R4("PolyHaven", "reed_roof_04", 2.5f, .3534f, .2581f, .1498f);
+            GreenMetal = R4("PolyHaven", "green_metal_rust", 1f, .0499f, .0742f, .0342f);
+            RustyMetal = R4("PolyHaven", "rusty_metal_04", 2f, .1063f, .0739f, .0564f);
+            Ceramic = R4("ambientCG", "ceramic_aged", .5f, .6848f, .6807f, .6741f);
+            MirrorOld = R4("ambientCG", "mirror_old", .6f, .4908f, .4908f, .4585f);
+            BlackSmudge = R4("ambientCG", "black_smudged", .6f, .0053f, .0053f, .0053f);
+            PlasticSmudge = R4("ambientCG", "plastic_smudged", .6f, .6938f, .6938f, .6938f);
+            Enamel = R4("ambientCG", "enamel_chipped", .6f, .6857f, .6773f, .6713f);
+            GoldDirty = R4("ambientCG", "gold_dirty", .5f, .9655f, .7501f, .3232f);
+            BronzeOld = R4("ambientCG", "bronze_old", .6f, .2763f, .2021f, .1481f);
+            PaperWhite = R4("ambientCG", "paper_white", .5f, .7392f, .7392f, .7392f);
+            PaperAged = R4("ambientCG", "paper_aged", .5f, .6315f, .6270f, .6192f);
             loaded = true;
         }
 
@@ -265,6 +296,18 @@ namespace HakoOnna.Art.EditorTools
             Up(p.WickerA, Wicker, C(.55f, .42f, .25f), .8f);
             Up(p.WickerB, Wicker, C(.48f, .38f, .24f), .8f);
             Up(p.Rust, Rust, C(.35f, .20f, .12f), .8f, 1f, new Vector2(1f, 1f));
+            // r4：剩下的纯色占位材质（障子纸、天花板、土间石、地毯、地板、黑漆、浴室砖、屋顶）。
+            // 不动 M_Fusuma_A/B、M_Container_Interior、M_Metal_Dark：押入れ容器和暗门预制体也在用
+            const string r4 = "r4";
+            Up(p.Paper, PaperWhite, C(.80f, .77f, .68f), .25f, .5f, new Vector2(.9f, .9f), r4);
+            Up(p.Ceiling, CedarU, C(.30f, .23f, .16f), .5f, 1f, null, r4);
+            Up(p.Stone, GroundGrey, C(.36f, .35f, .33f), .5f, 1f, new Vector2(1.4f, 1.4f), r4);
+            Up(p.Carpet, Velour, C(.30f, .11f, .09f), .5f, 1f, new Vector2(1.2f, 1.2f), r4);
+            Up(p.Tatami, Tatami, C(.50f, .45f, .31f), .8f, .8f, null, r4);
+            Up(p.WoodFloor, DarkPlanks, C(.30f, .24f, .18f), 1.2f, 1f, null, r4);
+            Up(p.Lacquer, Cabinet, C(.06f, .035f, .03f), 1.1f, .6f, new Vector2(.6f, .3f), r4);
+            Up(p.Tile, Tiles, C(.34f, .40f, .42f), 1.2f, 1f, new Vector2(1.6f, 1.6f), r4);
+            Up(p.Roof, Ceramic, C(.10f, .10f, .11f), .5f, 1f, new Vector2(1.5f, 1.5f), r4);
             AssetDatabase.SaveAssets();
         }
 
@@ -301,7 +344,68 @@ namespace HakoOnna.Art.EditorTools
             Up(d.BambooDry, Bamboo, C(.48f, .41f, .29f), .9f);
             Up(d.Iron, Rust, C(.16f, .10f, .065f), .8f, 1f, new Vector2(1f, 1f));
             Up(d.StoneWall, StoneWall, C(.38f, .37f, .35f), .8f);
+            UpgradeDetailR4(d);
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// 第四轮：剩下的纯色细节材质全部接上贴图（布、毛巾、床垫布、格子被面、瓷、搪瓷、金 / 铜、旧镜子、玻璃、塑料、纸、草、灰、土）。
+        /// smooth 是乘在 mask.A 上的系数，按各贴图 mask.A 的平均值反推（布 ≈ .2、瓷釉 ≈ .75、黑漆 ≈ .5）。
+        /// </summary>
+        static void UpgradeDetailR4(DetailMats d)
+        {
+            const string r4 = "r4";
+            // 布：素色旧布（亚麻 / 绉绸 / 天鹅绒），都带水渍、黄斑
+            Up(d.ClothWhite, Linen, C(.70f, .67f, .60f), .6f, 1f, null, r4);
+            Up(d.ClothRed, Crepe, C(.42f, .07f, .06f), .7f, 1f, null, r4);
+            Up(d.ClothIndigo, Linen, C(.08f, .11f, .22f), .6f, 1f, null, r4);
+            Up(d.ClothPurple, Velour, C(.23f, .08f, .21f), .6f, 1f, null, r4);
+            Up(d.DustSheet, Linen, C(.60f, .59f, .55f), .1f, 1f, null, r4);
+            Up(d.DustSheetOld, Linen, C(.57f, .53f, .44f), .1f, 1f, null, r4);
+            Up(d.DustSheetTop, Linen, C(.43f, .41f, .37f), .06f, 1f, null, r4);
+            Up(d.Towel, Terry, C(.72f, .70f, .63f), .5f, 1f, null, r4);
+            Up(d.TowelBlue, Terry, C(.22f, .32f, .46f), .5f, 1f, null, r4);
+            Up(d.Ticking, Ticking, C(.74f, .72f, .66f), .6f, 1f, null, r4);
+            Up(d.Check, Check, C(.52f, .53f, .45f), 1f, 1f, null, r4);
+            Up(d.GinghamRed, GinghamRed, C(.50f, .34f, .31f), .6f, 1f, null, r4);
+            Up(d.GinghamGreen, GinghamGreen, C(.42f, .47f, .37f), .6f, 1f, null, r4);
+            // 瓷：带开片和污垢的釉面
+            Up(d.CeramicWhite, Ceramic, C(.78f, .76f, .70f), .85f, 1f, null, r4);
+            Up(d.CeramicBlue, Ceramic, C(.16f, .22f, .36f), .85f, 1f, null, r4);
+            Up(d.CeramicBrown, Ceramic, C(.27f, .16f, .09f), .7f, 1f, null, r4);
+            Up(d.RidgeTile, Ceramic, C(.13f, .135f, .15f), .5f, 1f, new Vector2(1f, 1f), r4);
+            // 金属：掉瓷的搪瓷、发乌的金、旧铜、绿漆铁皮、锈铁皮
+            Up(d.Enamel, Enamel, C(.80f, .79f, .75f), 1f, 1f, null, r4);
+            Up(d.Gold, GoldDirty, C(.80f, .60f, .26f), .75f, 1f, null, r4);
+            Up(d.GoldLeaf, GoldDirty, C(.70f, .54f, .25f), .45f, 1f, null, r4);
+            Up(d.Brass, BronzeOld, C(.52f, .40f, .20f), .85f, 1f, null, r4);
+            Up(d.PaintGreen, GreenMetal, C(.26f, .33f, .24f), 1f, 1f, null, r4);
+            Up(d.RustSheet, RustyMetal, C(.33f, .24f, .18f), 1f, 1f, null, r4);
+            // 旧镜子：水银脱落的斑点 + 手印、擦痕；上面那层灰雾淡一些（镜面自己已经花了）
+            Up(d.Mirror, MirrorOld, C(.52f, .53f, .52f), 1f, .4f, null, r4);
+            Up(d.MirrorFog, m =>
+            {
+                var c = m.GetColor("_BaseColor");
+                c.a = .32f;
+                m.SetColor("_BaseColor", c);
+            }, r4);
+            // 玻璃、黑漆、塑料、蜡烛：表面有指纹和擦痕
+            Up(d.Glass, BlackSmudge, C(.05f, .06f, .07f), 1.2f, 1f, null, r4);
+            Up(d.Black, BlackSmudge, C(.03f, .03f, .03f), .7f, 1f, null, r4);
+            Up(d.LampGlass, PlasticSmudge, C(.82f, .80f, .74f), 1.3f, 1f, null, r4);
+            Up(d.PlasticRed, PlasticSmudge, C(.48f, .05f, .04f), .95f, 1f, null, r4);
+            Up(d.Candle, PlasticSmudge, C(.86f, .84f, .78f), .5f, 1f, null, r4);
+            // 纸
+            Up(d.Paper, PaperWhite, C(.84f, .82f, .76f), .2f, 1f, null, r4);
+            Up(d.PaperLamp, PaperWhite, C(.86f, .82f, .70f), .2f, 1f, null, r4);
+            Up(d.PaperOld, PaperAged, C(.60f, .55f, .43f), .1f, 1f, null, r4);
+            Up(d.PaperText, PaperAged, C(.42f, .39f, .33f), .1f, 1f, new Vector2(.25f, .25f), r4);
+            // 草、灰、土、苔、竹
+            Up(d.Straw, Reed, C(.55f, .46f, .27f), 1f, 1f, new Vector2(.8f, .8f), r4);
+            Up(d.Ash, GroundGrey, C(.36f, .35f, .33f), .1f, 1f, new Vector2(.6f, .6f), r4);
+            Up(d.Dirt, MudDry, C(.30f, .24f, .17f), .3f, 1f, null, r4);
+            Up(d.Moss, MudLeaves, C(.10f, .16f, .055f), .5f, 1f, new Vector2(.8f, .8f), r4);
+            Up(d.Bamboo, Bamboo, C(.32f, .38f, .18f), .9f, 1f, null, r4);
         }
 
         /// <summary>封门后钉上去的木板：浅色杉木（比旧门板浅，一眼看出是后来钉的）。在 DM.Load 末尾调用。</summary>

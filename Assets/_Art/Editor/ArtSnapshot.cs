@@ -196,8 +196,12 @@ namespace HakoOnna.Art.EditorTools
             var shots = new List<Shot>(Shots());
             shots.AddRange(DecalShots());
             // 第三轮：废弃感里随机摆的东西（水渍、破障子、蜘蛛网），生成时记下的位置
+            // 第四轮：院子里的（杂草、晾的床单）用白天的光拍（夜里室外只有手电一小圈，看不清）
             foreach (var (name, pos, look) in HouseBlockoutGenerator.RuinShots)
-                shots.Add(new Shot("rev_" + name, Mode.Detail, pos, look) { raw = true });
+            {
+                bool outdoor = name.StartsWith("r4_weeds") || name.StartsWith("r4_garden");
+                shots.Add(new Shot("rev_" + name, outdoor ? Mode.Day : Mode.Detail, pos, look) { raw = true });
+            }
             int count = 0;
             try
             {
@@ -206,12 +210,14 @@ namespace HakoOnna.Art.EditorTools
                     bool plan = s.mode == Mode.Plan1F || s.mode == Mode.Plan2F;
                     cam.orthographic = plan;
                     data.renderPostProcessing = !plan;
-                    spot.enabled = s.mode == Mode.Interior || IsMood(s.mode) || s.mode == Mode.Detail;
+                    // 第四轮：院子里的审图机位（白天 + raw）也开检查光，不然墙根的杂草在背光面一片黑
+                    spot.enabled = s.mode == Mode.Interior || IsMood(s.mode) || s.mode == Mode.Detail || (s.mode == Mode.Day && s.raw);
                     // 游戏光：手电 55° / 内 25°、射程 16 m、强度 25（2026-11-19 用户定的 25，Codex 那边原来是 5，待改）；检查光：大角度补光
                     bool mood = IsMood(s.mode);
                     spot.spotAngle = mood ? 55f : 80f;
                     spot.innerSpotAngle = mood ? 25f : 45f;
-                    spot.intensity = mood ? GameBeamIntensity : 3f;
+                    // 院子的审图机位离得远（3 m 上下）、泥地很暗：检查光加到 14，亮度和屋里 1.5–2 m 拍的差不多
+                    spot.intensity = mood ? GameBeamIntensity : s.mode == Mode.Day ? 14f : 3f;
                     spot.color = mood ? new Color(1f, .95f, .84f) : new Color(1f, .93f, .82f);
                     RenderSettings.fog = mood && fog;
                     if (moon)
@@ -243,7 +249,7 @@ namespace HakoOnna.Art.EditorTools
                         cam.farClipPlane = 300f;
                         // 机位按 V3 旧坐标书写：室内跟着房间搬家，室外整体按比例放大
                         Vector3 pos, look;
-                        if (s.mode == Mode.Day)
+                        if (s.mode == Mode.Day && !s.raw)
                         {
                             float k = ExteriorScale;
                             pos = s.pos * k; look = s.look * k;

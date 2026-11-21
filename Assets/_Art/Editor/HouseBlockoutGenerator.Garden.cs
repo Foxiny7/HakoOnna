@@ -194,9 +194,12 @@ namespace HakoOnna.Art.EditorTools
             foreach (float z in new[] { lz0, lz1 })
                 mb.Box(D.Post, new Vector3(lx, 1.05f, z), new Vector3(.08f, 2.1f, .08f));
             mb.Cyl(D.Bamboo, new Vector3(lx, 1.95f, lz0 - .1f), .025f, .025f, lz1 - lz0 + .2f, 8, true, Quaternion.Euler(90, 0, 0));
-            mb.Box(D.ClothWhite, new Vector3(lx, 1.36f, lz0 + 1.6f), new Vector3(.012f, 1.15f, 1.35f));
-            mb.Box(D.ClothIndigo, new Vector3(lx, 1.62f, lz0 + 3.3f), new Vector3(.012f, .62f, .45f));
-            mb.Box(D.ClothWhite, new Vector3(lx, 1.5f, lz1 - 1.3f), new Vector3(.012f, .85f, .9f));
+            // 第四轮：竿上的床单、蓝布、白布从三块竖着的薄板换成搭在竿上、前后两片、起褶、被风吹得有点斜的布（Soft.cs TowelOnBar）
+            var alongZ = Quaternion.Euler(0f, -90f, 0f);
+            TowelOnBar(mb, D.ClothWhite, D.ClothWhite, new Vector3(lx, 1.95f, lz0 + .925f), alongZ, 1.35f, 1.15f, .9f, .025f, 1.2f, .02f, .004f, .04f);
+            TowelOnBar(mb, D.ClothIndigo, D.ClothIndigo, new Vector3(lx, 1.95f, lz0 + 3.075f), alongZ, .45f, .62f, .5f, .025f, 3.4f, .012f, .004f, -.05f);
+            TowelOnBar(mb, D.ClothWhite, D.ClothWhite, new Vector3(lx, 1.95f, lz1 - 1.75f), alongZ, .9f, .85f, .7f, .025f, 5.7f, .016f, .004f, .03f);
+            ShotDir("garden_laundry", new Vector3(lx, 1.35f, (lz0 + lz1) / 2f), Quaternion.Euler(0f, -25f, 0f) * Vector3.right, 3.6f, .25f);
 
             // 枯树
             var tb = W(4.6f, 28.6f);
@@ -244,6 +247,13 @@ namespace HakoOnna.Art.EditorTools
             FirewoodShed(mb, 3.64f * PlanScale, 24.6f, 3.0f, rng);
 
             mb.Build(parent, "GardenDetails");
+            // 第四轮：墙根、院墙、竹篱笆脚下的杂草（Weeds.cs；随机数单独一条）
+            GardenWeeds(parent, new[]
+            {
+                (new Vector3(10.92f, 0, yardIn), new Vector3(10.92f, 0, 0f)),
+                (new Vector3(westIn, 0, 0f), new Vector3(0f, 0, 0f)),
+                (new Vector3(37.31f, 0, 20.02f), new Vector3(yardOut, 0, 20.02f)),
+            });
             GateLeafDetails(parent.root);
         }
 
