@@ -45,7 +45,10 @@ namespace HakoOnna.Art.EditorTools
         public static void GenerateAndShoot()
         {
             HouseBlockoutGenerator.Generate();
+            // 第五轮：这一版布局里放不下的几件（糸車、木马、手压泵……）临时摆到院墙外拍一张，拍完删掉，不存进场景
+            var gallery = HouseBlockoutGenerator.BuildReviewGallery();
             Shoot();
+            if (gallery != null) Object.DestroyImmediate(gallery);
         }
 
         /// <summary>室内机位和注视点（新坐标）。按房间补家具时机位前方留空，截图不会被贴脸的家具挡住。</summary>
@@ -199,8 +202,11 @@ namespace HakoOnna.Art.EditorTools
             // 第四轮：院子里的（杂草、晾的床单）用白天的光拍（夜里室外只有手电一小圈，看不清）
             foreach (var (name, pos, look) in HouseBlockoutGenerator.RuinShots)
             {
-                bool outdoor = name.StartsWith("r4_weeds") || name.StartsWith("r4_garden");
+                // 第五轮：院子的树、灌木、石头（r5_）白天拍一张看形状，再按游戏里的夜 + 手电拍一张
+                bool r5 = name.StartsWith("r5_");
+                bool outdoor = name.StartsWith("r4_weeds") || name.StartsWith("r4_garden") || r5;
                 shots.Add(new Shot("rev_" + name, outdoor ? Mode.Day : Mode.Detail, pos, look) { raw = true });
+                if (r5 && !name.StartsWith("r5_gal") && (pos - look).magnitude < 4.6f) shots.Add(new Shot("revmood_" + name, Mode.MoodX, pos, look) { raw = true }); // 雾里 7 m 以外看不见
             }
             int count = 0;
             try

@@ -146,7 +146,7 @@ namespace HakoOnna.Art.EditorTools
             draw();
             k.Pop();
             // 第四轮审图：洗衣机、毛巾、洗衣筐、洗手钵、洗脸台（正面偏 20° 看）
-            float lookY = name switch { "Washer" => .75f, "TowelBar" => 1.05f, "Basket" => .3f, "HandBasin" => .8f, "Washstand" => .85f, _ => -1f };
+            float lookY = name switch { "Washer" => .75f, "TowelBar" => 1.05f, "Basket" => .3f, "HandBasin" => .8f, "Washstand" => .85f, "Urinal" => .6f, _ => -1f };
             if (lookY > 0f)
             {
                 var q = Quaternion.Euler(0f, yaw, 0f);
@@ -335,70 +335,6 @@ namespace HakoOnna.Art.EditorTools
             foreach (float sx in new[] { .31f, .59f }) k.B(D.TrimMid, sx, .98f, .04f, .02f, .03f, .08f);
             // 第四轮：毛巾搭在杆上（前后两片、起褶；Soft.cs TowelOnBar），原来是两块薄板 + 一块黄渍
             TowelOnBar(k.mb, D.Towel, D.Towel, new Vector3(.34f, .98f, .075f), Quaternion.identity, .22f, .27f, .2f, .01f, 1.7f);
-        }
-
-        /// <summary>朝顔（小便器）：白瓷喇叭口挂在墙上，下面排水管进地；铜冲水管从上面下来接阀门；两边各一块木隔板。</summary>
-        static void DrawAsagao(Kit k, System.Random rng)
-        {
-            k.Bb(D.CeramicWhite, 0, .18f, .03f, .17f, .36f, .06f);
-            k.Push(new Vector3(0, .2f, .15f), 0f, 16f);
-            k.C(D.CeramicWhite, 0, 0, 0, .05f, .16f, .3f, 18);
-            k.C(D.Ash, 0, .287f, 0, .146f, .146f, .012f, 18);
-            k.C(D.Iron, 0, .29f, 0, .03f, .03f, .01f, 8);
-            k.Pop();
-            k.C(D.Iron, 0, 0, .15f, .024f, .024f, .21f, 8);
-            k.C(D.Black, 0, 0, .15f, .055f, .055f, .006f, 12);
-            k.C(D.Brass, 0, .5f, .035f, .011f, .011f, .74f, 8);
-            k.Cr(D.Brass, new Vector3(0, .5f, .035f), .011f, .011f, .1f, Quaternion.Euler(110f, 0, 0), 8);
-            k.C(D.Brass, 0, 1.24f, .045f, .026f, .026f, .07f, 10);
-            k.B(D.Brass, 0, 1.325f, .045f, .07f, .012f, .012f);
-            foreach (float sx in new[] { -.45f, .45f })
-            {
-                k.Bb(D.TrimMid, sx, .12f, .27f, .025f, 1.24f, .52f);
-                k.Bb(D.TrimLight, sx, 1.36f, .27f, .035f, .025f, .54f);
-                for (float z = .08f; z < .5f; z += .12f) k.Bb(D.BeamDark, sx, .2f, z, .027f, 1.1f, .006f);
-            }
-            k.C(D.Straw, 0, .001f, .3f, .17f, .2f, .001f, 14); // 地上发黄的尿渍
-        }
-
-        /// <summary>
-        /// 和式蹲便（昭和的水洗式）：瓷砖地台上嵌一个长圆形白瓷便器，金隠し朝里墙；墙上高处一个水箱，
-        /// 铁管下来接到便器，一根拉链垂着；隔间西板上一个落とし紙的纸盒；墙上一个插着枯花的一轮插。
-        /// 局部原点 = 北墙脚中点、+z 朝南；sideX = 西板内侧在局部的 x（yaw 180 时西边是 +x）。
-        /// </summary>
-        static void DrawWashiki(Kit k, System.Random rng, float sideX)
-        {
-            float pw = Mathf.Min(.9f, 2 * sideX - .02f);
-            k.Bb(D.BathTile, 0, 0, .68f, pw, .08f, 1.3f);
-            k.Bb(D.TrimMid, 0, 0, 1.34f, pw, .08f, .03f);
-            const float y = .08f, cz = .66f;
-            k.PushS(new Vector3(0, y, cz), Vector3.zero, new Vector3(1f, 1f, 1.8f));
-            k.C(D.CeramicWhite, 0, -.004f, 0, .155f, .16f, .016f, 22);
-            k.C(D.Ash, 0, .0115f, 0, .122f, .122f, .002f, 20);
-            k.C(D.Water, 0, .012f, .07f, .045f, .045f, .002f, 12);
-            k.Pop();
-            k.S(D.CeramicWhite, 0, y, cz - .24f, .16f, .2f, .09f, 14);
-            k.S(D.Black, 0, y + .035f, cz - .2f, .1f, .11f, .05f, 10);
-            // 高水箱、铁管、拉链
-            k.Bb(D.CeramicWhite, -.14f, 1.55f, .12f, .44f, .24f, .2f);
-            k.Bb(D.Iron, -.14f, 1.79f, .12f, .46f, .02f, .22f);
-            k.C(D.Iron, -.14f, .14f, .045f, .017f, .017f, 1.41f, 8);
-            var p0 = new Vector3(-.14f, .14f, .045f);
-            var p1 = new Vector3(0, y + .12f, cz - .3f);
-            k.Cr(D.Iron, p0, .017f, .017f, (p1 - p0).magnitude, Quaternion.FromToRotation(Vector3.up, p1 - p0), 8);
-            k.Bb(D.Iron, .02f, 1.62f, .2f, .14f, .015f, .015f);
-            k.B(D.Iron, .09f, 1.32f, .2f, .005f, .6f, .005f);
-            k.C(D.TrimLight, .09f, .96f, .2f, .016f, .016f, .08f, 8);
-            // 落とし紙的纸盒（西板上）
-            k.Bb(D.TrimMid, sideX - .045f, .52f, .74f, .08f, .15f, .2f);
-            k.Bb(D.Paper, sideX - .045f, .64f, .74f, .06f, .045f, .17f);
-            k.Br(D.Paper, sideX - .2f, .085f, .9f, .12f, .002f, .1f, 0, Rf(rng, 0f, 90f), 0); // 掉在地台上的一张
-            // 一轮插（干掉的花）
-            k.C(D.CeramicBrown, .26f, 1.08f, .045f, .03f, .024f, .13f, 10);
-            k.B(D.Iron, .26f, 1.2f, .01f, .008f, .008f, .03f);
-            k.Cr(D.Straw, new Vector3(.26f, 1.2f, .045f), .003f, .002f, .24f, Quaternion.Euler(0, 0, 12f), 5);
-            k.S(D.Bark, .21f, 1.43f, .045f, .02f, .016f, .02f, 6);
-            k.Cr(D.Straw, new Vector3(.27f, 1.2f, .05f), .002f, .002f, .16f, Quaternion.Euler(0, 0, -25f), 5);
         }
 
         // =====================================================================

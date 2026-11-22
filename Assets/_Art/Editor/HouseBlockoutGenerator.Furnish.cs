@@ -119,7 +119,12 @@ namespace HakoOnna.Art.EditorTools
             public void Br(Material m, float x, float y, float z, float w, float h, float d, float pitch, float yaw, float roll) =>
                 Prim(() => mb.Box(m, new Vector3(x, y, z), new Vector3(w, h, d), Quaternion.Euler(pitch, yaw, roll)));
 
-            public void C(Material m, float x, float y0, float z, float r0, float r1, float h, int seg = 12) => Prim(() => mb.Cyl(m, new Vector3(x, y0, z), r0, r1, h, seg));
+            /// <summary>第五轮：瓷质的圆台（杯、碗、坛、盘、盖）第二遍以后车削成器形（Props5c Vessel）；第一遍量尺寸还是圆台。</summary>
+            public void C(Material m, float x, float y0, float z, float r0, float r1, float h, int seg = 12) => Prim(() =>
+            {
+                if (!Probing && IsCeramic(m) && Mathf.Max(r0, r1) >= .02f) Vessel(mb, m, new Vector3(x, y0, z), r0, r1, h, Quaternion.identity);
+                else mb.Cyl(m, new Vector3(x, y0, z), r0, r1, h, seg);
+            });
             public void Cr(Material m, Vector3 b, float r0, float r1, float h, Quaternion rot, int seg = 10) => Prim(() => mb.Cyl(m, b, r0, r1, h, seg, true, rot));
             public void S(Material m, float x, float y, float z, float rx, float ry, float rz, int seg = 10) => Prim(() => mb.Sphere(m, new Vector3(x, y, z), new Vector3(rx, ry, rz), seg));
 
@@ -705,13 +710,22 @@ namespace HakoOnna.Art.EditorTools
             k.Pop();
             // 挂钟
             k.Push(new Vector3(11.0f, 1.95f, 12.146f), 180f);
-            k.B(D.Post, 0, 0, .06f, .3f, .56f, .12f);
-            k.Cr(D.CeramicWhite, new Vector3(0, .13f, .12f), .11f, .11f, .006f, AlongZ, 20);
-            k.B(D.Ink, 0, .16f, .1275f, .008f, .07f, .002f);
-            k.B(D.Ink, .03f, .13f, .1275f, .06f, .006f, .002f);
-            k.B(D.Glass, 0, -.13f, .121f, .2f, .22f, .004f);
-            k.B(D.Brass, 0, -.12f, .11f, .004f, .16f, .004f);
-            k.Cr(D.Brass, new Vector3(0, -.2f, .106f), .03f, .03f, .006f, AlongZ, 12);
+            // 第五轮：换成八角柱时计（Props5 DrawClock）；Swap：搬家照旧
+            k.Swap(() =>
+            {
+                k.B(D.Post, 0, 0, .06f, .3f, .56f, .12f);
+                k.Cr(D.CeramicWhite, new Vector3(0, .13f, .12f), .11f, .11f, .006f, AlongZ, 20);
+                k.B(D.Ink, 0, .16f, .1275f, .008f, .07f, .002f);
+                k.B(D.Ink, .03f, .13f, .1275f, .06f, .006f, .002f);
+                k.B(D.Glass, 0, -.13f, .121f, .2f, .22f, .004f);
+                k.B(D.Brass, 0, -.12f, .11f, .004f, .16f, .004f);
+                k.Cr(D.Brass, new Vector3(0, -.2f, .106f), .03f, .03f, .006f, AlongZ, 12);
+            }, () =>
+            {
+                k.Push(new Vector3(0f, -.31f, 0f));
+                DrawClock(k);
+                k.Pop();
+            });
             k.Pop();
         }
 
@@ -743,14 +757,30 @@ namespace HakoOnna.Art.EditorTools
             });
             k.Bb(D.Paper, -.45f, lv[3], 0, .3f, .1f, .22f);
             // 玻璃柜里的日本人形
-            k.Bb(D.Lacquer, .35f, lv[3], 0, .3f, .03f, .24f);
-            k.C(D.ClothRed, .35f, lv[3] + .03f, 0, .07f, .045f, .2f, 10);
-            k.S(D.CeramicWhite, .35f, lv[3] + .27f, 0, .042f, .05f, .042f, 10);
-            k.S(D.Black, .35f, lv[3] + .29f, -.01f, .048f, .045f, .046f, 10);
-            foreach (float sx in new[] { .21f, .49f })
-                foreach (float sz in new[] { -.11f, .11f })
-                    k.Bb(D.Lacquer, sx, lv[3] + .03f, sz, .01f, .34f, .01f);
-            k.Bb(D.Lacquer, .35f, lv[3] + .37f, 0, .3f, .01f, .24f);
+            // 第五轮：换成市松人形（Props5b），柜子四面加玻璃；Swap：搬家照旧
+            k.Swap(() =>
+            {
+                k.Bb(D.Lacquer, .35f, lv[3], 0, .3f, .03f, .24f);
+                k.C(D.ClothRed, .35f, lv[3] + .03f, 0, .07f, .045f, .2f, 10);
+                k.S(D.CeramicWhite, .35f, lv[3] + .27f, 0, .042f, .05f, .042f, 10);
+                k.S(D.Black, .35f, lv[3] + .29f, -.01f, .048f, .045f, .046f, 10);
+                foreach (float sx in new[] { .21f, .49f })
+                    foreach (float sz in new[] { -.11f, .11f })
+                        k.Bb(D.Lacquer, sx, lv[3] + .03f, sz, .01f, .34f, .01f);
+                k.Bb(D.Lacquer, .35f, lv[3] + .37f, 0, .3f, .01f, .24f);
+            }, () =>
+            {
+                var mb = k.mb;
+                BevelBox(mb, D.Lacquer, new Vector3(.35f, lv[3] + .015f, 0f), new Vector3(.3f, .03f, .24f), .004f);
+                IchimatsuDoll(k, new Vector3(.35f, lv[3] + .03f, 0f), .3f, D.ClothRed, D.ClothPurple);
+                foreach (float sx in new[] { .21f, .49f })
+                    foreach (float sz in new[] { -.11f, .11f })
+                        mb.Box(D.Lacquer, new Vector3(sx, lv[3] + .2f, sz), new Vector3(.01f, .34f, .01f));
+                BevelBox(mb, D.Lacquer, new Vector3(.35f, lv[3] + .375f, 0f), new Vector3(.3f, .01f, .24f), .003f);
+                foreach (float sz in new[] { -.11f, .11f }) mb.Box(D.Glass, new Vector3(.35f, lv[3] + .2f, sz), new Vector3(.27f, .33f, .002f));
+                foreach (float sx in new[] { .21f, .49f }) mb.Box(D.Glass, new Vector3(sx, lv[3] + .2f, 0f), new Vector3(.002f, .33f, .21f));
+                KitShot(k, "r5i_ichimatsu", new Vector3(.35f, lv[3] + .2f, 0f), 1.2f, .1f);
+            });
             k.Pop();
             Blocker("NandoShelf", new Vector3(16.85f, .55f, 11.935f), 180f, new Vector3(1.5f, 1.8f, .37f));
         }

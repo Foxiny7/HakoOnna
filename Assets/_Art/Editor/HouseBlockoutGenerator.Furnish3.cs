@@ -587,23 +587,6 @@ namespace HakoOnna.Art.EditorTools
             k.Cr(D.Lacquer, new Vector3(-w / 2 - .035f, .03f, .014f), .014f, .014f, w + .07f, AlongX, 10);
         }
 
-        static void DrawClock(Kit k)
-        {
-            // 柱时计：上半钟面，下半玻璃门里能看到钟摆
-            k.Push(new Vector3(0, .31f, 0));
-            k.B(D.Post, 0, .13f, .06f, .3f, .3f, .12f);
-            k.B(D.Post, 0, -.15f, .01f, .3f, .26f, .02f);
-            foreach (float sx in new[] { -.14f, .14f }) k.B(D.Post, sx, -.15f, .06f, .02f, .26f, .12f);
-            k.B(D.Post, 0, -.27f, .06f, .3f, .02f, .12f);
-            k.Cr(D.CeramicWhite, new Vector3(0, .13f, .12f), .11f, .11f, .006f, AlongZ, 20);
-            k.B(D.Ink, 0, .16f, .1275f, .008f, .07f, .002f);
-            k.B(D.Ink, .03f, .13f, .1275f, .06f, .006f, .002f);
-            k.B(D.Brass, 0, -.1f, .06f, .004f, .16f, .004f);
-            k.Cr(D.Brass, new Vector3(0, -.19f, .057f), .03f, .03f, .006f, AlongZ, 12);
-            k.B(D.Glass, 0, -.145f, .118f, .26f, .23f, .004f);
-            k.Pop();
-        }
-
         static void DrawDrawings(Kit k, System.Random rng)
         {
             Material[] crayon = { D.ClothRed, D.ClothIndigo, D.Leaf, D.Gold };
@@ -1078,14 +1061,15 @@ namespace HakoOnna.Art.EditorTools
                     {
                         const float r = .1f;
                         if (room < .2f || clear < .22f) return 0f;
+                        // 第五轮：立着的一排盘子（原来是圆饼）
                         for (int i = 0; i < 5; i++)
-                            k.Cr(i % 2 == 0 ? D.CeramicWhite : D.CeramicBlue, new Vector3(x + r, y + r + .004f, -.11f + i * .028f), r, r, .012f, Quaternion.Euler(78f, 0, 0), 16);
+                            Vessel(k.mb, i % 2 == 0 ? D.CeramicWhite : D.CeramicBlue, new Vector3(x + r, y + r + .004f, -.11f + i * .028f), r * .55f, r, .02f, Quaternion.Euler(78f, 0, 0));
                         return 2 * r;
                     }
                     if (room < .2f) return 0f;
-                    k.S(D.CeramicBrown, x + .1f, y + .08f, 0, .09f, .08f, .09f, 12);
-                    k.C(D.CeramicBrown, x + .1f, y + .15f, 0, .04f, .045f, .025f, 10);
-                    k.Cr(D.CeramicBrown, new Vector3(x + .17f, y + .08f, 0), .015f, .01f, .1f, Quaternion.Euler(0, 0, -50f), 6);
+                    // 第五轮：急須 + 一只茶杯（原来是球 + 圆柱）
+                    Kyusu(k.mb, new Vector3(x + .085f, y, 0f), 15f);
+                    Yunomi(k.mb, new Vector3(x + .17f, y, .06f), D.CeramicWhite);
                     return .2f;
                 case 2: // 布料、纸捆、卷轴
                     if (pick <= 1)
@@ -1112,29 +1096,23 @@ namespace HakoOnna.Art.EditorTools
                     {
                         case 0: // 不倒翁
                             if (room < .16f) return 0f;
-                            k.S(D.ClothRed, x + .08f, y + .08f, 0, .08f, .08f, .075f, 12);
-                            k.S(D.ClothWhite, x + .08f, y + .1f, .06f, .045f, .04f, .02f, 8);
-                            k.S(D.Black, x + .06f, y + .105f, .075f, .008f, .008f, .004f, 5);
+                            Daruma(k.mb, new Vector3(x + .08f, y, 0f), 1f, 8f);
+                            KitShot(k, "r5i_toys", new Vector3(x + .2f, y + .1f, 0f), 1.0f, .1f);
                             return .16f;
                         case 1: // 一对小芥子
                             if (room < .14f) return 0f;
-                            foreach (float sx in new[] { .03f, .1f })
-                            {
-                                k.C(sx < .05f ? D.ClothRed : D.TrimLight, x + sx, y, 0, .025f, .025f, .13f, 10);
-                                k.S(D.TrimLight, x + sx, y + .16f, 0, .035f, .035f, .035f, 10);
-                                k.S(D.Black, x + sx, y + .175f, -.005f, .036f, .025f, .034f, 8);
-                            }
+                            Kokeshi(k.mb, new Vector3(x + .03f, y, 0f), .82f, true);
+                            Kokeshi(k.mb, new Vector3(x + .1f, y, 0f), .92f, false);
                             return .14f;
-                        case 2: // 陀螺 + 球
+                        case 2: // 陀螺 + 手鞠
                             if (room < .24f) return 0f;
-                            k.C(D.TrimMid, x + .05f, y, 0, .005f, .05f, .05f, 12);
-                            k.C(D.ClothRed, x + .05f, y + .05f, 0, .05f, .02f, .03f, 12);
-                            k.S(D.PlasticRed, x + .17f, y + .07f, 0, .07f, .07f, .07f, 12);
+                            Koma(k.mb, new Vector3(x + .05f, y + .014f, 0f), 30f, 24f);
+                            Temari(k.mb, new Vector3(x + .17f, y + .07f, 0f), .07f);
                             return .24f;
                         default: // 纸鹤
                             if (room < .14f) return 0f;
-                            k.Br(D.ClothWhite, x + .07f, y + .03f, 0, .12f, .02f, .05f, 0, 20f, 0);
-                            k.Br(D.ClothWhite, x + .07f, y + .045f, 0, .03f, .02f, .12f, 0, 20f, 25f);
+                            PaperCrane(k.mb, new Vector3(x + .06f, y, 0f), 20f, 1f);
+                            PaperCrane(k.mb, new Vector3(x + .11f, y, .07f), -50f, .7f);
                             return .14f;
                     }
                 case 4: // 土蔵：坛子、折起的提灯、卷轴、旧人形
@@ -1144,9 +1122,8 @@ namespace HakoOnna.Art.EditorTools
                         {
                             float r = Rf(rng, .1f, .14f), h = Mathf.Min(clear, Rf(rng, .22f, .32f));
                             if (2 * r > room) return 0f;
-                            k.C(D.CeramicBrown, x + r, y, 0, r * .75f, r, h * .65f, 14);
-                            k.C(D.CeramicBrown, x + r, y + h * .65f, 0, r, r * .5f, h * .25f, 14);
-                            k.C(D.Straw, x + r, y + h * .9f, 0, r * .55f, r * .5f, h * .1f, 12);
+                            Jar(k.mb, new Vector3(x + r, y, 0f), r, h, D.CeramicBrown, true); // 第五轮：蒙纸扎绳的坛子
+                            KitShot(k, "r5i_jar", new Vector3(x + r, y + .15f, 0f), 1.0f, .1f);
                             return 2 * r;
                         }
                         case 1:
@@ -1165,10 +1142,7 @@ namespace HakoOnna.Art.EditorTools
                             return .45f;
                         default:
                             if (room < .16f || clear < .3f) return 0f;
-                            k.Bb(D.Lacquer, x + .08f, y, 0, .16f, .03f, .14f);
-                            k.C(D.ClothRed, x + .08f, y + .03f, 0, .055f, .035f, .17f, 10);
-                            k.S(D.CeramicWhite, x + .08f, y + .23f, 0, .035f, .042f, .035f, 10);
-                            k.S(D.Black, x + .08f, y + .245f, -.008f, .04f, .038f, .038f, 10);
+                            IchimatsuDoll(k, new Vector3(x + .08f, y, 0f), .27f, D.ClothRed, D.ClothIndigo); // 第五轮：市松人形
                             return .16f;
                     }
                 case 5: // 毛巾、脸盆、肥皂
@@ -1302,149 +1276,6 @@ namespace HakoOnna.Art.EditorTools
             k.C(D.Iron, .62f, H, .2f, .1f, .09f, .12f, 14);
             k.C(D.Iron, .62f, H + .12f, .2f, .06f, .03f, .03f, 12);
             k.Br(D.Iron, .62f, H + .2f, .2f, .2f, .012f, .012f, 0, 0, Rf(rng, -5f, 5f));
-        }
-
-        /// <summary>手压井泵 + 石流し + 木桶。</summary>
-        static void DrawPump(Kit k)
-        {
-            const float sx = -.15f, z = .36f;
-            k.Bb(D.Stone, sx, 0, z, .9f, .3f, .66f);
-            k.Bb(D.Stone, sx, .3f, z + .29f, .9f, .12f, .08f);
-            k.Bb(D.Stone, sx, .3f, z - .29f, .9f, .12f, .08f);
-            foreach (float s in new[] { -1f, 1f }) k.Bb(D.Stone, sx + s * .41f, .3f, z, .08f, .12f, .5f);
-            k.Bb(D.Water, sx, .3f, z, .74f, .06f, .5f);
-            k.Bb(D.Post, sx, 0, .05f, .12f, 1.0f, .1f);
-            k.C(D.Iron, sx, .42f, .14f, .06f, .06f, .55f, 12);
-            k.C(D.Iron, sx, .97f, .14f, .075f, .075f, .04f, 12);
-            k.Cr(D.Iron, new Vector3(sx, .8f, .17f), .025f, .02f, .2f, Quaternion.Euler(110f, 0, 0), 8);
-            k.Bb(D.Iron, sx + .05f, .97f, .14f, .04f, .12f, .03f);
-            k.Br(D.Iron, sx + .2f, 1.08f, .14f, .38f, .025f, .03f, 0, 0, 20f);
-            Oke(k, .45f, 0f, .35f, .16f, .26f);
-            k.Cr(D.TrimLight, new Vector3(.45f, .18f, .35f), .01f, .01f, .42f, Quaternion.Euler(0, 0, 18f), 6);
-            k.S(D.TrimLight, .32f, .58f, .35f, .04f, .03f, .04f, 8);
-        }
-
-        static void DrawArmor(Kit k)
-        {
-            const float z = .36f;
-            k.Bb(D.Lacquer, 0, 0, z, .7f, .06f, .6f);
-            k.Bb(D.Post, 0, .06f, z - .12f, .05f, 1.25f, .05f);
-            k.Bb(D.Post, 0, 1.12f, z - .12f, .62f, .04f, .04f);
-            k.C(D.Lacquer, 0, .66f, z, .2f, .25f, .46f, 10);
-            for (int i = 0; i < 6; i++) k.C(D.ClothIndigo, 0, .7f + i * .065f, z, .208f + i * .008f, .208f + i * .008f, .012f, 10);
-            for (int i = 0; i < 5; i++)
-            {
-                float a = -60f + i * 30f;
-                var p = Quaternion.Euler(0, a, 0) * new Vector3(0, 0, .2f);
-                k.Br(D.Lacquer, p.x, .5f, z + p.z, .16f, .3f, .025f, 12f, a, 0);
-                for (int j = 0; j < 3; j++) k.Br(D.ClothIndigo, p.x * 1.06f, .4f + j * .09f, z + p.z * 1.06f, .165f, .012f, .02f, 12f, a, 0);
-            }
-            foreach (float s in new[] { -1f, 1f })
-            {
-                k.Br(D.Lacquer, s * .3f, 1.0f, z + .02f, .04f, .32f, .26f, 0, 0, s * 14f);
-                k.Cr(D.ClothIndigo, new Vector3(s * .26f, 1.08f, z + .05f), .045f, .035f, .5f, Quaternion.Euler(0, 0, 180f + s * 8f), 8);
-                k.S(D.Black, s * .29f, .58f, z + .05f, .045f, .05f, .04f, 7);
-            }
-            k.S(D.Black, 0, 1.38f, z, .14f, .11f, .14f, 12);
-            k.C(D.Lacquer, 0, 1.24f, z - .02f, .22f, .15f, .12f, 12);
-            foreach (float s in new[] { -1f, 1f })
-            {
-                k.Br(D.Gold, s * .07f, 1.56f, z + .1f, .02f, .26f, .008f, 0, 0, -s * 22f);
-                k.Br(D.Lacquer, s * .15f, 1.33f, z + .08f, .06f, .08f, .02f, 0, s * 30f, 0);
-            }
-            k.S(D.ClothRed, 0, 1.29f, z + .1f, .085f, .07f, .045f, 10);
-            k.B(D.Black, -.03f, 1.31f, z + .142f, .025f, .012f, .01f);
-            k.B(D.Black, .03f, 1.31f, z + .142f, .025f, .012f, .01f);
-            k.B(D.CeramicWhite, 0, 1.26f, z + .142f, .06f, .008f, .006f);
-        }
-
-        static void DrawDressForm(Kit k)
-        {
-            const float z = .25f;
-            for (int i = 0; i < 3; i++)
-            {
-                var dir = Quaternion.Euler(0, i * 120f + 30f, 0) * new Vector3(.2f, -.12f, 0);
-                k.Cr(D.Post, new Vector3(0, .14f, z), .014f, .012f, dir.magnitude, Quaternion.FromToRotation(Vector3.up, dir.normalized), 6);
-            }
-            k.Cr(D.Post, new Vector3(0, .1f, z), .016f, .014f, .9f, Quaternion.identity, 6);
-            k.S(D.ClothWhite, 0, 1.18f, z, .16f, .26f, .12f, 14);
-            k.S(D.ClothWhite, 0, 1.38f, z, .19f, .07f, .11f, 12);
-            k.C(D.TrimMid, 0, 1.43f, z, .045f, .035f, .1f, 10);
-            k.C(D.Lacquer, 0, 1.53f, z, .05f, .05f, .02f, 10);
-            if (CoverNext) return; // 盖着防尘布：布条、珠针都在布底下（侧面那条红布还会戳出布外）
-            k.Br(D.ClothRed, -.08f, 1.1f, z + .115f, .2f, .5f, .008f, 0, 0, 5f);
-            k.Br(D.ClothRed, -.17f, .85f, z + .06f, .18f, .5f, .008f, 0, 30f, 0);
-            for (int i = 0; i < 4; i++) k.S(D.Brass, .02f + i * .03f, 1.2f - i * .07f, z + .125f, .006f, .006f, .006f, 5);
-            k.Br(D.Gold, .05f, 1.36f, z + .1f, .015f, .3f, .003f, 0, 0, -10f);
-        }
-
-        static void DrawSewing(Kit k)
-        {
-            const float z = .25f;
-            foreach (float sx in new[] { -.4f, .4f })
-            {
-                k.Bb(D.Iron, sx, 0, z, .05f, .04f, .44f);
-                k.Br(D.Iron, sx, .37f, z - .1f, .025f, .72f, .03f, 12f, 0, 0);
-                k.Br(D.Iron, sx, .37f, z + .1f, .025f, .72f, .03f, -12f, 0, 0);
-            }
-            k.Bb(D.Iron, 0, .3f, z - .17f, .8f, .03f, .025f);
-            k.Br(D.Iron, 0, .12f, z + .05f, .5f, .02f, .26f, 14f, 0, 0);
-            k.Cr(D.Iron, new Vector3(.36f, .42f, z), .2f, .2f, .02f, AlongX, 20);
-            for (int i = 0; i < 4; i++) k.Br(D.Iron, .37f, .42f, z, .01f, .38f, .014f, i * 45f, 0, 0);
-            k.Br(D.Black, .37f, .6f, z + .05f, .006f, .36f, .006f, -8f, 0, 0);
-            k.Bb(D.TrimMid, 0, .72f, z, .95f, .035f, .48f);
-            const float y = .755f;
-            k.Bb(D.Black, 0, y, z, .36f, .05f, .17f);
-            k.Bb(D.Black, .13f, y + .05f, z, .08f, .2f, .12f);
-            k.Bb(D.Black, -.02f, y + .2f, z, .38f, .08f, .1f);
-            k.Bb(D.Black, -.19f, y + .09f, z, .06f, .15f, .08f);
-            k.B(D.Iron, -.19f, y + .06f, z + .02f, .005f, .06f, .005f);
-            k.Cr(D.Brass, new Vector3(.17f, y + .2f, z), .07f, .07f, .03f, AlongX, 14);
-            k.B(D.Gold, -.02f, y + .24f, z + .051f, .22f, .03f, .002f);
-            if (!CoverNext) k.C(D.ClothRed, .02f, y + .28f, z, .015f, .015f, .04f, 8); // 线轴（盖着布时不画，会戳穿布）
-            k.Bb(D.ClothIndigo, -.2f, y, z + .14f, .3f, .004f, .2f);
-        }
-
-        /// <summary>雛人形：五段红毯台阶，顶上金屏风前的内裏雛，下面三人官女、五人囃子、随身、橘与樱。</summary>
-        static void DrawHina(Kit k)
-        {
-            const int n = 5;
-            const float W = 1.3f, step = .2f, rise = .22f;
-            for (int i = 0; i < n; i++)
-            {
-                float dz = 1.0f - i * step;
-                k.Bb(D.ClothRed, 0, 0, dz / 2, W, rise * (i + 1), dz);
-                k.B(D.Black, 0, rise * (i + 1), dz - .006f, W + .002f, .012f, .012f);
-            }
-            float Ty(int i) => rise * (i + 1);
-            float Tz(int i) => 1.0f - i * step - step / 2;
-            const int t = n - 1;
-            k.Bb(D.GoldLeaf, 0, Ty(t), .03f, .7f, .32f, .02f);
-            Doll(k, -.14f, Ty(t), Tz(t), D.Black, .9f);
-            Doll(k, .14f, Ty(t), Tz(t), D.ClothRed, .9f);
-            foreach (float sx in new[] { -.45f, .45f })
-            {
-                k.C(D.Lacquer, sx, Ty(t), Tz(t), .03f, .02f, .16f, 8);
-                k.S(D.PaperLamp, sx, Ty(t) + .2f, Tz(t), .045f, .06f, .045f, 10);
-            }
-            for (int i = 0; i < 3; i++) Doll(k, -.3f + i * .3f, Ty(3), Tz(3), D.ClothWhite, .8f);
-            for (int i = 0; i < 5; i++) Doll(k, -.48f + i * .24f, Ty(2), Tz(2), D.ClothIndigo, .7f);
-            Doll(k, -.35f, Ty(1), Tz(1), D.ClothPurple, .75f);
-            Doll(k, .35f, Ty(1), Tz(1), D.Lacquer, .75f);
-            foreach (float sx in new[] { -.4f, .4f })
-            {
-                k.Bb(D.Lacquer, sx, Ty(0), Tz(0), .1f, .04f, .1f);
-                k.Cr(D.Bark, new Vector3(sx, Ty(0) + .04f, Tz(0)), .008f, .006f, .1f, Quaternion.identity, 5);
-                k.S(sx < 0 ? D.Leaf : D.ClothWhite, sx, Ty(0) + .17f, Tz(0), .07f, .06f, .07f, 8);
-            }
-        }
-
-        static void Doll(Kit k, float x, float y, float z, Material robe, float s)
-        {
-            k.C(robe, x, y, z, .06f * s, .025f * s, .13f * s, 10);
-            k.S(D.CeramicWhite, x, y + .155f * s, z, .025f * s, .03f * s, .025f * s, 8);
-            k.S(D.Black, x, y + .17f * s, z - .006f * s, .027f * s, .025f * s, .026f * s, 8);
-            k.B(D.Gold, x, y + .07f * s, z + .045f * s, .03f * s, .05f * s, .004f);
         }
 
         /// <summary>落地穿衣镜，上半截盖着紫布（鏡掛け）。</summary>
@@ -1603,45 +1434,6 @@ namespace HakoOnna.Art.EditorTools
             for (int i = 0; i < 12; i++) k.Bb(D.TrimMid, 0, .12f + i * .035f, .012f, .26f, .012f, .008f);
             k.Pop();
             k.S(D.CeramicWhite, .3f, .03f, .45f, .05f, .025f, .035f, 8);
-        }
-
-        static void DrawRockingHorse(Kit k)
-        {
-            const float z = .22f, R = .8f;
-            foreach (float sz in new[] { -.12f, .12f })
-            {
-                for (int i = 0; i < 6; i++)
-                {
-                    float a = -35f + i * 14f, ar = a * Mathf.Deg2Rad;
-                    k.Br(D.TrimMid, Mathf.Sin(ar) * R, R - Mathf.Cos(ar) * R + .02f, z + sz, R * .25f, .035f, .03f, 0, 0, a);
-                }
-                foreach (float sx in new[] { -.22f, .22f }) k.Br(D.TrimLight, sx, .25f, z + sz * .6f, .03f, .38f, .03f, sz > 0 ? -12f : 12f, 0, 0);
-            }
-            k.Bb(D.TrimLight, 0, .42f, z, .58f, .2f, .17f);
-            k.Br(D.TrimLight, .32f, .68f, z, .12f, .34f, .1f, 0, 0, -28f);
-            k.Br(D.TrimLight, .42f, .84f, z, .26f, .11f, .09f, 0, 0, -12f);
-            foreach (float s in new[] { -.03f, .03f }) k.Br(D.TrimLight, .34f, .93f, z + s, .03f, .07f, .02f, 0, 0, -20f);
-            k.Br(D.Black, .27f, .72f, z, .05f, .34f, .02f, 0, 0, -28f);
-            foreach (float s in new[] { -.046f, .046f }) k.S(D.Black, .46f, .87f, z + s, .012f, .012f, .006f, 6);
-            k.Bb(D.ClothRed, -.02f, .62f, z, .24f, .03f, .2f);
-            k.Cr(D.Black, new Vector3(-.29f, .55f, z), .025f, .006f, .28f, Quaternion.Euler(0, 0, 125f), 6);
-        }
-
-        static void DrawSpinningWheel(Kit k)
-        {
-            const float z = .21f;
-            k.Bb(D.TrimMid, 0, 0, z, .9f, .05f, .3f);
-            foreach (float s in new[] { -.08f, .08f }) k.Bb(D.TrimMid, .22f, .05f, z + s, .04f, .5f, .04f);
-            var c = new Vector3(.22f, .55f, z);
-            for (int i = 0; i < 8; i++) k.Br(D.TrimLight, c.x, c.y, c.z, .01f, .54f, .012f, 0, 0, i * 22.5f);
-            Ring(k, D.Bamboo, c + new Vector3(0, 0, .03f), .27f, .02f);
-            Ring(k, D.Bamboo, c - new Vector3(0, 0, .03f), .27f, .02f);
-            k.Cr(D.Iron, c - new Vector3(0, 0, .1f), .015f, .015f, .2f, AlongZ, 6);
-            k.Br(D.TrimLight, c.x + .1f, c.y - .05f, z + .12f, .14f, .02f, .02f, 0, 0, -70f);
-            k.Bb(D.TrimMid, -.33f, .05f, z, .05f, .22f, .05f);
-            k.Cr(D.Iron, new Vector3(-.44f, .29f, z), .004f, .004f, .2f, AlongX, 5);
-            k.Cr(D.ClothWhite, new Vector3(-.4f, .29f, z), .025f, .025f, .06f, AlongX, 8);
-            k.Br(D.ClothWhite, -.06f, .43f, z, .55f, .003f, .003f, 0, 0, 25f);
         }
 
         static void DrawKoto(Kit k)

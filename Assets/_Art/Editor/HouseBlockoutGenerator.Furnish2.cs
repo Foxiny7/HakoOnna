@@ -246,9 +246,17 @@ namespace HakoOnna.Art.EditorTools
             k.Bb(D.Paper, .4f, lv[1], 0, .22f, .12f, .28f);
             k.Bb(D.CeramicBrown, .4f, lv[1] + .12f, 0, .2f, .01f, .26f);
             // 兜
-            k.C(D.Iron, 0, lv[2], 0, .2f, .14f, .1f, 14);
-            k.S(D.Iron, 0, lv[2] + .14f, 0, .13f, .12f, .14f, 12);
-            foreach (float s in new[] { -1f, 1f }) k.Br(D.Gold, s * .06f, lv[2] + .3f, .1f, .015f, .22f, .01f, 0, 0, s * -20f);
+            // 第五轮：换成筋兜（Props5b Kabuto）；Swap：搬家照旧
+            k.Swap(() =>
+            {
+                k.C(D.Iron, 0, lv[2], 0, .2f, .14f, .1f, 14);
+                k.S(D.Iron, 0, lv[2] + .14f, 0, .13f, .12f, .14f, 12);
+                foreach (float s in new[] { -1f, 1f }) k.Br(D.Gold, s * .06f, lv[2] + .3f, .1f, .015f, .22f, .01f, 0, 0, s * -20f);
+            }, () =>
+            {
+                Kabuto(k.mb, new Vector3(0f, lv[2] + .2f, .03f));
+                KitShot(k, "r5i_kabuto", new Vector3(0f, lv[2] + .2f, 0f), 1.3f, .1f);
+            });
             k.Bb(D.Lacquer, -.5f, lv[2], 0, .3f, .04f, .25f);
             k.Cr(D.Straw, new Vector3(-.75f, lv[3] + .06f, 0), .06f, .02f, .8f, AlongX, 8);
             k.S(D.ClothRed, .5f, lv[3] + .12f, 0, .11f, .12f, .1f, 10);

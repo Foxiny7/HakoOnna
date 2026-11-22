@@ -88,6 +88,9 @@ namespace HakoOnna.Art.EditorTools
             S("SchoolDesk_01", smooth: .6f),
             S("side_table_01", smooth: .6f),
             S("wicker_basket_01", tint: new Color(.74f, .70f, .64f, 1f), smooth: .6f),
+            // 第五轮（2026-11-21）：院子的石头（枯山水、池边、蹲踞），Blender 减过面
+            S("rock_moss_set_01", tint: new Color(.82f, .80f, .76f, 1f), smooth: .6f),
+            S("rock_moss_set_02", tint: new Color(.82f, .80f, .76f, 1f), smooth: .6f),
         };
 
         public static IEnumerable<string> Ids => Specs.Select(s => s.id).Distinct();

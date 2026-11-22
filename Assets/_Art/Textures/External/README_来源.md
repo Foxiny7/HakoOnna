@@ -1,4 +1,4 @@
-# 外部资源来源（第二轮贴图，第三轮模型和古画，2026-11-19；第四轮贴图和模型，2026-11-20）
+# 外部资源来源（第二轮贴图，第三轮模型和古画，2026-11-19；第四轮贴图和模型，2026-11-20；第五轮院子的枝叶和石头，2026-11-21）
 
 这里的贴图全部是 **CC0（公有领域）**：可以商用、可以改、不用署名。记下来源是为了以后换分辨率、追溯和替换。
 材质怎么接、颜色怎么校准见 `Assets/_Art/Editor/ExternalMats.cs`；处理脚本在 `Assets/_Art/Tools~/`（Unity 不导入这个文件夹）。
@@ -187,3 +187,43 @@ make_textures.py 生成：血字四句（ここから出して / 開けるな / 
 |---|---|
 | dl_acg.py | 按 ambientCG API 的清单下载 1K-JPG 压缩包，只解出贴图（校验来源、大小、文件名） |
 | prep_tex_r4.py | 合成第四轮的布、瓷、金属、纸贴图（拼大块、做旧、mask），打印每张的平均色和一块的米数 |
+
+# 第五轮（2026-11-21）：院子的松、红叶、灌木、石头
+
+全部 CC0，下载清单经用户批准（5 项，共约 15.1 MB）。
+
+## 枝叶贴图（`Foliage/`，Tools~/prep_tex_r5.py 合成）
+
+| 合成后的贴图 | 来源 | 用在哪 |
+|---|---|---|
+| maple_sprig（三格红叶小枝 + 一格 4 × 4 的单片叶子） | ambientCG LeafSet028（https://ambientcg.com/view?id=LeafSet028 ，1K-JPG） | 4 棵红叶的树冠；树下的落叶 |
+| shrub_sprig（三格常绿小枝 + 一格半枯的） | ambientCG LeafSet022（https://ambientcg.com/view?id=LeafSet022 ，1K-JPG） | 24 丛灌木 |
+| pine_tuft（三格松针簇 + 一格发黄的） | Poly Haven pine_sapling_small（https://polyhaven.com/a/pine_sapling_small ）的 twig 贴图（diff / nor_gl / arm 1K JPG + alpha 1K PNG），只取松针和细枝的颜色 | 2 棵松的云片 |
+
+- 每张 1024 × 1024、带透明通道，四格各 512 px，小枝从格子底边中点往上长；材质是透明裁切、双面（`Materials/External/Foliage/MX_*`）。
+- pine_sapling_small 的 twig 贴图是模型的 UV 展开图（一条条松针、松果），不是现成的枝叶面片，所以松针簇是按它的松针颜色画出来的；模型本体（16 MB、约 40 万面）没有下载。
+- 枫叶原图偏橙黄，合成时往红里调过；常绿叶压暗、少数叶子做成发黄 / 枯褐。
+
+## Poly Haven 模型（1K FBX + 1K 贴图）
+
+| id | 用在哪 | 处理 |
+|---|---|---|
+| rock_moss_set_01（6 块苔石） | 枯山水的石组 4 块、东侧庭园 3 块 | Blender 减面到原来的 40%（每块 2000–6600 面） |
+| rock_moss_set_02（7 块较扁的苔石） | 池边一圈 30 块、蹲踞的手烛石和汤桶石 | Blender 减面到原来的 20%（每块约 1600 面） |
+
+## 看过但没用的
+
+- Poly Haven shrub_01–04：都是稀疏的地被植物，种在院子里不像灌木。
+- ambientCG PineNeedles001：落在地上的枯黄松针，不是活的松叶。
+- Poly Haven spinning_wheel_01：维多利亚式的欧式纺车；用户定纺车按日本的糸車程序化重做。
+
+## 暂存和脚本（第五轮新增，`Assets/_Art/Tools~/`）
+
+下载的原文件在 `Assets/_Art/Import~/r5/`（Unity 不导入）。验收后可以删掉。
+
+| 脚本 | 做什么 |
+|---|---|
+| dl_ph_maps.py | 只下载 Poly Haven 模型某一组材质的 1K 贴图（不下 FBX），校验 md5 |
+| prep_tex_r5.py | 把叶片、松针颜色合成三张枝叶面片贴图，打印覆盖率和平均色 |
+| decimate_fbx.py | Blender 无界面给 FBX 减面（保留物体名、材质、UV） |
+| make_props_r5.py | 画两张贴花（不是下载的）：柱时计的钟面 `Decals/T_ClockDial.png`、碁盤的线 `Decals/T_GobanGrid.png` |

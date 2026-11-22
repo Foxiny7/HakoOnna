@@ -62,7 +62,7 @@ namespace HakoOnna.Art.EditorTools
         }
 
         /// <summary>不规则的池塘：深色水面（略高于地面，免得被地面盖住）+ 岸边一圈大小交错的石头 + 几片睡莲叶。</summary>
-        static void Pond(MeshBatch mb, Vector3 c, float rx, float rz, System.Random rng)
+        static void Pond(MeshBatch mb, Vector3 c, float rx, float rz, System.Random rng, MeshBatch rocks)
         {
             float R(float a, float b) => a + (b - a) * (float)rng.NextDouble();
             const int N = 30;
@@ -83,8 +83,11 @@ namespace HakoOnna.Art.EditorTools
             {
                 var o = rim[i] - c; o.y = 0; o.Normalize();
                 float r = i % 3 == 0 ? R(.3f, .42f) : R(.17f, .26f);
-                mb.Sphere(D.Stone, rim[i] + o * r * .4f + Vector3.up * r * .2f, new Vector3(r, r * .55f, r * .8f), 7,
-                    Quaternion.Euler(R(-6, 6), R(0, 360), R(-6, 6)));
+                float tx = R(-6, 6), yaw = R(0, 360), tz = R(-6, 6);
+                // 第五轮：池边石换成 CC0 的苔石（较扁的那一套）；缺模型才画原来的扁球
+                var at = rim[i] + o * r * .4f;
+                if (!RockModel(rocks, new Vector3(at.x, 0f, at.z), new Vector3(r, r * .62f, r * .85f), yaw, i * 3 + 1, true))
+                    mb.Sphere(D.Stone, at + Vector3.up * r * .2f, new Vector3(r, r * .55f, r * .8f), 7, Quaternion.Euler(tx, yaw, tz));
             }
             for (int i = 0; i < 6; i++)
             {
@@ -93,22 +96,6 @@ namespace HakoOnna.Art.EditorTools
                 float r = R(.1f, .17f);
                 mb.Cyl(D.Leaf, p, r, r, .006f, 10, true, Quaternion.Euler(0, R(0, 360), 0));
             }
-        }
-
-        /// <summary>雪见灯笼：三只脚、大笠，矮矮地立在池边。</summary>
-        static void YukimiLantern(MeshBatch mb, Vector3 b, float yaw)
-        {
-            var up = Vector3.up;
-            var q = Quaternion.Euler(0, yaw, 0);
-            for (int i = 0; i < 3; i++)
-                mb.Cyl(D.Stone, b + q * (Quaternion.Euler(0, i * 120f, 0) * new Vector3(.24f, 0, 0)), .055f, .045f, .4f, 6);
-            mb.Cyl(D.Stone, b + up * .38f, .24f, .22f, .08f, 6, true, q);
-            mb.Box(D.Stone, b + up * .57f, new Vector3(.25f, .22f, .25f), q);
-            mb.Box(D.Black, b + up * .57f, new Vector3(.14f, .13f, .26f), q);
-            mb.Box(D.Black, b + up * .57f, new Vector3(.26f, .13f, .14f), q);
-            mb.Cyl(D.Stone, b + up * .68f, .62f, .1f, .2f, 6, true, q);
-            mb.Sphere(D.Stone, b + up * .93f, new Vector3(.07f, .08f, .07f), 8);
-            mb.Sphere(D.Moss, b + q * new Vector3(.2f, .8f, .1f), new Vector3(.22f, .035f, .16f), 6);
         }
 
         /// <summary>红叶（伊吕波红叶）：主干微弯分三枝，伞形树冠由许多小叶团组成。</summary>
@@ -150,17 +137,20 @@ namespace HakoOnna.Art.EditorTools
         }
 
         /// <summary>蹲踞：低的手水钵 + 前石、手烛石、汤桶石，后面一根竹筧往钵里滴水，钵上横一把柄杓。front 朝向人站的一边。</summary>
-        static void Tsukubai(MeshBatch mb, Vector3 b, float yaw)
+        static void Tsukubai(MeshBatch mb, Vector3 b, float yaw, MeshBatch rocks)
         {
             var up = Vector3.up;
             var q = Quaternion.Euler(0, yaw, 0);
             Vector3 L(float x, float y, float z) => b + q * new Vector3(x, y, z);
-            mb.Cyl(D.Gravel, L(0, 0, 0), .9f, .9f, .012f, 16);           // 海：铺卵石的低处
-            mb.Cyl(D.Stone, L(0, 0, 0), .3f, .27f, .38f, 12);              // 手水钵
-            mb.Cyl(D.Water, L(0, .381f, 0), .17f, .17f, .002f, 12);
-            mb.Box(D.Stone, L(0, .06f, .64f), new Vector3(.56f, .12f, .32f), q * Quaternion.Euler(0, 6, 0)); // 前石
-            mb.Sphere(D.Stone, L(-.62f, .1f, .12f), new Vector3(.24f, .2f, .2f), 7);   // 手烛石
-            mb.Sphere(D.Stone, L(.6f, .08f, .1f), new Vector3(.22f, .16f, .2f), 7);    // 汤桶石
+            mb.Cyl(D.Gravel, L(0, 0, 0), .9f, .9f, .012f, 30);           // 海：铺卵石的低处
+            // 第五轮：手水钵换成车削的石钵，前石换成不规则的扁石（GardenStone.cs）
+            TsukubaiBasin(mb, L(0, 0, 0));
+            FlatStone(mb, L(0, 0, .66f), .3f, yaw + 6f, 3.7f, .11f, 1.35f);
+            // 第五轮：手烛石、汤桶石换成 CC0 的苔石
+            if (!RockModel(rocks, L(-.62f, 0f, .12f), new Vector3(.24f, .26f, .2f), yaw + 40f, 4, true))
+                mb.Sphere(D.Stone, L(-.62f, .1f, .12f), new Vector3(.24f, .2f, .2f), 7);   // 手烛石
+            if (!RockModel(rocks, L(.6f, 0f, .1f), new Vector3(.22f, .2f, .2f), yaw + 200f, 1, true))
+                mb.Sphere(D.Stone, L(.6f, .08f, .1f), new Vector3(.22f, .16f, .2f), 7);    // 汤桶石
             // 筧
             var spout = L(.04f, .62f, -.62f);
             mb.Cyl(D.Bamboo, L(.04f, 0, -.62f), .035f, .035f, .66f, 8);

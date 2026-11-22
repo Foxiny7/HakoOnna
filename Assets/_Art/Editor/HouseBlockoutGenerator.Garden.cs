@@ -54,6 +54,12 @@ namespace HakoOnna.Art.EditorTools
             }
 
             var mb = new MeshBatch();
+            // 第五轮：松、红叶、灌木、石头换成 Flora.cs 的枝干 + 枝叶面片 + CC0 石头模型。原来用球体拼的那些画进 scrap（不生成），
+            // 只为了随机数序列和以前一样（院子里别的东西位置不变）；新的用自己的随机数。
+            var scrap = new MeshBatch();
+            var flora = new MeshBatch();
+            var frng = new System.Random(5311);
+            FloraLoad();
 
             // 竹篱笆分区（碰撞体在 Structure/GardenFences）
             var fences = ArtKit.Empty(structure, "GardenFences", Vector3.zero);
@@ -83,7 +89,9 @@ namespace HakoOnna.Art.EditorTools
                     {
                         var p = Vector2.Lerp(path[i], path[i + 1], (k + .5f) / n) + new Vector2(Rr(-.07f, .07f), Rr(-.07f, .07f));
                         float r = Rr(.21f, .29f);
-                        mb.Cyl(D.Stone, new Vector3(p.x, -.03f, p.y), r, r * .9f, .08f, 9, true, Quaternion.Euler(0, Rr(0, 360), 0));
+                        // 第五轮：九边形的圆饼换成轮廓不规则、边上带斜面的扁石
+                        float yw = Rr(0, 360);
+                        FlatStone(mb, new Vector3(p.x, 0f, p.y), r * 1.08f, yw, p.x * 7.3f + p.y * 3.1f);
                     }
                 }
             }
@@ -97,21 +105,17 @@ namespace HakoOnna.Art.EditorTools
 
             // 石灯笼（春日型）
             var lb = W(19.9f, -3.2f);
-            mb.Cyl(D.Stone, lb, .3f, .28f, .12f, 6);
-            mb.Cyl(D.Stone, lb + up * .12f, .1f, .085f, .75f, 10);
-            mb.Cyl(D.Stone, lb + up * .87f, .2f, .26f, .1f, 6);
-            mb.Box(D.Stone, lb + up * 1.11f, new Vector3(.3f, .28f, .3f));
-            mb.Box(D.Black, lb + up * 1.12f, new Vector3(.15f, .15f, .31f));
-            mb.Box(D.Black, lb + up * 1.12f, new Vector3(.31f, .15f, .15f));
-            mb.Cyl(D.Stone, lb + up * 1.25f, .42f, .06f, .24f, 6);
-            mb.Sphere(D.Stone, lb + up * 1.53f, new Vector3(.08f, .1f, .08f), 8);
-            mb.Sphere(D.Leaf, lb + new Vector3(.12f, 1.29f, .1f), new Vector3(.16f, .04f, .12f), 6);
+            KasugaLantern(mb, lb, 12f); // 第五轮：GardenStone.cs
+            ShotDir("r5_kasuga", lb + up * .95f, new Vector3(.5f, 0f, -1f), 2.6f, .2f);
             Blocker("StoneLantern", lb, 0, new Vector3(.62f, 1.6f, .62f));
 
             // 枯山水的石组
+            int rockPick = 0;
             void Rock(Vector3 c, Vector3 radii, bool block)
             {
-                mb.Sphere(D.Stone, c + up * (radii.y * .35f), radii, 7, Quaternion.Euler(Rr(-8, 8), Rr(0, 360), Rr(-8, 8)));
+                float tx = Rr(-8, 8), yawR = Rr(0, 360), tz = Rr(-8, 8);
+                if (!RockModel(flora, new Vector3(c.x, 0, c.z), radii, yawR, rockPick++, false))
+                    mb.Sphere(D.Stone, c + up * (radii.y * .35f), radii, 7, Quaternion.Euler(tx, yawR, tz));
                 if (block) Blocker("Rock", new Vector3(c.x, 0, c.z), 0, new Vector3(radii.x * 1.6f, radii.y * 1.3f, radii.z * 1.6f));
             }
             Rock(W(15.6f, -5.6f), new Vector3(.62f, .55f, .48f), true);
@@ -120,6 +124,7 @@ namespace HakoOnna.Art.EditorTools
             Rock(W(16.2f, -5.0f), new Vector3(.2f, .14f, .18f), false);
 
             // 松
+            int pineShot = 0;
             void Pine(Vector3 b, float h, float yaw)
             {
                 var q = Quaternion.Euler(0, yaw, 0);
@@ -129,37 +134,43 @@ namespace HakoOnna.Art.EditorTools
                 for (int i = 0; i < 3; i++)
                 {
                     var d = (q * dirs[i]).normalized;
-                    mb.Cyl(D.Bark, p, r, r * .78f, seg + .06f, 9, false, Quaternion.FromToRotation(up, d));
+                    scrap.Cyl(D.Bark, p, r, r * .78f, seg + .06f, 9, false, Quaternion.FromToRotation(up, d));
                     p += d * seg;
                     // 每段向外伸一根枝，末端是一团修剪成云朵状的松叶
                     var bd = q * Quaternion.Euler(0, i * 137f + 40f, 0) * Vector3.right;
                     float bl = Rr(.9f, 1.5f) * (1f - i * .2f);
                     var bstart = p - d * seg * .3f;
                     var bdir = (bd + up * .25f).normalized;
-                    mb.Cyl(D.Bark, bstart, r * .45f, r * .25f, bl, 7, false, Quaternion.FromToRotation(up, bdir));
+                    scrap.Cyl(D.Bark, bstart, r * .45f, r * .25f, bl, 7, false, Quaternion.FromToRotation(up, bdir));
                     var pad = bstart + bdir * bl;
                     float pr = Rr(.7f, .95f) * (1f - i * .18f);
-                    mb.Sphere(D.Pine, pad, new Vector3(pr, pr * .34f, pr * .85f), 9);
-                    mb.Sphere(D.Pine, pad + new Vector3(pr * .4f, .1f, pr * .2f), new Vector3(pr * .55f, pr * .25f, pr * .5f), 8);
+                    scrap.Sphere(D.Pine, pad, new Vector3(pr, pr * .34f, pr * .85f), 9);
+                    scrap.Sphere(D.Pine, pad + new Vector3(pr * .4f, .1f, pr * .2f), new Vector3(pr * .55f, pr * .25f, pr * .5f), 8);
                     r *= .78f;
                 }
-                mb.Sphere(D.Pine, p + up * .1f, new Vector3(.75f, .32f, .7f), 9);
-                mb.Sphere(D.Pine, p + new Vector3(.3f, .3f, -.2f), new Vector3(.45f, .24f, .4f), 8);
+                scrap.Sphere(D.Pine, p + up * .1f, new Vector3(.75f, .32f, .7f), 9);
+                scrap.Sphere(D.Pine, p + new Vector3(.3f, .3f, -.2f), new Vector3(.45f, .24f, .4f), 8);
                 Blocker("PineTrunk", b, 0, new Vector3(.42f, 2.2f, .42f));
+                FloraPine(flora, frng, b, h, yaw);
+                ShotDir("r5_pine_" + (pineShot++), b + up * (h * .55f), q * new Vector3(.6f, 0f, -1f), h * 1.5f, -h * .25f);
             }
             Pine(new Vector3(8.84f, 0, -8.6f), 4.4f, 20f); // 门前：大门东侧的松，枝伸向大门
             Pine(W(30.2f, 3.0f), 5.0f, 200f);
 
             // 灌木（只是视觉，不挡路）
+            int shrubShot = 0;
             void Shrub(float x, float z, float s)
             {
                 int n = 3 + (int)Rr(0, 2.99f);
                 for (int i = 0; i < n; i++)
                 {
                     float rr = Rr(.35f, .55f) * s;
-                    mb.Sphere(D.Shrub, new Vector3(x + Rr(-.35f, .35f) * s, rr * .55f, z + Rr(-.3f, .3f) * s), new Vector3(rr, rr * .8f, rr), 8,
+                    scrap.Sphere(D.Shrub, new Vector3(x + Rr(-.35f, .35f) * s, rr * .55f, z + Rr(-.3f, .3f) * s), new Vector3(rr, rr * .8f, rr), 8,
                         Quaternion.Euler(0, Rr(0, 360), 0));
                 }
+                FloraShrub(flora, frng, x, z, s);
+                if (shrubShot == 0 || shrubShot == 14) ShotDir("r5_shrub_" + shrubShot, new Vector3(x, .45f, z), new Vector3(.3f, 0f, -1f), 2.6f, .5f);
+                shrubShot++;
             }
             foreach (var p in new[]
                      {
@@ -178,15 +189,8 @@ namespace HakoOnna.Art.EditorTools
 
             // 水井
             var wb = W(.5f, 19.5f);
-            mb.Cyl(D.Stone, wb, .6f, .58f, .72f, 14);
-            mb.Cyl(D.Water, wb + up * .72f, .47f, .47f, .004f, 14);
-            mb.Box(D.TrimMid, wb + new Vector3(-.22f, .745f, 0), new Vector3(.58f, .04f, 1.12f));
-            foreach (float sx in new[] { -1f, 1f })
-                mb.Box(D.Post, wb + new Vector3(sx * .68f, .95f, 0), new Vector3(.08f, 1.9f, .08f));
-            mb.Box(D.Post, wb + new Vector3(0, 1.86f, 0), new Vector3(1.5f, .08f, .08f));
-            mb.Cyl(D.TrimMid, wb + new Vector3(0, 1.7f, -.035f), .1f, .1f, .07f, 12, true, Quaternion.Euler(90, 0, 0));
-            mb.Box(D.Straw, wb + new Vector3(.1f, 1.25f, 0), new Vector3(.015f, .9f, .015f));
-            mb.Cyl(D.TrimMid, wb + new Vector3(-.25f, .765f, .25f), .13f, .15f, .22f, 10);
+            WellStone(mb, wb); // 第五轮：GardenStone.cs
+            ShotDir("r5_well", wb + up * .9f, new Vector3(-.6f, 0f, -1f), 3.2f, .5f);
             Blocker("Well", wb, 0, new Vector3(1.5f, .8f, 1.25f));
 
             // 晾衣竿 + 一块白布
@@ -204,31 +208,39 @@ namespace HakoOnna.Art.EditorTools
             // 枯树
             var tb = W(4.6f, 28.6f);
             var tq = Quaternion.Euler(4, 0, -5);
-            mb.Cyl(D.Bark, tb, .18f, .1f, 2.7f, 9, false, tq);
+            scrap.Cyl(D.Bark, tb, .18f, .1f, 2.7f, 9, false, tq);
+            FloraDeadTree(flora, frng, tb, 2.9f);
+            ShotDir("r5_deadtree", tb + up * 1.7f, new Vector3(1f, 0f, -.4f), 5f, -.4f);
             for (int i = 0; i < 6; i++)
             {
                 var start = tb + tq * up * Rr(1.3f, 2.6f);
                 var dir = (Quaternion.Euler(0, i * 61f + Rr(-15, 15), 0) * Vector3.right + up * Rr(.4f, 1.1f)).normalized;
                 float len = Rr(.9f, 1.6f);
-                mb.Cyl(D.Bark, start, .05f, .015f, len, 6, false, Quaternion.FromToRotation(up, dir));
+                scrap.Cyl(D.Bark, start, .05f, .015f, len, 6, false, Quaternion.FromToRotation(up, dir));
                 var mid = start + dir * len * .6f;
                 var dir2 = (dir + Quaternion.Euler(0, 70, 0) * dir * .8f + up * .3f).normalized;
-                mb.Cyl(D.Bark, mid, .025f, .008f, len * .5f, 5, false, Quaternion.FromToRotation(up, dir2));
+                scrap.Cyl(D.Bark, mid, .025f, .008f, len * .5f, 5, false, Quaternion.FromToRotation(up, dir2));
             }
             Blocker("DeadTree", tb, 0, new Vector3(.4f, 2f, .4f));
 
             // ---- 主庭园：池塘 + 雪见灯笼 + 红叶 + 蹲踞 + 苔藓 ----
-            Pond(mb, new Vector3(15.0f, 0, -6.7f), 2.8f, 2.0f, rng);
-            YukimiLantern(mb, new Vector3(18.95f, 0, -5.0f), 15f);
+            Pond(mb, new Vector3(15.0f, 0, -6.7f), 2.8f, 2.0f, rng, flora);
+            ShotDir("r5_pond", new Vector3(15.0f, .3f, -6.7f), new Vector3(.5f, 0f, 1f), 4.6f, 1.5f);
+            YukimiLanternStone(mb, new Vector3(18.95f, 0, -5.0f), 15f); // 第五轮：GardenStone.cs
+            ShotDir("r5_yukimi", new Vector3(18.95f, .55f, -5.0f), new Vector3(-.4f, 0f, 1f), 2.4f, .4f);
             Blocker("YukimiLantern", new Vector3(18.95f, 0, -5.0f), 0, new Vector3(.62f, .95f, .62f));
+            int mapleShot = 0;
             var maples = new[] { new Vector4(12.9f, -3.3f, 4.2f, 30f), new Vector4(34.6f, -7.4f, 4.8f, 200f),
                                  new Vector4(43.6f, 12.4f, 4.4f, 110f), new Vector4(-5.2f, -4.4f, 3.8f, 300f) }; // 最后一棵在门前西侧
             foreach (var m in maples)
             {
-                Maple(mb, new Vector3(m.x, 0, m.y), m.z, m.w, rng);
+                Maple(scrap, new Vector3(m.x, 0, m.y), m.z, m.w, rng);
+                FloraMaple(flora, frng, new Vector3(m.x, 0, m.y), m.z, m.w);
+                ShotDir("r5_maple_" + (mapleShot++), new Vector3(m.x, m.z * .55f, m.y), Quaternion.Euler(0, m.w, 0) * new Vector3(.4f, 0f, -1f), m.z * 1.5f, -m.z * .25f);
                 Blocker("MapleTrunk", new Vector3(m.x, 0, m.y), 0, new Vector3(.3f, 2f, .3f));
             }
-            Tsukubai(mb, new Vector3(23.4f, 0, -1.75f), 0f);
+            Tsukubai(mb, new Vector3(23.4f, 0, -1.75f), 0f, flora);
+            ShotDir("r5_tsukubai", new Vector3(23.4f, .3f, -1.75f), new Vector3(.4f, 0f, -1f), 2.6f, 1.0f);
             Blocker("Tsukubai", new Vector3(23.4f, 0, -1.75f), 0, new Vector3(1.6f, .7f, 1.6f));
             foreach (var m in new[]
                      {
@@ -246,7 +258,9 @@ namespace HakoOnna.Art.EditorTools
             // ---- 后院：靠裏階段西墙的薪棚 ----
             FirewoodShed(mb, 3.64f * PlanScale, 24.6f, 3.0f, rng);
 
+            ShotDir("r5_karesansui", W(16.6f, -5.4f) + up * .3f, new Vector3(-.5f, 0f, -1f), 4.2f, 1.3f);
             mb.Build(parent, "GardenDetails");
+            flora.Build(parent, "GardenFlora");
             // 第四轮：墙根、院墙、竹篱笆脚下的杂草（Weeds.cs；随机数单独一条）
             GardenWeeds(parent, new[]
             {

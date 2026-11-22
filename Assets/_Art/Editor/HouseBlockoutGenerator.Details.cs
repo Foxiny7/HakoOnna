@@ -17,7 +17,7 @@ namespace HakoOnna.Art.EditorTools
         const string DetailMeshDir = "Assets/_Art/Generated";
         const string DetailMeshPrefix = "HouseDetail_Meshes_";
         // GitHub 拒收单个超过 100 MB 的文件（50 MB 以上会警告）：网格按生成顺序装进几个文件，每个估算不超过 45 MB
-        const long DetailMeshBudget = 45L * 1024 * 1024;
+        const long DetailMeshBudget = 42L * 1024 * 1024;
         static DetailMats D;
         static Palette P;
         static List<Room> DRooms;

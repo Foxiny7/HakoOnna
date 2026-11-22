@@ -91,6 +91,9 @@ namespace HakoOnna.Art.EditorTools
                     imp.alphaSource = TextureImporterAlphaSource.FromInput;
                     imp.alphaIsTransparency = true;
                     imp.wrapMode = TextureWrapMode.Repeat;
+                    // 第五轮：枝叶面片远了以后别被 mip 吃瘦（只对新导入的贴图生效）
+                    imp.mipMapsPreserveCoverage = true;
+                    imp.alphaTestReferenceValue = .4f;
                     break;
                 case Kind.Painting:
                     imp.textureType = TextureImporterType.Default;

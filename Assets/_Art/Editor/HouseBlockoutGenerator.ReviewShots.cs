@@ -27,7 +27,7 @@ namespace HakoOnna.Art.EditorTools
         /// <summary>从 dir 那一侧看 look：机位夹在屋子里（离墙 0.2 m、天花下面）；同名只记一次。</summary>
         static void ShotDir(string name, Vector3 look, Vector3 dir, float dist, float up)
         {
-            name = "r4_" + name;
+            name = name.StartsWith("r5") ? name : "r4_" + name; // 第五轮的机位自带前缀
             foreach (var s in RuinShots)
                 if (s.name == name) return;
             dir.y = 0f;

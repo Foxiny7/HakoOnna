@@ -181,12 +181,12 @@ namespace HakoOnna.Art.EditorTools
         /// <summary>茶盆 + 急须 + 茶杯（y 为桌面高度）。</summary>
         static void TeaSet(Kit k, float x, float y, float z, int cups)
         {
-            k.Bb(D.Lacquer, x, y, z, .38f, .018f, .26f);
-            k.C(D.CeramicBrown, x - .09f, y + .018f, z, .062f, .055f, .1f, 14);
-            k.C(D.CeramicBrown, x - .09f, y + .118f, z, .035f, .02f, .02f, 10);
-            k.Cr(D.CeramicBrown, new Vector3(x - .035f, y + .07f, z), .012f, .007f, .07f, Quaternion.Euler(0, 0, -60f), 6);
+            // 第五轮：漆盘倒角，急須和茶杯车削（原来是圆柱）
+            var mb = k.mb;
+            BevelBox(mb, D.Lacquer, new Vector3(x, y + .009f, z), new Vector3(.38f, .018f, .26f), .004f);
+            Kyusu(mb, new Vector3(x - .09f, y + .018f, z), 35f);
             for (int i = 0; i < cups; i++)
-                k.C(D.CeramicWhite, x + .05f + (i % 2) * .08f, y + .018f, z - .06f + (i / 2) * .1f, .028f, .034f, .062f, 12);
+                Yunomi(mb, new Vector3(x + .05f + (i % 2) * .08f, y + .018f, z - .06f + (i / 2) * .1f), D.CeramicWhite);
         }
 
         /// <summary>
@@ -317,30 +317,43 @@ namespace HakoOnna.Art.EditorTools
             set.blocks.Add((Vector3.zero, new Vector3(BW, LegH + BT, BD)));
             set.draw = (k, r) =>
             {
+                // 第五轮：梔子脚、倒角的厚盘、漆线（贴花）、扁圆的棋子、木钵（原来是圆柱 + 方块 + 小球）。随机数的次数和顺序不变。
+                PropDecals();
+                var mb = k.mb;
                 foreach (float sx in new[] { -1f, 1f })
                     foreach (float sz in new[] { -1f, 1f })
-                        k.C(D.TrimMid, sx * (BW / 2 - .07f), 0, sz * (BD / 2 - .07f), .035f, .045f, LegH, 10);
-                k.Bb(D.TrimLight, 0, LegH, 0, BW, BT, BD);
+                        GobanLeg(mb, new Vector3(sx * (BW / 2 - .07f), 0f, sz * (BD / 2 - .07f)), LegH);
+                BevelBox(mb, D.TrimLight, new Vector3(0f, LegH + BT / 2, 0f), new Vector3(BW, BT, BD), .005f);
                 float top = LegH + BT, gx = BW * .9f / 18f, gz = BD * .9f / 18f;
-                for (int i = 0; i < 19; i++)
-                {
-                    k.B(D.Ink, (i - 9) * gx, top + .0006f, 0, .0022f, .0012f, 18 * gz);
-                    k.B(D.Ink, 0, top + .0006f, (i - 9) * gz, 18 * gx, .0012f, .0022f);
-                }
+                if (propGoban != null)
+                    mb.Poly(propGoban, new[] { new Vector3(-BW / 2, top + .0008f, -BD / 2), new Vector3(BW / 2, top + .0008f, -BD / 2), new Vector3(BW / 2, top + .0008f, BD / 2), new Vector3(-BW / 2, top + .0008f, BD / 2) },
+                        new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) }, Vector3.up);
+                else
+                    for (int i = 0; i < 19; i++)
+                    {
+                        k.B(D.Ink, (i - 9) * gx, top + .0006f, 0, .0022f, .0012f, 18 * gz);
+                        k.B(D.Ink, 0, top + .0006f, (i - 9) * gz, 18 * gx, .0012f, .0022f);
+                    }
                 for (int i = 0; i < 16; i++)
                 {
                     int ix = r.Next(3, 16), iz = r.Next(3, 16);
-                    k.S(i % 2 == 0 ? D.Black : D.CeramicWhite, (ix - 9) * gx, top + .004f, (iz - 9) * gz, .011f, .0045f, .011f, 8);
+                    GoStone(mb, new Vector3((ix - 9) * gx, top + .001f, (iz - 9) * gz), i % 2 == 0);
                 }
+                KitShot(k, "r5i_goban", new Vector3(0f, top, 0f), 1.2f, .75f);
                 for (int sg = -1; sg <= 1; sg += 2)
                 {
                     float bx = sg * .33f, bz = sg * .1f;
-                    var stone = sg > 0 ? D.Black : D.CeramicWhite;
-                    k.C(D.TrimMid, bx, 0, bz, .055f, .066f, .075f, 14);
-                    k.S(stone, bx, .074f, bz, .055f, .014f, .055f, 10);
-                    k.C(D.TrimMid, bx, 0, bz + sg * .17f, .062f, .066f, .028f, 14); // 翻过来的盖子
+                    GoBowl(mb, new Vector3(bx, 0f, bz));
+                    // 钵里的子堆到七分满
+                    mb.Sphere(sg > 0 ? D.Black : D.CeramicWhite, new Vector3(bx, .04f, bz), new Vector3(.05f, .016f, .05f), 10);
+                    for (int j = 0; j < 5; j++)
+                        GoStone(mb, new Vector3(bx + Mathf.Cos(j * 2.4f) * .026f, .052f + j % 2 * .003f, bz + Mathf.Sin(j * 2.4f) * .026f), sg > 0);
+                    GoLid(mb, new Vector3(bx, 0f, bz + sg * .17f)); // 翻过来的盖子
                     for (int j = 0; j < 3; j++)
-                        k.S(sg > 0 ? D.CeramicWhite : D.Black, bx + Rf(r, -.025f, .025f), .03f, bz + sg * .17f + Rf(r, -.025f, .025f), .011f, .0045f, .011f, 8);
+                    {
+                        float sx2 = Rf(r, -.025f, .025f), sz2 = Rf(r, -.025f, .025f);
+                        GoStone(mb, new Vector3(bx + sx2, .012f, bz + sg * .17f + sz2), sg <= 0);
+                    }
                     Zabuton(k, Rf(r, -.03f, .03f), 0, sg * (BD / 2 + .1f + .275f), Rf(r, -5f, 5f), D.ClothPurple);
                 }
             };
@@ -398,24 +411,24 @@ namespace HakoOnna.Art.EditorTools
                 Material[] crayon = { D.PlasticRed, D.ClothIndigo, D.Leaf, D.Gold };
                 for (int i = 0; i < crayon.Length; i++)
                     k.Br(crayon[i], -.14f + i * .03f, H + .008f, .14f, .07f, .01f, .01f, 0, Rf(r, -30f, 30f), 0);
-                k.Br(D.Paper, -.05f, H + .03f, .1f, .08f, .002f, .05f, 0, 30f, 25f);
-                k.Br(D.Paper, -.05f, H + .03f, .1f, .08f, .002f, .05f, 0, 30f, -25f);
+                PaperCrane(k.mb, new Vector3(-.05f, H + .003f, .1f), 30f, 1f); // 第五轮：折出来的纸鹤（原来是两块薄板）
                 Zabuton(k, 0, 0, -.62f, Rf(r, -8f, 8f), D.ClothRed);
                 Zabuton(k, .6f, 0, .1f, 90f + Rf(r, -8f, 8f), D.ClothIndigo);
                 // 皮球、不倒翁
-                k.S(D.PlasticRed, -.62f, .09f, .35f, .09f, .09f, .09f, 12);
-                k.S(D.ClothRed, -.55f, .1f, -.25f, .1f, .105f, .095f, 12);
-                k.S(D.ClothWhite, -.55f, .125f, -.18f, .055f, .05f, .03f, 10);
-                foreach (float ex in new[] { -.02f, .02f }) k.S(D.Black, -.55f + ex, .13f, -.155f, .008f, .008f, .005f, 6);
+                // 第五轮：手鞠、不倒翁、倒角积木、木陀螺（原来是球、方块、圆柱）。随机数的次数和顺序不变。
+                Temari(k.mb, new Vector3(-.62f, .09f, .35f), .09f);
+                Daruma(k.mb, new Vector3(-.55f, 0f, -.25f), 1.25f, 15f);
                 // 积木
                 Material[] block = { D.TrimLight, D.PlasticRed, D.ClothIndigo, D.CeramicWhite };
                 for (int i = 0; i < 3; i++)
-                    k.Br(block[i], .25f + Rf(r, -.01f, .01f), .04f + i * .08f, .5f + Rf(r, -.01f, .01f), .08f, .08f, .08f, 0, Rf(r, -20f, 20f), 0);
-                k.Br(block[3], .4f, .04f, .42f, .08f, .08f, .08f, 0, Rf(r, 0f, 90f), 0);
+                {
+                    float bx = .25f + Rf(r, -.01f, .01f), bz = .5f + Rf(r, -.01f, .01f), byaw = Rf(r, -20f, 20f);
+                    BevelBox(k.mb, block[i], new Vector3(bx, .04f + i * .08f, bz), Vector3.one * .08f, .006f, Quaternion.Euler(0f, byaw, 0f));
+                }
+                BevelBox(k.mb, block[3], new Vector3(.4f, .04f, .42f), Vector3.one * .08f, .006f, Quaternion.Euler(0f, Rf(r, 0f, 90f), 0f));
                 // 陀螺
-                k.C(D.PlasticRed, -.2f, 0, .55f, .006f, .05f, .05f, 12);
-                k.C(D.TrimMid, -.2f, .05f, .55f, .05f, .02f, .015f, 12);
-                k.C(D.TrimMid, -.2f, .065f, .55f, .008f, .008f, .04f, 6);
+                Koma(k.mb, new Vector3(-.2f, .016f, .55f), 40f, 22f);
+                KitShot(k, "r5i_kidsplay", new Vector3(-.3f, .1f, .1f), 1.5f, .8f);
                 k.Pop();
             };
             set.blocks.Add((new Vector3(-.075f, 0, .13f), new Vector3(.5f, H, .5f)));
