@@ -407,8 +407,15 @@ def grab(spec, opt=None):
     return spec
 
 
-# Upside-down faces: her shoulders are above the face on screen, so arms reaching for the middle of the screen
-# sweep across her mouth. They grab at the top corners instead, staying on the shoulder side of her chin.
-GRAB_OPTS = {"YofukuTansu": {"spread": 0.12, "ahead": 0.08, "drop": -0.09, "elbow_up": 0.4, "elbow_back": 0.0},
+# Upside-down faces (the wardrobe, the drawer): her shoulders are above the face on screen, and whatever her arms
+# wear hangs from them down across it.
+# 2026-11-22, the user: the mouth has to show, and the hands of the wardrobe further apart. What hid the mouth in
+# both was not the pose: grab_targets() sent her left hand to the camera's right, which is right for an upright
+# body and crosses the arms in front of the mouth of one that hangs upside down (and left them 11 cm short of the
+# explorer). Fixed there; the drawer needed nothing else.
+# The wardrobe also brings the elbows down beside her head: the sleeves then hang beside her forehead instead of
+# from arms held over her chin, and the hands come in from both edges of the screen. Spread 0.14 against the 0.11
+# of the upright grabs; wider than that and the hands leave the screen.
+GRAB_OPTS = {"YofukuTansu": {"spread": 0.14, "ahead": 0.15, "drop": 0.02, "elbow_up": -1.0, "elbow_back": 0.6},
              "Tansu": {"spread": 0.12, "ahead": 0.08, "drop": -0.09, "elbow_up": 0.4, "elbow_back": 0.0}}
 LUNGES = {k: (lambda f, o: (lambda c: grab(f(c), o)))(f, GRAB_OPTS.get(k)) for k, f in BRACE_LUNGES.items()}

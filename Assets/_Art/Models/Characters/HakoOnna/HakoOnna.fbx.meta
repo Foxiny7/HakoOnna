@@ -7,6 +7,11 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: HakoOnna_Mouth
+    second: {fileID: 2100000, guid: 19c0fe8597cab404dadfa7d112b0a821, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: tripo_mat_48543c68
     second: {fileID: 2100000, guid: a883c8a063159474abbc32834eca5ecf, type: 2}
   materials:
@@ -41,7 +46,7 @@ ModelImporter:
       takeName: Armature|Lunge_ChaTansu
       internalID: 1451340180660933264
       firstFrame: 0
-      lastFrame: 1
+      lastFrame: 24
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -70,7 +75,7 @@ ModelImporter:
       takeName: Armature|Lunge_GetaBako
       internalID: 8013982930253915318
       firstFrame: 0
-      lastFrame: 1
+      lastFrame: 24
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -99,7 +104,7 @@ ModelImporter:
       takeName: Armature|Lunge_Komebitsu
       internalID: -8216620364086913529
       firstFrame: 0
-      lastFrame: 1
+      lastFrame: 24
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -128,7 +133,7 @@ ModelImporter:
       takeName: Armature|Lunge_Nagamochi
       internalID: -3408414253773126433
       firstFrame: 0
-      lastFrame: 1
+      lastFrame: 24
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -157,7 +162,7 @@ ModelImporter:
       takeName: Armature|Lunge_Oshiire
       internalID: 448152512829953081
       firstFrame: 0
-      lastFrame: 1
+      lastFrame: 24
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -186,7 +191,7 @@ ModelImporter:
       takeName: Armature|Lunge_Tansu
       internalID: -7199327306973944277
       firstFrame: 0
-      lastFrame: 1
+      lastFrame: 24
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -215,7 +220,7 @@ ModelImporter:
       takeName: Armature|Lunge_Tsuzura
       internalID: 2089179135785102854
       firstFrame: 0
-      lastFrame: 1
+      lastFrame: 24
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -244,7 +249,7 @@ ModelImporter:
       takeName: Armature|Lunge_YofukuTansu
       internalID: -2827498936560770099
       firstFrame: 0
-      lastFrame: 1
+      lastFrame: 24
       wrapMode: 0
       orientationOffsetY: 0
       level: 0

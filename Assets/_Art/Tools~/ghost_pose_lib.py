@@ -1,12 +1,17 @@
 """HakoOnna ghost poses in Blender: 8 hiding poses (art bible 6.2 / 6.5) and 8 jump-scare lunges (4.3).
 
 blender -b --factory-startup --python ghost_pose_lib.py -- <out_dir> <kinds|all> [--blend f.blend] [--fbx f.fbx]
-        [--eevee] [--no-lunge]
+        [--eevee] [--no-lunge] [--follow]
 <out_dir> gets report.json and, per container, <Kind>_player/front/side.png (hiding pose) and
 <Kind>_lunge_player/climax/side.png; ghost_pose_sheets.py turns them into two contact sheets. Use absolute
 paths: Blender does not write renders to relative ones.
-Actions: Pose_<Kind> (hiding pose = first frame of the lunge) and Lunge_<Kind> (end of the lunge), keyed on
-frames 1-2 of one armature; the FBX carries both as separate takes.
+Actions on one armature, one FBX take each: Pose_<Kind> (the hiding pose, frames 1-2) and Lunge_<Kind> (the lunge
+from the hiding pose to the grab, ghost_motion.FRAMES + 1 keys; ghost_motion.py). The face is ghost_face.py.
+<Kind>_motion_0..4.png are five moments of the lunge from the player's camera.
+
+Hair, sleeves and hem are bone chains added to the Tripo rig and hung under gravity for every pose (ghost_soft.py;
+"hair" / "cloth" in a pose spec tune it, --follow leaves them rigid for an A/B look). The report also counts
+stretched edges per pose ("stretch"): a vertex left behind by its neighbours shows as a spike.
 
 Poses are written as data in ghost_pose_specs.py, in the frame of each reference box (Blender: X right, Y into the
 container, Z up; the Tansu pose is in the Drawer_0 frame). Each bone gets a world-space orientation:
@@ -19,6 +24,8 @@ container, Z up; the Tansu pose is in the Drawer_0 frame). Each bone gets a worl
   Left_Foot ... {"dir", "sole"}               toe direction, direction out of the sole
   hand_L/hand_R {"curl": (prox, mid, tip), "spread", "thumb": (a, b, c)}   finger curls in degrees
   Left_Shoulder ... {"rot": [(axis, deg)]}    extra world-axis rotation on top of the parent
+  Jaw           {"local": [(axis, deg)]}      rotation in the parent's frame; ((1, 0, 0), 40) opens the mouth wide
+  MouthCorner_L ... {"move": (x, y, z)}       shift in the parent's frame; ghost_face.expression(k) = the scream
 """
 import json
 import math
@@ -31,6 +38,9 @@ from mathutils import Matrix, Quaternion, Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import ghost_face as FACE
+import ghost_motion as MOTION
+import ghost_soft as SOFT
 
 ART = os.path.dirname(HERE)   # Assets/_Art
 GHOST_FBX = os.path.join(ART, "Models", "External", "Tripo", "GhostGirl",
@@ -174,6 +184,13 @@ def solve(rig, spec, ctx):
                 for axis, deg in s["rot"]:
                     q = Quaternion(vec(axis).normalized(), math.radians(deg)) @ q
                 G[b] = q @ G[p]
+            elif "local" in s:   # turned in its parent's frame (axes as in the rest pose): the jaw
+                q = Quaternion()
+                for axis, deg in s["local"]:
+                    q = q @ Quaternion(vec(axis).normalized(), math.radians(deg))
+                G[b] = G[p] @ q
+            elif "move" in s:    # shifted in its parent's frame, not turned: mouth corners, lip, eyelids
+                P[b] = P[b] + G[p] @ vec(s["move"])
             elif b == "Head":
                 face = s["face"]
                 if face == "camera":
@@ -216,77 +233,10 @@ def solve(rig, spec, ctx):
             G[lower] = Quaternion(axis, 0.5 * tw) @ G[lower]
     if "Neck_Twist_A" in G:
         G["Neck_Twist_A"] = G["Neck"].slerp(G["Head"], 0.5)
-    pose_hair(rig, spec, ctx, G, P)
+    FACE.follow_lip(rig, spec, G, P)
+    if ctx.get("soft", True):   # hair, sleeves and hem hang from the finished body pose
+        SOFT.settle(rig, spec, ctx, G, P)
     return G, P
-
-
-HEAD_CENTRE = Vector((-0.011, -0.012, 0.06))   # scalp centre relative to the Head bone, rest
-
-
-def seg_closest(p, a, b):
-    ab = b - a
-    t = 0.0 if ab.length_squared < 1e-12 else max(0.0, min(1.0, (p - a).dot(ab) / ab.length_squared))
-    return a + ab * t
-
-
-def capsules(G, P):
-    caps = [(P["Hips"], P["Neck"], 0.085), (P["Neck"], P["Head"], 0.045),
-            (P["Left_UpperLeg"], P["Right_UpperLeg"], 0.08)]
-    hc = P["Head"] + G["Head"] @ HEAD_CENTRE
-    caps.append((hc, hc, 0.075))
-    for s in ("Left", "Right"):
-        caps += [(P[s + "_UpperArm"], P[s + "_LowerArm"], 0.04), (P[s + "_LowerArm"], P[s + "_Hand"], 0.035),
-                 (P[s + "_UpperLeg"], P[s + "_LowerLeg"], 0.06), (P[s + "_LowerLeg"], P[s + "_Foot"], 0.045)]
-    return caps, hc
-
-
-def pose_hair(rig, spec, ctx, G, P):
-    """Hang the hair chains: "gravity" (down, pushed outside the head/body/floor), "spread" (fanned out on the
-    floor around the head) or "follow" (rigid with the head). Per-chain directions in hair["chains"] win."""
-    hs = spec.get("hair", {"mode": "gravity"})
-    mode = hs.get("mode", "gravity")
-    if mode == "follow" or "Hair_BC_1" not in rig.head0:
-        return
-    floor = ctx["zone"][0].z + hs.get("floor", 0.09)   # the hair shell is a few cm thick around its bones
-    g = vec(hs.get("g", (0, 0, -1))).normalized()
-    caps, hc = capsules(G, P)
-    for name, ang, za, zt, n in HAIR:
-        over = hs.get("chains", {}).get(name)
-        for i in range(n):
-            b = "%s_%d" % (name, i + 1)
-            p = rig.parent[b]
-            P[b] = P[p] + G[p] @ (rig.head0[b] - rig.head0[p])
-            seg = rig.tail0[b] - rig.head0[b]
-            L, rest_dir = seg.length, seg.normalized()
-            if over:
-                d = vec(over[min(i, len(over) - 1)]).normalized()
-            elif mode == "spread":
-                radial = P[b] - hc
-                radial.z = 0.0
-                if radial.length < 1e-4:
-                    radial = G["Head"] @ Vector((math.sin(math.radians(ang)), math.cos(math.radians(ang)), 0))
-                    radial.z = 0.0
-                radial.normalize()
-                d = (radial * (0.5 if i == 0 else 1.0) + Vector((0, 0, -1.0 if i == 0 else -0.08))).normalized()
-            else:
-                out = P[b] - hc
-                out = out - g * out.dot(g)
-                d = (g + out.normalized() * hs.get("push", 0.3)).normalized() if out.length > 1e-4 else g
-            tail = P[b] + d * L
-            zl, zh = ctx["zone"]
-            walls = all(zl[k] < P[b][k] < zh[k] for k in range(3))   # only while the hair is in the container
-            for _ in range(2):
-                tail.z = max(tail.z, floor)
-                if walls:
-                    for k in (0, 1):
-                        tail[k] = min(max(tail[k], zl[k] + 0.04), zh[k] - 0.04)
-                for a, bb, r in caps:
-                    q = seg_closest(tail, a, bb)
-                    off = tail - q
-                    if off.length < r + 0.012:
-                        tail = q + (off.normalized() if off.length > 1e-6 else Vector((0, 0, 1))) * (r + 0.012)
-            tail.z = max(tail.z, floor)
-            G[b] = (G[p] @ rest_dir).rotation_difference(tail - P[b]) @ G[p]
 
 
 def apply(rig, G, P):
@@ -297,7 +247,11 @@ def apply(rig, G, P):
         Gp = G[p] if p else Quaternion()
         R0 = rig.R0[b]
         pb.rotation_quaternion = R0.inverted() @ Gp.inverted() @ G[b] @ R0
-        pb.location = (R0.inverted() @ (P[b] - rig.head0[b])) if p is None else Vector()
+        if p is None:
+            pb.location = R0.inverted() @ (P[b] - rig.head0[b])
+        else:   # only the first bone of a hair / cloth chain ever leaves its parent (ghost_soft.relax)
+            d = P[b] - (P[p] + G[p] @ (rig.head0[b] - rig.head0[p]))
+            pb.location = R0.inverted() @ (G[p].inverted() @ d) if d.length > 1e-6 else Vector()
         pb.scale = (1, 1, 1)
     bpy.context.view_layer.update()
 
@@ -329,108 +283,11 @@ def load_ghost():
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     arm.name, mesh.name = "Armature", "HakoOnna_Mesh"
     fix_unweighted(mesh)
-    add_hair_rig(arm, mesh)
-    return Rig(arm, mesh)
-
-
-# Hair chains: (name, angle around the head: 0 = back, +90 = her left, 180 = front; attach z; tip z; bones).
-# Heights are the rest pose at 1.2 m, read from the Tripo hair shell (bl_hair2.py survey).
-HAIR = [("Hair_BC", 0, 1.03, 0.49, 3), ("Hair_BL", 30, 1.03, 0.54, 3), ("Hair_BR", -30, 1.03, 0.54, 3),
-        ("Hair_SL", 56, 1.03, 0.78, 2), ("Hair_SR", -56, 1.03, 0.78, 2),
-        ("Hair_FL", 125, 1.02, 0.82, 2), ("Hair_FR", -135, 1.02, 0.82, 2)]
-
-
-def hair_island(mesh):
-    import bmesh
-    me = mesh.data
-    bm = bmesh.new()
-    bm.from_mesh(me)
-    bm.verts.ensure_lookup_table()
-    top = max(me.vertices, key=lambda v: v.co.z).index
-    seen, stack = set(), [top]
-    while stack:
-        j = stack.pop()
-        if j in seen:
-            continue
-        seen.add(j)
-        for e in bm.verts[j].link_edges:
-            k = e.other_vert(bm.verts[j]).index
-            if k not in seen:
-                stack.append(k)
-    bm.free()
-    return sorted(seen)
-
-
-def add_hair_rig(arm, mesh):
-    """Tripo binds the long hair to the hips and arms, so it smears across the body in strong poses.
-    Give it 7 chains under Head and re-weight only the hair shell to them (Head keeps the scalp)."""
-    me = mesh.data
-    hair = hair_island(mesh)
-    scalp = [me.vertices[j].co for j in hair if me.vertices[j].co.z > 1.08]
-    cx = sum(c.x for c in scalp) / len(scalp)
-    cy = sum(c.y for c in scalp) / len(scalp)
-    bpy.context.view_layer.objects.active = arm
-    bpy.ops.object.mode_set(mode="EDIT")
-    eb = arm.data.edit_bones
-    for name, ang, za, zt, n in HAIR:
-        a = math.radians(ang)
-        r = 0.085
-        x, y = cx + r * math.sin(a), cy + r * math.cos(a)
-        parent = eb["Head"]
-        for i in range(n):
-            b = eb.new("%s_%d" % (name, i + 1))
-            b.head = (x, y, za - (za - zt) * i / n)
-            b.tail = (x, y, za - (za - zt) * (i + 1) / n)
-            b.parent = parent
-            b.use_connect = i > 0
-            parent = b
-    bpy.ops.object.mode_set(mode="OBJECT")
-    groups = {}
-    for name, ang, za, zt, n in HAIR:
-        for i in range(n):
-            g = mesh.vertex_groups.get("%s_%d" % (name, i + 1)) or mesh.vertex_groups.new(name="%s_%d" % (name, i + 1))
-            groups[(name, i)] = g
-    order = sorted(HAIR, key=lambda h: h[1])
-    names = {g.index: g.name for g in mesh.vertex_groups}
-    for j in hair:
-        v = me.vertices[j]
-        c = v.co
-        phi = math.degrees(math.atan2(c.x - cx, c.y - cy))
-        # two neighbouring chains by angle
-        best = sorted(order, key=lambda h: abs((phi - h[1] + 180) % 360 - 180))
-        c1, c2 = best[0], best[1]
-        d1 = abs((phi - c1[1] + 180) % 360 - 180)
-        d2 = abs((phi - c2[1] + 180) % 360 - 180)
-        gap = abs((c2[1] - c1[1] + 180) % 360 - 180)
-        if gap > 80 or d1 + d2 > gap + 1e-3:
-            chain_w = [(c1, 1.0)]
-        else:
-            chain_w = [(c1, d2 / (d1 + d2)), (c2, d1 / (d1 + d2))]
-        s = max(0.0, min(1.0, (c.z - (c1[2] - 0.05)) / 0.06))
-        head_w = s * s * (3 - 2 * s)   # 1 above the attach line, 0 a few cm below it
-        new = {}
-        if head_w > 0:
-            orig = [(names[g.group], g.weight) for g in v.groups]
-            tot = sum(w for _, w in orig) or 1.0
-            for nm, w in orig:
-                new[nm] = new.get(nm, 0) + head_w * w / tot
-        for ch, cw in chain_w:
-            name, ang, za, zt, n = ch
-            t = max(0.0, min(1.0, (za - c.z) / (za - zt))) * n - 0.5
-            i0 = int(math.floor(t))
-            f = t - i0
-            for i, w in ((i0, 1 - f), (i0 + 1, f)):
-                i = max(0, min(n - 1, i))
-                key = "%s_%d" % (name, i + 1)
-                new[key] = new.get(key, 0) + (1 - head_w) * cw * w
-        top = sorted(new.items(), key=lambda kv: -kv[1])[:4]
-        tot = sum(w for _, w in top) or 1.0
-        for g in list(v.groups):
-            mesh.vertex_groups[g.group].remove([j])
-        for nm, w in top:
-            if w > 1e-4:
-                mesh.vertex_groups[nm].add([j], w / tot, "REPLACE")
-    print("hair rig: %d chains, %d hair vertices re-weighted" % (len(HAIR), len(hair)))
+    face = FACE.build(arm, mesh, SOFT.islands_of(mesh.data), ART)   # jaw, teeth, throat (ghost_face.py)
+    soft = SOFT.build(arm, mesh)   # hair, sleeve and hem chains (ghost_soft.py)
+    rig = Rig(arm, mesh)
+    rig.soft, rig.face = soft, face
+    return rig
 
 
 def fix_unweighted(mesh):
@@ -494,9 +351,12 @@ def load_box(kind):
     return ctx
 
 
-def grab_targets(ctx, F, opt):
+def grab_targets(ctx, F, opt, P=None):
     """Arms for the grab (art bible 4.3): the camera gets pulled in until it is 0.2 m from her eyes; both hands
-    reach past her face and clutch the explorer's head beside that camera, so they fill both edges of the screen."""
+    reach past her face and clutch the explorer's head beside that camera, so they fill both edges of the screen.
+    P: the solved body (bone heads). Each hand goes to the side of the screen its own shoulder is on: facing the
+    camera upright her left is the camera's right, hanging upside down it is the camera's left, and without this
+    her arms crossed in front of her mouth in the wardrobe and the drawer."""
     opt = opt if isinstance(opt, dict) else {}
     cam = ctx["cam"]
     C = cam.matrix_world.translation.copy()
@@ -506,7 +366,9 @@ def grab_targets(ctx, F, opt):
     right, up = rot @ Vector((1, 0, 0)), rot @ Vector((0, 1, 0))
     f = (F - E).normalized()
     spec = {}
-    for name, k, s in (("Left", "L", 1.0), ("Right", "R", -1.0)):   # she faces the camera: her left is its right
+    flip = -1.0 if P is not None and (P["Left_UpperArm"] - P["Right_UpperArm"]).dot(right) < 0.0 else 1.0
+    ctx["grab_flip"] = flip
+    for name, k, s in (("Left", "L", flip), ("Right", "R", -flip)):
         W = E + f * opt.get("ahead", 0.12) + right * (s * opt.get("spread", 0.11)) - up * opt.get("drop", 0.02)
         spec["arm_" + k] = {"to": W, "hint": (right * s + up * opt.get("elbow_up", -0.6) + f * opt.get("elbow_back", 0.2)).normalized()}
         spec[name + "_Hand"] = {"dir": (-f * 0.9 - right * (s * 0.35)).normalized(), "palm": (-right * s).normalized()}
@@ -592,12 +454,34 @@ def check(rig, ctx):
             if len(vg):
                 g = max(vg, key=lambda g: g.weight)
                 groups[names[g.group]] = groups.get(names[g.group], 0) + 1
+    # stretched edges: a vertex left behind by its neighbours shows as a spike
+    if getattr(rig, "edge0", None) is None:
+        rest = rig.mesh.data
+        rig.edge0 = [(rest.vertices[e.vertices[0]].co - rest.vertices[e.vertices[1]].co).length for e in rest.edges]
+    long_edges, worst_ratio, sg, spikes = 0, 1.0, {}, []
+    for e in me.edges:
+        l0 = rig.edge0[e.index]
+        l1 = (pts[e.vertices[0]] - pts[e.vertices[1]]).length
+        if l1 > 0.03 and l1 > 3.0 * max(l0, 0.004):
+            long_edges += 1
+            worst_ratio = max(worst_ratio, l1 / max(l0, 0.004))
+            spikes.append((round(l1 * 100, 1), [[round(x, 3) for x in rig.mesh.data.vertices[vi].co] for vi in e.vertices],
+                          [sorted(((names[g.group], round(g.weight, 2)) for g in src[vi].groups), key=lambda t: -t[1])[:3]
+                           for vi in e.vertices]))
+            for vi in e.vertices:
+                vg = src[vi].groups
+                if len(vg):
+                    g = max(vg, key=lambda g: g.weight)
+                    sg[names[g.group]] = sg.get(names[g.group], 0) + 1
     ev.to_mesh_clear()
+    stretch = {"edges": long_edges, "worst_x": round(worst_ratio, 1),
+               "by_bone": sorted(sg.items(), key=lambda kv: -kv[1])[:6], "longest": sorted(spikes, reverse=True)[:4]}
     bb_lo = Vector([min(p[i] for p in pts) for i in range(3)])
     bb_hi = Vector([max(p[i] for p in pts) for i in range(3)])
     top = sorted(groups.items(), key=lambda kv: -kv[1])[:6]
     return {"outside": out, "of": len(pts), "worst_cm": dict(zip(["-x", "+x", "-y", "+y", "-z", "+z"], [round(x * 100, 1) for x in worst])),
-            "by_bone": top, "body_lo": [round(x, 3) for x in bb_lo], "body_hi": [round(x, 3) for x in bb_hi]}
+            "by_bone": top, "body_lo": [round(x, 3) for x in bb_lo], "body_hi": [round(x, 3) for x in bb_hi],
+            "stretch": stretch}
 
 
 def eyes(rig):
@@ -720,7 +604,8 @@ def render_lunge(ctx, out_prefix, F, body_lo, body_hi):
 # ---------------------------------------------------------------------------- keys and export
 
 
-def key_action(rig, name):
+def key_action(rig, name, frames=(1, 2)):
+    """Key the pose the rig is in on these frames of the action (made if it is not there yet)."""
     arm = rig.arm
     if arm.animation_data is None:
         arm.animation_data_create()
@@ -728,7 +613,7 @@ def key_action(rig, name):
     act.use_fake_user = True
     arm.animation_data.action = act
     for pb in arm.pose.bones:
-        for f in (1, 2):
+        for f in frames:
             pb.keyframe_insert("rotation_quaternion", frame=f)
             pb.keyframe_insert("location", frame=f)
     arm.animation_data.action = None   # unassign, or the keys would override the next pose set from Python
@@ -835,13 +720,18 @@ def main():
     report = {}
     for kind in kinds:
         ctx = load_box(kind)
+        ctx["bvh"] = boards_bvh(ctx)   # the boards also stop the hair and the cloth (ghost_soft.settle)
         spec = SP.POSES[kind](ctx)
+        if "--follow" in opts:   # A/B: hair and cloth rigid with the body, as Tripo skinned them
+            spec["hair"], spec["cloth"] = {"mode": "follow"}, {"mode": "follow"}
         G, P = solve(rig, spec, ctx)
         apply(rig, G, P)
+        hiding = (dict(G), dict(P))
         res = check(rig, ctx)
         e = eyes(rig)
         res["eyes"] = [round(x, 3) for x in e]
         res["face_target"] = [round(x, 3) for x in ctx["face"]]
+        res["soft"] = ctx.get("soft_stats")
         report[kind] = res
         print("POSE", kind, json.dumps(res))
         render_views(ctx, os.path.join(out_dir, kind))
@@ -850,7 +740,11 @@ def main():
         if kind in getattr(SP, "LUNGES", {}) and "--no-lunge" not in opts:
             ctx["ik_err"] = {}
             lspec = SP.LUNGES[kind](ctx)
+            lspec.update(FACE.expression(1.0))   # she arrives screaming
+            if "--follow" in opts:
+                lspec["hair"], lspec["cloth"] = {"mode": "follow"}, {"mode": "follow"}
             F = vec(lspec["_face"]) if "_face" in lspec else None
+            ctx["soft"] = False   # the body first; hair and cloth hang from the final pose only
             for _ in range(4):   # the trunk chain decides where the eyes end up: shift the hips until they land on F
                 ctx["ik_err"] = {}
                 G, P = solve(rig, lspec, ctx)
@@ -863,18 +757,30 @@ def main():
                     break
                 lspec["root"]["pos"] = vec(lspec["root"]["pos"]) + err
             if lspec.get("grab"):   # hands go to the explorer's head once the face is placed
-                lspec.update(grab_targets(ctx, F, lspec["grab"]))
-                ctx["ik_err"] = {}
-                G, P = solve(rig, lspec, ctx)
-                apply(rig, G, P)
+                lspec.update(grab_targets(ctx, F, lspec["grab"], P))
+            ctx["soft"] = True
+            ctx["ik_err"] = {}
+            G, P = solve(rig, lspec, ctx)
+            apply(rig, G, P)
             body = check(rig, ctx)
             lres = lunge_check(rig, ctx, F)
+            lres["soft"] = ctx.get("soft_stats")
+            lres["stretch"] = body["stretch"]
+            lres["grab_flip"] = ctx.pop("grab_flip", None)   # -1: her left hand is on the camera's left
             lres["hips"] = [round(x, 3) for x in lspec["root"]["pos"]]
             report["Lunge_" + kind] = lres
             print("LUNGE", kind, json.dumps(lres))
             render_lunge(ctx, os.path.join(out_dir, kind + "_lunge"), F, body["body_lo"], body["body_hi"])
-            if blend or fbx:
-                key_action(rig, "Lunge_" + kind)
+            # the lunge itself: hiding pose -> this pose, bone by bone on its own clock (ghost_motion.py)
+            bpy.context.scene.camera = ctx["cam"]
+            bpy.context.scene.render.resolution_x, bpy.context.scene.render.resolution_y = 960, 540
+            for i, (t, Gt, Pt) in enumerate(MOTION.frames(rig, hiding, (G, P))):
+                apply(rig, Gt, Pt)
+                if blend or fbx:
+                    key_action(rig, "Lunge_" + kind, (i + 1,))
+                if i % (MOTION.FRAMES // 4) == 0 and "--no-motion-renders" not in opts:
+                    bpy.context.scene.render.filepath = os.path.join(out_dir, "%s_motion_%d.png" % (kind, i * 4 // MOTION.FRAMES))
+                    bpy.ops.render.render(write_still=True)
         if blend is None:
             remove(ctx["objs"])
         else:   # keep every box in its own collection for the .blend

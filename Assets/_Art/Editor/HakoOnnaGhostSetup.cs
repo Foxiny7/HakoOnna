@@ -31,7 +31,11 @@ namespace HakoOnna.Art.EditorTools
         public const string PrefabPath = "Assets/_Art/Resources/" + HakoOnnaGhost.ResourcePath + ".prefab";
         /// <summary>FBX 里的材质名（Tripo 原名）。</summary>
         const string SourceMaterial = "tripo_mat_48543c68";
-        const string RevTag = "HakoArtRev", Rev = "ghost2";
+        /// <summary>嘴里的东西：FBX 里的材质名、Blender 脚本生成的小贴图、Unity 材质。</summary>
+        const string SourceMouthMaterial = "HakoOnna_Mouth";
+        public const string MouthTexturePath = "Assets/_Art/Textures/Characters/HakoOnna_Mouth.png";
+        public const string MouthMaterialPath = "Assets/_Art/Materials/Characters/M_HakoOnna_Mouth.mat";
+        const string RevTag = "HakoArtRev", Rev = "ghost2", MouthRev = "mouth3";
         const string DefaultCheckDir = "Docs/screenshots/hakoonna";
 
         [MenuItem("Hako/Art/箱女：材质和预制体", priority = 40)]
@@ -44,14 +48,18 @@ namespace HakoOnna.Art.EditorTools
 
             var tex = EnsureTexture();
             var mat = EnsureMaterial(tex);
-            var id = new AssetImporter.SourceAssetIdentifier(typeof(Material), SourceMaterial);
+            var mouth = EnsureMouthMaterial();
             imp = (ModelImporter)AssetImporter.GetAtPath(ModelPath);
-            if (!imp.GetExternalObjectMap().TryGetValue(id, out var mapped) || mapped != mat)
+            bool remapped = false;
+            foreach (var (source, target) in new[] { (SourceMaterial, mat), (SourceMouthMaterial, mouth) })
             {
-                imp.AddRemap(id, mat);
-                imp.SaveAndReimport();
+                var id = new AssetImporter.SourceAssetIdentifier(typeof(Material), source);
+                if (imp.GetExternalObjectMap().TryGetValue(id, out var mapped) && mapped == target) continue;
+                imp.AddRemap(id, target);
+                remapped = true;
             }
-            BuildPrefab(mat);
+            if (remapped) imp.SaveAndReimport();
+            BuildPrefab(mat, mouth);
             AssetDatabase.SaveAssets();
             var clips = Clips();
             Debug.Log($"[Hako Ghost] 预制体 {PrefabPath}：{clips.Count} 个动作（{string.Join(", ", clips.Keys.OrderBy(k => k))}）");
@@ -154,12 +162,59 @@ namespace HakoOnna.Art.EditorTools
             return m;
         }
 
+        /// <summary>
+        /// 嘴里的东西（牙、血丝、喉咙、口腔内壁、舌头）：Blender 脚本生成的 64×64 小贴图（Tools~/ghost_face.py，
+        /// 四列：牙的渐变 | 血 | 黑 | 血到黑），按点采样；不反射环境、没有高光。
+        /// </summary>
+        static Material EnsureMouthMaterial()
+        {
+            AssetDatabase.ImportAsset(MouthTexturePath);
+            var ti = AssetImporter.GetAtPath(MouthTexturePath) as TextureImporter;
+            if (ti == null) throw new InvalidOperationException("缺少 " + MouthTexturePath + "（Blender 脚本导出时生成）");
+            if (ti.filterMode != FilterMode.Point || ti.mipmapEnabled || ti.textureCompression != TextureImporterCompression.Uncompressed)
+            {
+                ti.filterMode = FilterMode.Point;
+                ti.mipmapEnabled = false;
+                ti.wrapMode = TextureWrapMode.Clamp;
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                ti.sRGBTexture = true;
+                ti.SaveAndReimport();
+            }
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(MouthTexturePath);
+            var m = AssetDatabase.LoadAssetAtPath<Material>(MouthMaterialPath);
+            bool created = m == null;
+            if (created) m = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = Path.GetFileNameWithoutExtension(MouthMaterialPath) };
+            else if (m.GetTag(RevTag, false, "") == MouthRev) return m;
+            m.SetTexture("_BaseMap", tex);
+            m.SetColor("_BaseColor", Color.white);
+            m.SetFloat("_WorkflowMode", 1f);
+            m.SetFloat("_Metallic", 0f);
+            m.SetFloat("_Smoothness", .2f);
+            m.SetFloat("_SmoothnessTextureChannel", 0f);
+            // 不反射环境、不要高光：口腔是个洞，暗色的内壁几乎是侧着对镜头的，掠射角下的反光把上颚照成一条灰蓝的带子
+            // （mouth1 是环境反射，mouth2 是高光），嘴里就不黑了
+            m.SetFloat("_EnvironmentReflections", 0f);
+            m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+            m.SetFloat("_SpecularHighlights", 0f);
+            m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            m.SetFloat("_Surface", 0f);
+            m.SetFloat("_AlphaClip", 0f);
+            m.DisableKeyword("_ALPHATEST_ON");
+            m.SetFloat("_Cull", (float)CullMode.Back);
+            m.SetOverrideTag("RenderType", "Opaque");
+            m.renderQueue = -1;
+            m.SetOverrideTag(RevTag, MouthRev);
+            if (created) AssetDatabase.CreateAsset(m, MouthMaterialPath);
+            else EditorUtility.SetDirty(m);
+            return m;
+        }
+
         static Dictionary<string, AnimationClip> Clips() =>
             AssetDatabase.LoadAllAssetsAtPath(ModelPath).OfType<AnimationClip>()
                 .Where(c => !c.name.StartsWith("__preview__"))
                 .GroupBy(c => c.name).ToDictionary(g => g.Key, g => g.First());
 
-        static void BuildPrefab(Material mat)
+        static void BuildPrefab(Material mat, Material mouth)
         {
             var model = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
             var go = (GameObject)PrefabUtility.InstantiatePrefab(model);
@@ -173,7 +228,10 @@ namespace HakoOnna.Art.EditorTools
                 animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;   // 镜头跟着 Face 走，看不见时也要更新
                 foreach (var smr in go.GetComponentsInChildren<SkinnedMeshRenderer>(true))
                 {
-                    smr.sharedMaterial = mat;
+                    var mats = smr.sharedMaterials;   // 两个子网格：身体（Tripo 贴图）和嘴里的东西
+                    for (int i = 0; i < mats.Length; i++)
+                        mats[i] = mats[i] != null && mats[i].name.Contains("Mouth") ? mouth : mat;
+                    smr.sharedMaterials = mats;
                     smr.updateWhenOffscreen = true;   // 姿势离静止姿态很远（倒挂、折叠），默认包围盒会被错误剔除
                 }
 
@@ -332,13 +390,13 @@ namespace HakoOnna.Art.EditorTools
                 Vector3 camPos = box.transform.TransformPoint(eyePos / HakoOnnaGhost.FurnitureScale);
                 var camRot = box.transform.rotation * eyeRot;
 
-                foreach (var (clip, lunge) in new[] { ("Pose_" + name, 0f), ("Lunge_" + name, 1f) })
+                foreach (var (clip, lunge) in new[] { ("Pose_" + name, 0f), ("Mid_" + name, .5f), ("Lunge_" + name, 1f) })
                 {
                     // 每个姿势用新的实例：批处理里不跑帧循环，蒙皮只在实例第一次渲染时算，之后换姿势画出来的还是旧的
                     var ghost = HakoOnnaGhost.Spawn(visual);
                     var anchor = ghost.transform.parent;
                     ghost.Lunge = lunge;
-                    Shoot(cam, key, camPos, camRot, Path.Combine(outDir, $"{name}_{(lunge > 0 ? "lunge" : "pose")}.png"));
+                    Shoot(cam, key, camPos, camRot, Path.Combine(outDir, $"{name}_{(lunge >= 1f ? "lunge" : lunge > 0f ? "mid" : "pose")}.png"));
                     if (!firstEntry) json.Append(",\n");
                     firstEntry = false;
                     json.Append($"  \"{clip}\": {{\"anchor\": \"{anchor.name}\"");
@@ -350,7 +408,7 @@ namespace HakoOnna.Art.EditorTools
                     }
                     json.Append("}");
 
-                    if (lunge > 0)
+                    if (lunge >= 1f)
                     {
                         // 突脸终点：镜头沿着脸 → 原镜头的连线拉到离两眼 0.2 m（美术设定 4.3）；姿势没变，同一个实例可以再拍
                         Transform le = Find(ghost.transform, "Left_Eye"), re = Find(ghost.transform, "Right_Eye");

@@ -41,6 +41,8 @@ def sheet(d, kinds, cols, caption, out, sc):
 
 def main():
     d, prefix = sys.argv[1], sys.argv[2]
+    sheet(d, KINDS, [("%%s_motion_%d.png" % i, 960) for i in range(5)], lambda k: "%s | lunge at 0, 1/4, 1/2, 3/4, 1" % k,
+          prefix + "_motion.jpg", 0.4)
     rep = json.load(open(os.path.join(d, "report.json"), encoding="utf-8"))
 
     def hide_cap(k):
