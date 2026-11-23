@@ -240,7 +240,8 @@ namespace HakoOnna.Art.EditorTools
             var mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterials = order.ToArray();
             if (!shadows) mr.shadowCastingMode = ShadowCastingMode.Off;
-            GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccludeeStatic);
+            // 不能加 BatchingStatic：存盘前法线压成 16 位定点（MeshPack），运行时静态合批把这种网格合并以后法线全坏，物体变成纯黑（2026-11-23）
+            GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.OccludeeStatic);
             SpawnModels(go.transform, shadows);
             return go;
         }
