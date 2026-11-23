@@ -40,17 +40,20 @@
 - 提示词用英文，Tripo 对英文理解更好。
 - 导出 **FBX**，选 **Quad remesh（四边面重拓扑）**，面数按下表设置。
 - 角色勾选 **Auto Rig（自动绑定）**。
-- 生成后统一缩放：Unity 里 1 单位 = 1 米，探索者身高约 1.7 m，箱女约 1.2 m。
+- 生成后统一缩放：Unity 里 1 单位 = 1 米，探索者男约 1.72 m、女约 1.66 m，箱女约 1.2 m。
 - **原创要求**：提示词不要出现 “Hako Onna”、桌游名或任何现有作品名。
 
 ### 2.2 角色
 
+> 2026-11-23：探索者改成 1990 年代末的 5 个固定角色，外观当天通过（美术设定文档 6.1）。和箱女一样走图生模型：三视图提示词在 `HakoOnna_Explorer_ImagePrompts.md`，下表的文字提示词只是备用。旧的探索者 A–D 已经删掉。
+
 | 资产 | 面数 | 绑定 | 提示词 |
 |---|---|---|---|
-| 探索者 A | ≤ 20k | 是 | `realistic young japanese man in his 20s, urban explorer, dark windbreaker jacket, cargo pants, backpack, sneakers, neutral expression, A-pose, full body, game character, PBR` |
-| 探索者 B | ≤ 20k | 是 | `realistic young woman, urban explorer, olive field jacket, jeans, hiking boots, short hair, A-pose, full body, game character, PBR` |
-| 探索者 C | ≤ 20k | 是 | `realistic young man, hoodie and denim jacket, beanie hat, work trousers, A-pose, full body, game character, PBR` |
-| 探索者 D | ≤ 20k | 是 | `realistic young woman, long raincoat, ponytail, black trousers, rubber boots, A-pose, full body, game character, PBR` |
+| 探索者 1 中村大輔 | ≤ 20k | 是 | `realistic japanese young man about 21, late 1990s street wear, short black hair, navy baseball cap, navy and light grey colour-blocked nylon windbreaker, light grey t-shirt, light stone-wash straight jeans, grey sneakers, small black waist pouch on the right hip, neutral expression, A-pose, full body, game character, PBR` |
+| 探索者 2 吉田美穂 | ≤ 20k | 是 | `realistic japanese young woman about 20, late 1990s street wear, black knit beanie, chestnut-brown shoulder-length hair, open olive drab field jacket, oatmeal turtleneck, dark charcoal straight trousers, dark brown lace-up ankle boots, small black compact camera on a crossbody strap at the left hip, neutral expression, A-pose, full body, game character, PBR` |
+| 探索者 3 小野健太 | ≤ 20k | 是 | `realistic japanese young man about 19, late 1990s street wear, heather grey pullover hoodie with the hood up, thin flat mustard-yellow quilted vest, dark indigo jeans, dark navy canvas sneakers, neutral expression, A-pose, full body, game character, PBR` |
+| 探索者 4 藤井由香 | ≤ 20k | 是 | `realistic japanese young woman about 20, late 1990s street wear, black hair in a high ponytail with a black scrunchie, violet zip-up track jacket with white piping on the sleeves, black turtleneck, mid-blue flared jeans, black platform sneakers, neutral expression, A-pose, full body, game character, PBR` |
+| 探索者 5 石川直樹 | ≤ 20k | 是 | `realistic japanese young man about 22, late 1990s street wear, short black side-parted hair, silver and black over-ear headphones around the neck, lake-blue polar fleece jacket, navy and grey plaid flannel shirt, dark grey cargo trousers, black leather ankle boots, neutral expression, A-pose, full body, game character, PBR` |
 | 箱女 | ≤ 30k | 是 | `pale thin little girl about 7 years old, paper-white skin with a faint grey-blue undertone, grime smudges, faint paper fold creases, slightly hollow cheeks, very long soaked glossy straight black hair with a centre parting, swept behind the shoulders, thin wet strands of fringe over the forehead, pale milky clouded eyes in dark sunken sockets, blank cold stare, dark wine-red cracked lips, plain deep crimson child kimono, narrow sash knotted small at the back, narrow sleeves, irregularly torn frayed hem at mid-shin, barefoot, long thin bony fingers with swollen knuckles, japanese horror ghost, A-pose, full body, realistic, PBR` |
 
 **说明：**
@@ -60,7 +63,7 @@
 - 箱女的 8 个藏匿姿势和跳脸的脸都要手调、手工雕刻，Tripo 只出基础模型（见美术设定文档 6.2、6.5）。
 - 开箱死亡改用完整模型扑出来（美术设定文档 4.3），不再单独生成“伸出的手”。
 - 箱人不单独生成：用探索者模型改成箱人版（美术设定文档 6.3）。
-- 4 个探索者的外套颜色要明显不同，方便在黑暗里区分队友。
+- 5 个探索者在黑暗里先靠头部轮廓区分，再靠衣服深浅，最后才靠颜色（美术设定文档 6.1）。
 
 ### 2.3 关键物品
 
