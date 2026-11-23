@@ -55,6 +55,8 @@ namespace HakoOnna.Art.EditorTools
             BuildGrime(dressing, root);
             // 第四轮：床、桌椅、灶台、浴桶、坐垫换成模型和软网格（只换子物体，根节点、碰撞体、Firebox 不动；Refit.cs）
             RefitFixtures(root);
+            // 2026-11-23：保险箱的模型（Safe.cs）。要等家具搬家把它挪到位、放大以后再做
+            SafeDetails(root);
             // 灰盒立方体（墙、楼板、门框、代码生成的家具）换成按米铺 UV 的同形网格，贴图不再被拉伸；
             // 座敷床の間交给 ZashikiArt（运行时换模型），容器是预制体，都不动
             var wallMats = new HashSet<Material> { P.Plaster, P.WallPlaster, P.WallSoot, P.WallKura, P.Fence, P.Ground };

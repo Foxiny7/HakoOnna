@@ -177,7 +177,7 @@ House_Blockout
 ├─ Gameplay
 │   ├─ ExplorerSpawnPoints/SpawnPoint_0..4
 │   ├─ SecretExitCandidates/SecretExitCandidate_i_<房间>/{Carpet, HatchAnchor}
-│   ├─ Safe_Kinko/{InteractPoint, KeyAnchor}
+│   ├─ Safe_Kinko/{Model, Door/{Dial, Handle}, InteractPoint, KeyAnchor}
 │   ├─ MemorialPoint_Butsudan/InteractPoint     （超度地点，具体超度操作待定）
 │   ├─ Gate_Main/{GateDoor_L, GateDoor_R, InteractPoint}
 │   ├─ EscapeZone_Gate
@@ -365,6 +365,28 @@ map.Show(false);                  // 关地图
 
 **4. 楼梯**
 - 不用改代码。`Step_NN` 的名字和位置没变（`HouseFoley` 照旧）；`WalkRamp` 加宽到 3.48 m。
+
+### 保险箱（金庫）的模型（2026-11-23）
+对应 V1.3 第 9.1 节。`Gameplay/Safe_Kinko`（居間北墙）现在是一只绿漆铸铁保险箱，代码在 `Editor/HouseBlockoutGenerator.Safe.cs`。
+```
+Safe_Kinko
+├─ Body            灰盒方块：不显示了，碰撞体照旧
+├─ Model           箱体（空心，里面有一块搁板）
+├─ Door            门，轴心在合页上
+│   ├─ Dial        转盘，轴心在转盘中心
+│   └─ Handle      把手，轴心在把手轴上
+├─ InteractPoint   站位（没变）
+└─ KeyAnchor       钥匙放的位置（没变，正好在搁板上）
+```
+- 开门：`door.localRotation = Quaternion.Euler(0, 105, 0)`；关门是 `Quaternion.identity`。门只是模型，没有碰撞体。
+- 转盘、把手：绕自己的 Z 轴转（`localRotation = Quaternion.Euler(0, 0, 角度)`），输密码、开门时可以用来做动画。
+- 三个会动的部件都不参加静态合批。大门门扇上的细节（`GateDoor_L/R_Detail`）以前是静态合批的，门扇转动时不会跟着走，这次一起改了。
+- 密码怎么输（转盘还是按键）在美术圣经里是【待定】；模型上是转盘，界面照 V1.3 的“输入 4 位数字”做就行。
+
+### 调亮、居間的葛籠（2026-11-23，用户实机后两次要求）
+- 环境光 (.011, .013, .02) → (.07, .078, .105)，月光 0.22 → 0.35，后期曝光 0.1 → 0.6（`AtmosphereBuilder.NormalExposure`，每次生成都会写进 `VP_Normal`）。雾没动。
+- 手电（`NetworkPlayer.Inspection.cs`，第二次是用户让美术直接改的）：亮度 25 → 60，射程 24 → 30 m，光锥 55° / 内 25° → 70° / 内 35°。审图截图用同样的数。
+- `Ima_Tsuzura_03` 沿北墙往东挪了约 1 m：原来挡着西墙箪笥最下面的抽屉。容器基准已更新。
 
 ### 秘密出口
 - 候选点在被发现前只有地毯，**没有暗门模型**。

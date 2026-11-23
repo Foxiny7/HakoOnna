@@ -274,7 +274,7 @@ namespace HakoOnna.Art.EditorTools
             new Place("Zashiki", ContainerKind.Tansu, 16.23f, 1.965f, 0f),
             new Place("Ima", ContainerKind.Tansu, 6.06f, 7.995f, 90f),
             new Place("Ima", ContainerKind.ChaTansu, 5.81f, 5.45f, 90f),
-            new Place("Ima", ContainerKind.Tsuzura, 6.6f, 8.37f, 180f),
+            new Place("Ima", ContainerKind.Tsuzura, 7.0f, 8.37f, 180f), // 2026-11-23：往东挪 0.8 m，原来挡着西墙箪笥最下面的抽屉
             new Place("Nando", ContainerKind.Tansu, 12.04f, 5.32f, 0f),
             // 2026-11-22 用户定“一个房间 2–4 个容器”：納戸 5→4、土蔵 6→4，挪给只有 1 个的縁側、風呂、便所（总数还是 45）
             new Place("Benjo", ContainerKind.Tsuzura, 5.80f, 10.5f, 90f),       // 便所前间西南角

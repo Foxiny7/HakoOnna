@@ -17,7 +17,7 @@ namespace HakoOnna.Art.EditorTools
         const string OutDir = "Docs/screenshots/detail";
 
         /// <summary>游戏光里手电的强度：2026-11-19 用户看了 5 / 12 / 25 的对比后定为 25（Codex 的 NetworkPlayer.Inspection.cs 原来是 5）。</summary>
-        const float GameBeamIntensity = 25f;
+        const float GameBeamIntensity = 60f; // 2026-11-23 用户两次要求调高（25 → 40 → 60）；和 NetworkPlayer.Inspection.cs 一致
 
         /// <summary>
         /// Detail：室内灯光，机位直接用新坐标书写（不搬家映射，也不参与“机位前方不放家具”）。
@@ -193,7 +193,7 @@ namespace HakoOnna.Art.EditorTools
             spot.type = LightType.Spot;
             spot.spotAngle = 80f;
             spot.innerSpotAngle = 45f;
-            spot.range = 16f;
+            spot.range = 30f;
             spot.color = new Color(1f, .93f, .82f);
             spot.shadows = LightShadows.Soft;
             // 浮尘粒子在编辑器里不会自己播放：先模拟十几秒，截图里才有
@@ -212,6 +212,8 @@ namespace HakoOnna.Art.EditorTools
                 if (r5 && !name.StartsWith("r5_gal") && (pos - look).magnitude < 4.6f) shots.Add(new Shot("revmood_" + name, Mode.MoodX, pos, look) { raw = true }); // 雾里 7 m 以外看不见
             }
             int count = 0;
+            var safeDoorGo = GameObject.Find("House_Blockout/Gameplay/Safe_Kinko/Door");
+            var safeDoor = safeDoorGo ? safeDoorGo.transform : null;
             try
             {
                 foreach (var s in shots)
@@ -223,8 +225,9 @@ namespace HakoOnna.Art.EditorTools
                     spot.enabled = s.mode == Mode.Interior || IsMood(s.mode) || s.mode == Mode.Detail || (s.mode == Mode.Day && s.raw);
                     // 游戏光：手电 55° / 内 25°、射程 16 m、强度 25（2026-11-19 用户定的 25，Codex 那边原来是 5，待改）；检查光：大角度补光
                     bool mood = IsMood(s.mode);
-                    spot.spotAngle = mood ? 55f : 80f;
-                    spot.innerSpotAngle = mood ? 25f : 45f;
+                    if (safeDoor) safeDoor.localRotation = Quaternion.Euler(0f, s.name.Contains("safe_open") ? HouseBlockoutGenerator.SafeDoorOpenAngle : 0f, 0f);
+                    spot.spotAngle = mood ? 70f : 80f;
+                    spot.innerSpotAngle = mood ? 35f : 45f;
                     // 院子的审图机位离得远（3 m 上下）、泥地很暗：检查光加到 14，亮度和屋里 1.5–2 m 拍的差不多
                     spot.intensity = mood ? GameBeamIntensity : s.mode == Mode.Day ? 14f : 3f;
                     spot.color = mood ? new Color(1f, .95f, .84f) : new Color(1f, .93f, .82f);
@@ -278,6 +281,7 @@ namespace HakoOnna.Art.EditorTools
             }
             finally
             {
+                if (safeDoor) safeDoor.localRotation = Quaternion.identity;
                 RenderSettings.ambientMode = ambMode;
                 RenderSettings.ambientLight = ambColor;
                 RenderSettings.ambientProbe = ambProbe;

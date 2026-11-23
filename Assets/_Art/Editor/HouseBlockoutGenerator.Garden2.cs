@@ -295,7 +295,11 @@ namespace HakoOnna.Art.EditorTools
                     mb.Cyl(D.Iron, c, .028f, .022f, .035f, 10, true, outward);
                 }
                 var go = mb.Build(gate, leafName + "_Detail");
-                if (go != null) go.transform.SetParent(leaf, true);
+                if (go != null)
+                {
+                    go.transform.SetParent(leaf, true);
+                    UnityEditor.GameObjectUtility.SetStaticEditorFlags(go, 0); // 门扇会被程序转动，细节不能参加静态合批
+                }
             }
         }
     }

@@ -25,13 +25,13 @@ namespace HakoOnna.Art.EditorTools
             var moon = moonGo.AddComponent<Light>();
             moon.type = LightType.Directional;
             moon.color = new Color(0.50f, 0.60f, 0.92f);
-            moon.intensity = 0.22f;
+            moon.intensity = 0.35f;
             moon.shadows = LightShadows.Soft;
             RenderSettings.sun = moon;
 
             RenderSettings.skybox = null;
             RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.011f, 0.013f, 0.02f);
+            RenderSettings.ambientLight = new Color(0.07f, 0.078f, 0.105f); // 2026-11-23 用户实机后两次要求调亮，“至少能看清自己的房间”：(.011, .013, .02) → (.022, .026, .04) → 现在
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogColor = new Color(0.012f, 0.015f, 0.022f);
@@ -42,6 +42,12 @@ namespace HakoOnna.Art.EditorTools
             var hunt = LoadOrCreate(HuntPath, FillHunt);
             UpgradeNormalR2(normal);
             EnsureBloomGuard(normal);
+            // 2026-11-23：整体曝光 0.1 → 0.3（同上）。每次生成都写，要改就改这个数
+            if (normal.TryGet(out ColorAdjustments exposure) && !Mathf.Approximately(exposure.postExposure.value, NormalExposure))
+            {
+                exposure.postExposure.Override(NormalExposure);
+                EditorUtility.SetDirty(exposure);
+            }
 
             var globalGo = new GameObject("PostFX_Normal");
             globalGo.transform.SetParent(parent, false);
@@ -118,6 +124,8 @@ namespace HakoOnna.Art.EditorTools
             EditorUtility.SetDirty(p);
             AssetDatabase.SaveAssets();
         }
+
+        const float NormalExposure = 0.6f;
 
         static void FillNormal(VolumeProfile p)
         {
