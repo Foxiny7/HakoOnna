@@ -42,6 +42,7 @@ namespace HakoOnna.Art.EditorTools
             GlassSpecs.Clear();
             foreach (var room in rooms)
                 if (room.hasFloor && room.group != GFence) InteriorArchitecture(arch, room);
+            StairDetails(arch); // 2026-11-22：楼梯的踏板、踢板、侧板、扶手（Stairs.cs）
             ExteriorWalls(ext);
             BuildRoofs(ext);
             FenceAndGate(ext);
@@ -59,6 +60,8 @@ namespace HakoOnna.Art.EditorTools
             var wallMats = new HashSet<Material> { P.Plaster, P.WallPlaster, P.WallSoot, P.WallKura, P.Fence, P.Ground };
             int reUV = PrimitiveUV.Apply(root, wallMats, t => UnderName(t, "Zashiki_Tokonoma"));
             Debug.Log($"[Hako Art] 立方体换成按米铺 UV：{reUV} 个");
+            // 2026-11-22：给玩法的房间图、俯视机位、3D 地图用的简化房子（HouseGraph.cs）
+            BuildHouseGraph(root);
             SaveDetailMeshes();
         }
 

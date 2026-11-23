@@ -47,8 +47,11 @@ namespace HakoOnna.Art.EditorTools
             HouseBlockoutGenerator.Generate();
             // 第五轮：这一版布局里放不下的几件（糸車、木马、手压泵……）临时摆到院墙外拍一张，拍完删掉，不存进场景
             var gallery = HouseBlockoutGenerator.BuildReviewGallery();
+            // 3D 地图平时是关着的：打开、错开摆好拍几张，拍完关掉（场景已经存过，这些改动不会进场景）
+            var map = HouseBlockoutGenerator.ShowMapProxyForReview();
             Shoot();
             if (gallery != null) Object.DestroyImmediate(gallery);
+            if (map != null) { map.Explode(0f, 0f); map.Show(false); }
         }
 
         /// <summary>室内机位和注视点（新坐标）。按房间补家具时机位前方留空，截图不会被贴脸的家具挡住。</summary>

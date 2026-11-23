@@ -135,6 +135,23 @@
 - **贴花**：钟面 `T_ClockDial.png`、碁盤线 `T_GobanGrid.png` 是 `Tools~/make_props_r5.py` 画的（不是下载的）。
 - **截图**：室内的是 `rev_r5i_*`。
 
+## 房间图、3D 地图、房间机位、楼梯（2026-11-22）
+
+- **起因**：箱女转移改成“同房间 + 相邻房间”（`Docs/HakoOnna_DevPlan_V1.3_Iterations.md` 模块 T），需要房间的相邻关系、每个房间的俯视机位和一张 3D 地图。用户定：和模型有关的都由美术出。另外用户要求楼梯换纹理、两侧不要有缝。
+- **HouseGraph**（`Scripts/HouseGraph.cs`，生成在 `Gameplay/HouseGraph`）：24 个房间（16 个有容器）、45 个容器各自在哪个房间、26 条相邻关系。
+  - 同一层的相邻是按房间范围算的：共用一面墙（重叠 ≥ 0.5 m），或隔着一段没有容器的走廊正对着。楼梯两条（台所↔物置、奥の間↔子供部屋）和后院一条（風呂↔土蔵）是手写的（`SpecialLinks`）。
+  - 算出来的 26 条和程序 `HiderRoutes` 里手写的 26 条完全一致（生成日志里 `[Hako Art] HouseGraph：` 那一行会列出来，以后改了户型可以对）。任意两个有容器的房间最多隔 5 次换房间。
+  - 台所↔土蔵那条（V1.3 T.2 的【建议】）还没加，等设计者定；加的话是 `SpecialLinks` 里取消一行注释。
+- **RoomVantage**（`Gameplay/RoomVantages/Vantage_<房间>`，16 个）：每个有容器的房间一个靠天花板的机位，朝房间中心偏下。从四个角和四面墙正中这八个位置里挑：往每个容器和地面上 3×3 个点打射线，看得见的越多越好，镜头前 1.8 m 内有东西挡着（屏风、高柜子）要扣分；尽量正对着容器的正面，不落在到顶的柜子里；细长的房间（風呂、縁側）从短边正中顺着长边看。
+- **HouseMapProxy**（`Scripts/HouseMapProxy.cs`，生成在 `Gameplay/HouseMapProxy`，默认关着，在真房子正下方 300 m）：每个房间一块地板（有容器的亮一点、走廊暗一点、楼梯间是木色并且有一级级升上去的踏步）、0.7 m 高的矮墙（门洞留空，窗照样是墙）、每个容器一个小方块、楼梯和后院的蓝色弧线。一楼 / 二楼 / 土蔵是三个子节点，可以错开摆、单独隐藏。
+  - 材质 `Materials/Detail/MP_Map*.mat` 用自己的着色器 `Shaders/HakoMapUnlit.shader`（纯色，不受光、**不受雾**）。
+- **楼梯**（`HouseBlockoutGenerator.Stairs.cs`）：
+  - 以前每一级是一个方块，两边各留了半米多的空，旁边另有两条斜梁，所以看得到缝和黑洞。现在每一级是一块带圆口的踏板（`D.TrimMid`，木纹顺着踏板长边）+ 一块深色立板（`D.BeamDark`），**从这面墙铺到那面墙**（两头各插进墙里 5 mm）；两面墙上各有一条跟着坡度走的斜踢脚板和压条，踏板、立板的端头都收在踢脚板后面。东墙加了一根木扶手（铁托架）。
+  - `Step_NN` 那些方块还在（缩小一圈藏在踏板和立板后面），因为程序的 `HouseFoley` 按它们的范围判断“踩在木头上”。
+  - 行走用的斜坡碰撞体 `WalkRamp` 从 2.4 m 加宽到楼梯间的净宽 3.48 m：现在可以贴着墙上下楼，不会踩到斜坡外面掉进缝里。
+- **容器检查脚本进仓库了**：`Tools~/containers_diff.py` + `Tools~/baseline/containers.json`（每次重新生成后跑，45 个容器必须 0 变动；确认要动容器以后用 `--save` 更新基准）。
+- **截图**：`rev_r5s_*`（楼梯和楼梯贴墙处）、`rev_r5v_<房间>`（16 个机位看出去的样子）、`rev_r5_map_*`（3D 地图，二楼抬高 5 m、土蔵推开 5 m）。
+
 ## 给程序（GPT）的接口
 
 场景中所有对象按名称查找，层级如下：
@@ -149,7 +166,10 @@ House_Blockout
 │   ├─ Safe_Kinko/{InteractPoint, KeyAnchor}
 │   ├─ MemorialPoint_Butsudan/InteractPoint     （超度地点，具体超度操作待定）
 │   ├─ Gate_Main/{GateDoor_L, GateDoor_R, InteractPoint}
-│   └─ EscapeZone_Gate
+│   ├─ EscapeZone_Gate
+│   ├─ HouseGraph (HouseGraph)                  房间、相邻关系、容器在哪个房间
+│   ├─ RoomVantages/Vantage_<房间>              每个有容器的房间一个俯视机位
+│   └─ HouseMapProxy (HouseMapProxy)            3D 地图用的简化房子，默认关着
 ├─ Props
 ├─ Doors              所有能开关的门（DoorVisual），程序在运行时挂逻辑
 │   ├─ Door_<房间A>_<房间B>/{Leaf_0..n, Rail}   推拉门，默认开着；室外一侧写 Outside
@@ -287,6 +307,51 @@ House_Blockout
 - 对藏有箱女的容器使用错误弱点道具而死亡时，也播同样的演出（2026-11-19 确认）：没有读条，容器是关着的，由演出自己把门或盖猛地打开，所以同样不要设置 `IsOpen`。
 - 猎杀中被处决的演出：待定。
 
+### 箱女转移：房间图、房间机位、3D 地图（2026-11-22）
+对应 `Docs/HakoOnna_DevPlan_V1.3_Iterations.md` 模块 T。三样东西都在 `House_Blockout/Gameplay` 下，每次重新生成都会重做；程序只读，不要改它们的数据。
+
+**1. 房间图 `HakoOnna.Art.HouseGraph`**（`Gameplay/HouseGraph`）
+```csharp
+var graph = FindFirstObjectByType<HouseGraph>();
+int box   = Array.IndexOf(graph.containers, container.GetComponentInChildren<ContainerVisual>()); // 容器下标
+int room  = graph.RoomOf(box);                       // 容器在哪个房间（rooms 的下标）
+bool ok   = graph.CanTransfer(fromBox, toBox);       // 一次转移能不能到：同房间，或两个房间相邻
+graph.Neighbours(room, list);                        // 通道栏：相邻的房间
+graph.TryGetLink(room, other, out var kind);         // Wall = 同层隔壁；Stairs = 楼梯；Yard = 后院
+graph.LeadsToward(room, other, r => 条件);           // 方向徽标：往 other 走是不是离“满足条件的房间”更近
+graph.Hops(roomA, roomB);                            // 最少换几次房间
+graph.RoomAt(worldPosition);                         // 一个点在哪个房间（院子、屋外 = -1）
+```
+- `rooms[i]`：`id`（"Zashiki"）、`label`（"座敷"）、`floor`（0 一楼 / 1 二楼）、`building`（0 主屋 / 1 土蔵）、`center`、`size`、`ceilingY`、`hasContainers`、`vantage`。
+- `containers` 的顺序就是 `House_Blockout/Containers` 下 `GetComponentsInChildren<ContainerVisual>()` 的顺序。
+- 通道栏的图标：`kind == Stairs` 时比较两个房间的 `floor`（去更高的是 ↑，更低的是 ↓）；`kind == Yard` 时看 `building`（去土蔵是 ⌂，回主屋是 ↩）。
+- 26 条相邻和 `HiderRoutes` 手写的那张表一致，所以 `HiderRoutes` 可以改成读这张图：转移规则换成 `CanTransfer`（“每对相邻房间只连最近的一对容器”那一条按 V1.3 取消），服务器校验也用它。
+- 没有容器的房间（廊下、楼梯间等 8 个）也在 `rooms` 里，但不参与相邻：隔着走廊正对的两个房间已经直接连上了。
+
+**2. 房间机位**（视角转移）
+- `graph.rooms[i].vantage`（`Gameplay/RoomVantages/Vantage_<id>`）：直接用它的位置和朝向；没有容器的房间是 null。
+- 审图截图用的是 FOV 70。机位离天花板 0.4 m、离墙 0.5 m，程序想让玩家转动视角的话，建议只转不移（左右各 60° 以内不会穿墙）。
+- 机位只是一个空节点，没有相机。显示什么（要不要显示探索者）是规则，待定（V1.3 T.6）。
+
+**3. 3D 地图 `HakoOnna.Art.HouseMapProxy`**（`Gameplay/HouseMapProxy`，默认整个关着）
+```csharp
+var map = FindFirstObjectByType<HouseMapProxy>(FindObjectsInactive.Include);
+map.Show(true);                   // 只在打开地图的这台客户端上开；别的客户端不开就看不到
+map.Explode(5f, 5f);              // 二楼抬高 5 m、土蔵往外推 5 m，三部分互不遮挡；(0, 0) 复原
+map.ShowGroup(1, false);          // 单独隐藏：0 一楼、1 二楼、2 土蔵
+map.Tint(box, color);             // 给容器的小方块上色（当前所在、能去、冷却中……）
+map.MarkerPosition(box);          // 小方块的世界坐标（点选、画线、放图标用）
+map.roomAnchors[room].position;   // 房间地板中心（放房间名用）
+map.Show(false);                  // 关地图
+```
+- 地图在真房子正下方 300 m（`HouseMapProxy.Depth`），**要用一台单独的相机看**：`renderPostProcessing = false`（场景的后期会把它压得很暗）、背景用纯色、远裁剪面 80 m 就够。材质不受雾，不用管 `RenderSettings.fog`。
+- 相机位置的起点（审图截图用的）：地图包围盒中心 + (−15, 19, −18) 看向中心，或正上方 34 m 俯视。
+- 小方块没有碰撞体。点选可以用 `camera.WorldToScreenPoint(map.MarkerPosition(i))` 找离鼠标最近的一个。
+- `linkLines[i]` 和 `graph.links[i]` 一一对应（只有楼梯、后院那三条有线，其余是 null）；`Explode` / `ShowGroup` 以后线会自己重画。
+
+**4. 楼梯**
+- 不用改代码。`Step_NN` 的名字和位置没变（`HouseFoley` 照旧）；`WalkRamp` 加宽到 3.48 m。
+
 ### 秘密出口
 - 候选点在被发现前只有地毯，**没有暗门模型**。
 - 被发现时，程序隐藏 `Carpet`（或播放掀开动画），然后在 `HatchAnchor` 处实例化 `SecretExit_Hatch.prefab`。
@@ -306,5 +371,5 @@ House_Blockout
 - 钉死旧门上的符纸、血手印、抓痕还是程序生成的贴图（第二轮新加的血字、漏水痕、烟熏、香灰是外部贴图或 `Tools~/make_textures.py` 生成的贴花）。
 - 地板全部在 y = 0，没有做日式住宅抬高的木地板和玄关台阶，避免灰盒阶段增加台阶碰撞问题。
 - 屋顶是平的。
-- 楼梯用不可见的斜坡碰撞体行走，台阶模型本身没有碰撞。
+- 楼梯用不可见的斜坡碰撞体（`WalkRamp`，宽 3.48 m = 楼梯间净宽）行走，台阶模型本身没有碰撞。
 - 第二轮压暗以后，没有手电时只看得清月光照到的地方。在编辑器里检查布局看不清时，用菜单“3 切换预览照明”临时调亮（保存场景前切回去）。

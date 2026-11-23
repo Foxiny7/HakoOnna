@@ -511,12 +511,12 @@ namespace HakoOnna.Art.EditorTools
             {
                 float h = (top - floor) * (i + 1) / count;
                 float z = 10.01f * PlanScale + (i + .5f) * tread;
-                ArtKit.Box(t, $"Step_{i:00}", new Vector3(x, floor + h / 2, z), new Vector3(1.2f * PlanScale,h,tread), mat, false);
-                foreach (float side in new[] { -.64f, .64f })
-                    ArtKit.Box(t, "Stringer", new Vector3(x + side * PlanScale, floor + (h + .9f) / 2, z),
-                        new Vector3(.08f,h + .9f,tread), mat);
+                // 2026-11-22：踏步铺满楼梯间两面墙之间（原来 2.4 m 宽，两边各留 0.4 m 的深缝，另有两条带碰撞的侧板）。
+                // 这些方块只当“芯”，比外形缩进 1.5 cm，藏在 Stairs.cs 画的踏板、踢板后面；程序按它们的范围判断脚下是木头。
+                ArtKit.Box(t, $"Step_{i:00}", new Vector3(x, floor + (h - .015f) / 2, z + .0075f),
+                    new Vector3(StairClearWidth - .02f, h - .015f, tread - .015f), mat, false);
             }
-            Ramp(t, new Vector3(x,floor,10.01f * PlanScale), new Vector3(x,top,13.195f * PlanScale), 1.2f * PlanScale);
+            Ramp(t, new Vector3(x,floor,10.01f * PlanScale), new Vector3(x,top,13.195f * PlanScale), StairClearWidth);
         }
 
         static void Ramp(Transform parent, Vector3 start, Vector3 end, float width)
