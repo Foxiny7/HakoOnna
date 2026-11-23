@@ -40,18 +40,18 @@ namespace HakoOnna.Art.EditorTools
             switch (room.id)
             {
                 case "Genkan": return Sets(CEndai());
-                case "Daidokoro": return Sets(CPrepTable());
+                case "Daidokoro": return Sets(CPrepTable(), CPump());
                 case "Tsugi": return Sets(CZataku(4, true));
                 case "Butsuma": return Sets(CPrayerRows());
                 case "Zashiki": return Sets(CGoBoard());
                 case "Ima": return Sets(CSewing());
-                case "Nando": return Sets(CStoredPile(true));
+                case "Nando": return Sets(CStoredPile(true), CSpinningWheel());
                 case "Oku": return Sets(CZataku(2, true, sheet: true));
                 case "Kura": return Sets(CRiceBalePile());
                 case "Shinshitsu": return Sets(CChabudai(2, false), CIkou());
                 case "Washitsu2F": return Sets(CZataku(4, true, sheet: true), CLaidFuton());
                 case "Monooki": return Sets(CStoredPile(false));
-                case "Kodomo": return Sets(CKidsPlay());
+                case "Kodomo": return Sets(CKidsPlay(), CRockingHorse());
                 default: return new List<CenterSet>();
             }
         }

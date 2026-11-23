@@ -50,3 +50,8 @@ crashlytics-buildid.txt
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 审图截图：每次重新生成都会重拍，不进仓库（总览图在 Docs/screenshots/overview）
+Docs/screenshots/detail/
+Assets/_Art/Tools~/__pycache__/
+*.blend1

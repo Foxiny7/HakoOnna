@@ -222,17 +222,17 @@
 | Tsugi 次の間 | 2 | Tansu、Nagamochi |
 | Butsuma 仏間 | 2 | Tsuzura、ChaTansu |
 | Zashiki 座敷 | 2 | Nagamochi、Tansu |
-| Nando 納戸 | 6 | Nagamochi ×2、YofukuTansu、Tansu、Tsuzura、Komebitsu |
+| Nando 納戸 | 4 | Nagamochi、YofukuTansu、Tansu、Komebitsu |
 | Oku 奥の間 | 3 | Oshiire、Tansu、YofukuTansu |
-| Engawa 縁側 | 1 | Tsuzura |
-| Furo 風呂 | 1 | GetaBako |
-| Benjo 便所 | 1 | GetaBako |
+| Engawa 縁側 | 2 | Tsuzura、Nagamochi |
+| Furo 風呂 | 2 | GetaBako、Tsuzura |
+| Benjo 便所 | 2 | GetaBako、Tsuzura |
 | Shinshitsu 寝室 | 3 | Oshiire、YofukuTansu、Tansu |
 | Washitsu2F 二階和室 | 3 | Oshiire、ChaTansu、Nagamochi |
 | Kodomo 子供部屋 | 3 | Oshiire、Tansu、Tsuzura |
 | Monooki 物置 | 3 | Nagamochi、Tsuzura、Komebitsu |
-| Kura 土蔵 | 5 | Nagamochi ×2、Tansu、YofukuTansu、Tsuzura |
-| **合计** | **45** | |
+| Kura 土蔵 | 4 | Nagamochi ×2、Tansu、YofukuTansu |
+| **合计** | **45** | 2026-11-22 用户定：每个房间 2–4 个 |
 
 ---
 

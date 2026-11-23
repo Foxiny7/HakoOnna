@@ -23,8 +23,8 @@ namespace HakoOnna.Art.EditorTools
             ("Daidokoro", "Monooki", HouseGraph.LinkKind.Stairs), // 裏階段
             ("Oku", "Kodomo", HouseGraph.LinkKind.Stairs),        // 主階段
             ("Furo", "Kura", HouseGraph.LinkKind.Yard),           // 隔着后院
-            // 待设计者定（V1.3 T.2 的建议）：台所后门出去就是后院和土蔵
-            // ("Daidokoro", "Kura", HouseGraph.LinkKind.Yard),
+            // 2026-11-22 用户定：台所后门出去就是后院和土蔵（不然土蔵只连着風呂，是个死胡同）
+            ("Daidokoro", "Kura", HouseGraph.LinkKind.Yard),
         };
 
         const float MapWallHeight = .7f, MapWallThick = .09f, LinkMinOverlap = .5f;

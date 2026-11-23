@@ -152,6 +152,7 @@ namespace HakoOnna.Art.EditorTools
             BuildDetails(root, structure, props, rooms, openings, pal);
             AtmosphereBuilder.Build(lighting);
             BuildDust(lighting);
+            BuildLandmarkLights(lighting);
 
             ArtKit.EnsureFolder("Assets/_Art/Scenes");
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -275,7 +276,8 @@ namespace HakoOnna.Art.EditorTools
             new Place("Ima", ContainerKind.ChaTansu, 5.81f, 5.45f, 90f),
             new Place("Ima", ContainerKind.Tsuzura, 6.6f, 8.37f, 180f),
             new Place("Nando", ContainerKind.Tansu, 12.04f, 5.32f, 0f),
-            new Place("Nando", ContainerKind.Tsuzura, 9.79f, 8.295f, 180f),
+            // 2026-11-22 用户定“一个房间 2–4 个容器”：納戸 5→4、土蔵 6→4，挪给只有 1 个的縁側、風呂、便所（总数还是 45）
+            new Place("Benjo", ContainerKind.Tsuzura, 5.80f, 10.5f, 90f),       // 便所前间西南角
             new Place("Nando", ContainerKind.Komebitsu, 11.20f, 5.36f, 0f),
             new Place("Oku", ContainerKind.Oshiire, 14.015f, 5.52f, 0f),
             new Place("Oku", ContainerKind.YofukuTansu, 13.58f, 8.245f, 180f),
@@ -284,16 +286,16 @@ namespace HakoOnna.Art.EditorTools
             new Place("Benjo", ContainerKind.GetaBako, 5.725f, 13.9f, 90f),
             new Place("Furo", ContainerKind.GetaBako, 7.545f, 13.85f, 90f),
             new Place("Kura", ContainerKind.Nagamochi, 5.95f, 18.18f, 90f),
-            new Place("Kura", ContainerKind.Nagamochi, 5.95f, 20.88f, 90f),
+            new Place("Engawa", ContainerKind.Nagamochi, 15.9f, 0.36f, 0f),     // 縁側东段靠南墙
             new Place("Kura", ContainerKind.Nagamochi, 7.75f, 21.33f, 180f),
             new Place("Kura", ContainerKind.YofukuTansu, 10.15f, 17.68f, 0f),
             new Place("Kura", ContainerKind.Tansu, 9.1f, 21.505f, 180f),
-            new Place("Kura", ContainerKind.Tsuzura, 6.75f, 17.63f, 0f),
+            new Place("Furo", ContainerKind.Tsuzura, 12.40f, 11.9f, 270f),      // 脱衣所东墙（长凳和洗衣机之间）
             new Place("Shinshitsu", ContainerKind.Oshiire, 6.18f, 5.52f, 0f),
             new Place("Shinshitsu", ContainerKind.YofukuTansu, 4.43f, 5.395f, 0f),
-            new Place("Shinshitsu", ContainerKind.Tansu, 8.48f, 5.32f, 0f),
+            new Place("Shinshitsu", ContainerKind.Tansu, 8.0f, 8.32f, 180f),    // 原来三个都在南墙一条线上，这个挪到北墙（门东边；西墙是床）
             new Place("Washitsu2F", ContainerKind.Oshiire, 11.09f, 5.52f, 0f),
-            new Place("Washitsu2F", ContainerKind.Nagamochi, 13.24f, 5.495f, 0f),
+            new Place("Washitsu2F", ContainerKind.Nagamochi, 13.90f, 6.05f, 270f), // 同上，挪到东墙
             new Place("Washitsu2F", ContainerKind.ChaTansu, 9.69f, 5.295f, 0f),
             new Place("Monooki", ContainerKind.Nagamochi, 5.87f, 12.0f, 90f),
             new Place("Monooki", ContainerKind.Tsuzura, 5.8f, 10.75f, 90f),
