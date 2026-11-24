@@ -23,8 +23,12 @@ namespace HakoOnna.Art.EditorTools
         /// Detail：室内灯光，机位直接用新坐标书写（不搬家映射，也不参与“机位前方不放家具”）。
         /// MoodX：和 Mood 一样是游戏里的光（场景环境光 + 雾 + 手电），但不参与“机位前方不放家具”，
         /// 加机位不会让家具搬家（第二轮检查暗度用）。
+        /// 第六轮（院外风景，机位都是新坐标）：
+        /// OutX：探索者看到的——和 MoodX 一样的光（场景环境光 + 雾 + 手电），清屏用天空盒、远裁 1000 m（和 Explorer.prefab 的相机一样）。
+        /// Ghost：箱女视角——照 GhostSight.cs：关雾、关后处理、环境光 (.66, .92, .84)、相机上一盏 (.67, 1, .86) 射程 20 强度 5 的点光。
+        /// Aerial：白天的光 + 天空盒，从高处看院外的整体布局（只给审图用）。
         /// </summary>
-        enum Mode { Day, Interior, Mood, Plan1F, Plan2F, Detail, MoodX }
+        enum Mode { Day, Interior, Mood, Plan1F, Plan2F, Detail, MoodX, OutX, Ghost, Aerial }
 
         /// <summary>室外机位：平面和高度一起放大，构图和旧版一致。</summary>
         static float ExteriorScale => HouseBlockoutGenerator.PlanStretch;
@@ -37,10 +41,141 @@ namespace HakoOnna.Art.EditorTools
             public Mode mode;
             public bool raw; // 机位已是新坐标（场景里现找的，比如血字特写）
             public string closeDoor; // 拍这张时先把这扇门关上（Doors 下的名字），拍完再打开
-            public Shot(string n, Mode m, Vector3 p, Vector3 l, float f = 70f) { name = n; mode = m; pos = p; look = l; fov = f; raw = false; closeDoor = null; }
+            public bool openGate;    // 第六轮：拍这张时把大门两扇门板往里打开，拍完关回去
+            public Shot(string n, Mode m, Vector3 p, Vector3 l, float f = 70f) { name = n; mode = m; pos = p; look = l; fov = f; raw = false; closeDoor = null; openGate = false; }
         }
 
-        static bool IsMood(Mode m) => m == Mode.Mood || m == Mode.MoodX;
+        static bool IsMood(Mode m) => m == Mode.Mood || m == Mode.MoodX || m == Mode.OutX;
+
+        /// <summary>这一张清屏用天空盒（院外的机位、院外东西的白天审图）；别的照旧用纯色背景。</summary>
+        static bool UsesSky(Shot s) => s.mode == Mode.OutX || s.mode == Mode.Ghost || s.mode == Mode.Aerial || s.name.StartsWith("rev_r6_");
+
+        /// <summary>
+        /// 第六轮：只生成场景、拍院外的机位（10 个视点 × 探索者 / 箱女视角、路上 3 个、高处 4 张、生成时记下的 r6_ 特写），
+        /// 再拍 3 个室内机位“有天空盒 / 没有天空盒”各一张，比较亮度（天空盒不该改变屋里的光）。
+        /// 命令行：Unity -batchmode -executeMethod HakoOnna.Art.EditorTools.ArtSnapshot.GenerateAndShootOutskirts -quit
+        /// </summary>
+        public static void GenerateAndShootOutskirts()
+        {
+            HouseBlockoutGenerator.Generate();
+            ShootOutskirts();
+        }
+
+        [MenuItem("Hako/Art/9b 院外风景截图检查", priority = 91)]
+        public static void ShootOutskirts()
+        {
+            var shots = new List<Shot>(OutskirtsShots());
+            AddRuinShots(shots, true);
+            ShootList(shots);
+            SkyAB();
+        }
+
+        static IEnumerable<Shot> OutskirtsShots()
+        {
+            var views = new (string name, Vector3 pos, Vector3 look, bool open)[]
+            {
+                // 院子里往墙外看（二楼、土蔵的窗都是纸障子，縁側是关着的玻璃门，屋里看不到院外；第六轮 b 换成院子里的机位）
+                ("gate_closed", new Vector3(5.46f, 1.6f, -5f), new Vector3(5.46f, 2.6f, -14f), false),
+                ("gate_open", new Vector3(5.46f, 1.6f, -6.5f), new Vector3(5.46f, 1.1f, -16f), true),
+                ("gate_inside", new Vector3(9.5f, 1.6f, -4.5f), new Vector3(9.3f, 8.5f, -11.5f), false),
+                ("garden_south", new Vector3(34f, 1.6f, -2.5f), new Vector3(31f, 6.5f, -24f), false),
+                ("garden_east", new Vector3(40.5f, 1.6f, 23f), new Vector3(48.5f, 5.2f, 26.5f), false),
+                ("backyard", new Vector3(4f, 1.6f, 40f), new Vector3(0f, 6f, 60f), false),
+                ("backyard_ne", new Vector3(40f, 1.6f, 47.5f), new Vector3(36f, 11f, 72f), false),
+                ("backyard_bamboo", new Vector3(-5.5f, 1.6f, 28f), new Vector3(-13f, 7.5f, 31f), false),
+                ("west", new Vector3(-2f, 1.6f, 8f), new Vector3(-20f, 4f, 2f), false),
+                // 大门外的路上（门开着）：往西、往东、回头看大门、往东北看仓房
+                ("road_west", new Vector3(5.46f, 1.65f, -13.2f), new Vector3(-20f, 1.8f, -13.4f), true),
+                ("road_east", new Vector3(5.46f, 1.65f, -13.2f), new Vector3(40f, 1.8f, -13.4f), true),
+                ("road_gate", new Vector3(6.2f, 1.65f, -15.8f), new Vector3(5.46f, 2.4f, -10.9f), true),
+                ("road_barn", new Vector3(30f, 1.65f, -13.2f), new Vector3(60f, 2.5f, 3f), false),
+            };
+            foreach (var v in views)
+            {
+                yield return new Shot("out_" + v.name, Mode.OutX, v.pos, v.look, 75f) { raw = true, openGate = v.open };
+                yield return new Shot("outghost_" + v.name, Mode.Ghost, v.pos, v.look, 75f) { raw = true, openGate = v.open };
+            }
+            yield return new Shot("aerial_southwest", Mode.Aerial, new Vector3(-70f, 48f, -78f), new Vector3(19f, -2f, 18f), 55f) { raw = true };
+            yield return new Shot("aerial_southeast", Mode.Aerial, new Vector3(105f, 48f, -78f), new Vector3(19f, -2f, 18f), 55f) { raw = true };
+            yield return new Shot("aerial_north", Mode.Aerial, new Vector3(19f, 120f, 175f), new Vector3(19f, 0f, 8f), 55f) { raw = true };
+            yield return new Shot("aerial_valley", Mode.Aerial, new Vector3(19f, 22f, -160f), new Vector3(19f, 4f, 10f), 50f) { raw = true };
+        }
+
+        /// <summary>
+        /// 生成时记下的审图机位（RuinShots）。院外的（r6_）：白天看形状（清屏用天空盒），探索者视角、箱女视角各一张；
+        /// 别的照第三～五轮的规矩。onlyOutskirts = true 时只要 r6_ 的。
+        /// </summary>
+        static void AddRuinShots(List<Shot> shots, bool onlyOutskirts)
+        {
+            foreach (var (name, pos, look) in HouseBlockoutGenerator.RuinShots)
+            {
+                if (name.StartsWith("r6_"))
+                {
+                    shots.Add(new Shot("rev_" + name, Mode.Day, pos, look) { raw = true });
+                    shots.Add(new Shot("revout_" + name, Mode.OutX, pos, look, 75f) { raw = true });
+                    shots.Add(new Shot("revghost_" + name, Mode.Ghost, pos, look, 75f) { raw = true });
+                    continue;
+                }
+                if (onlyOutskirts) continue;
+                // 第三轮：废弃感里随机摆的东西（水渍、破障子、蜘蛛网），生成时记下的位置
+                // 第四轮：院子里的（杂草、晾的床单）用白天的光拍（夜里室外只有手电一小圈，看不清）
+                // 第五轮：院子的树、灌木、石头（r5_）白天拍一张看形状，再按游戏里的夜 + 手电拍一张
+                bool r5 = name.StartsWith("r5_");
+                bool outdoor = name.StartsWith("r4_weeds") || name.StartsWith("r4_garden") || r5;
+                shots.Add(new Shot("rev_" + name, outdoor ? Mode.Day : Mode.Detail, pos, look) { raw = true });
+                if (r5 && !name.StartsWith("r5_gal") && (pos - look).magnitude < 4.6f) shots.Add(new Shot("revmood_" + name, Mode.MoodX, pos, look) { raw = true }); // 雾里 7 m 以外看不见
+            }
+        }
+
+        /// <summary>
+        /// 天空盒会不会改变屋里的光（反射、透过窗看到的天）：3 个室内机位按游戏光各拍“没有天空盒 / 有天空盒”两张，
+        /// 记平均亮度和最大的单像素差（文件名 ab_nosky_* / ab_sky_*）。
+        /// </summary>
+        static void SkyAB()
+        {
+            var sky = RenderSettings.skybox;
+            var views = new[]
+            {
+                new Shot("ima", Mode.MoodX, new Vector3(12.2f, 2.1f, 7.6f), new Vector3(8.5f, 1.5f, 12.0f)),
+                new Shot("zashiki", Mode.MoodX, new Vector3(22.8f, 2.1f, 3.0f), new Vector3(19.5f, 1.2f, 6.8f)),
+                new Shot("kura", Mode.MoodX, new Vector3(8.4f, 1.85f, 25.0f), new Vector3(14.5f, 1.0f, 29.8f)),
+            };
+            var pairs = new List<Shot>();
+            foreach (var v in views)
+            {
+                var a = v; a.name = "ab_nosky_" + v.name;
+                var b = v; b.name = "ab_sky_" + v.name;
+                pairs.Add(a);
+                pairs.Add(b);
+            }
+            var lum = new Dictionary<string, (float mean, float maxDiff, Color32[] px)>();
+            try
+            {
+                foreach (var s in pairs)
+                {
+                    RenderSettings.skybox = s.name.StartsWith("ab_sky_") ? sky : null;
+                    ShootList(new List<Shot> { s }, (name, px) =>
+                    {
+                        float sum = 0f;
+                        foreach (var c in px) sum += .2126f * c.r + .7152f * c.g + .0722f * c.b;
+                        lum[name] = (sum / px.Length / 255f, 0f, px);
+                    }, true);
+                }
+            }
+            finally { RenderSettings.skybox = sky; }
+            foreach (var v in views)
+            {
+                if (!lum.TryGetValue("ab_nosky_" + v.name, out var a) || !lum.TryGetValue("ab_sky_" + v.name, out var b)) continue;
+                int maxD = 0, changed = 0;
+                for (int i = 0; i < a.px.Length && i < b.px.Length; i++)
+                {
+                    int d = Mathf.Max(Mathf.Abs(a.px[i].r - b.px[i].r), Mathf.Max(Mathf.Abs(a.px[i].g - b.px[i].g), Mathf.Abs(a.px[i].b - b.px[i].b)));
+                    if (d > maxD) maxD = d;
+                    if (d > 2) changed++;
+                }
+                Debug.Log($"[Hako Art] 天空盒 A/B {v.name}：平均亮度 {a.mean:F4} → {b.mean:F4}，最大单像素差 {maxD}/255，差 > 2 的像素 {changed}（共 {a.px.Length}）");
+            }
+        }
 
         public static void GenerateAndShoot()
         {
@@ -170,6 +305,22 @@ namespace HakoOnna.Art.EditorTools
         [MenuItem("Hako/Art/9 场景截图检查", priority = 90)]
         public static void Shoot()
         {
+            var shots = new List<Shot>(Shots());
+            shots.AddRange(DecalShots());
+            AddRuinShots(shots, false);
+            shots.AddRange(OutskirtsShots());
+            ShootList(shots);
+        }
+
+        /// <summary>箱女视角（GhostSight.cs）的环境光和点光。</summary>
+        static readonly Color GhostAmbient = new Color(.66f, .92f, .84f), GhostLightColor = new Color(.67f, 1f, .86f);
+
+        /// <summary>
+        /// 按顺序拍一组机位。onPixels：每张拍完把像素交给调用方（天空盒 A/B 用）；
+        /// fixedGrain：每张拍之前把随机数种子定死，胶片颗粒每张一样（A/B 比较时颗粒不算差别）。
+        /// </summary>
+        static void ShootList(List<Shot> shots, System.Action<string, Color32[]> onPixels = null, bool fixedGrain = false)
+        {
             Directory.CreateDirectory(OutDir);
             var moonGo = GameObject.Find("Moonlight");
             var moon = moonGo != null ? moonGo.GetComponent<Light>() : null;
@@ -196,21 +347,18 @@ namespace HakoOnna.Art.EditorTools
             spot.range = 30f;
             spot.color = new Color(1f, .93f, .82f);
             spot.shadows = LightShadows.Soft;
+            // 第六轮：箱女视角的点光（GhostSight.cs 挂在相机上的那盏）
+            var ghostGo = new GameObject("ArtSnapshotGhostLight");
+            ghostGo.transform.SetParent(camGo.transform, false);
+            var ghostLight = ghostGo.AddComponent<Light>();
+            ghostLight.type = LightType.Point;
+            ghostLight.color = GhostLightColor;
+            ghostLight.range = 20f;
+            ghostLight.intensity = 5f;
+            ghostLight.enabled = false;
             // 浮尘粒子在编辑器里不会自己播放：先模拟十几秒，截图里才有
             var dust = Object.FindObjectsByType<ParticleSystem>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
             foreach (var ps in dust) ps.Simulate(14f, true, true, true);
-            var shots = new List<Shot>(Shots());
-            shots.AddRange(DecalShots());
-            // 第三轮：废弃感里随机摆的东西（水渍、破障子、蜘蛛网），生成时记下的位置
-            // 第四轮：院子里的（杂草、晾的床单）用白天的光拍（夜里室外只有手电一小圈，看不清）
-            foreach (var (name, pos, look) in HouseBlockoutGenerator.RuinShots)
-            {
-                // 第五轮：院子的树、灌木、石头（r5_）白天拍一张看形状，再按游戏里的夜 + 手电拍一张
-                bool r5 = name.StartsWith("r5_");
-                bool outdoor = name.StartsWith("r4_weeds") || name.StartsWith("r4_garden") || r5;
-                shots.Add(new Shot("rev_" + name, outdoor ? Mode.Day : Mode.Detail, pos, look) { raw = true });
-                if (r5 && !name.StartsWith("r5_gal") && (pos - look).magnitude < 4.6f) shots.Add(new Shot("revmood_" + name, Mode.MoodX, pos, look) { raw = true }); // 雾里 7 m 以外看不见
-            }
             int count = 0;
             var safeDoorGo = GameObject.Find("House_Blockout/Gameplay/Safe_Kinko/Door");
             var safeDoor = safeDoorGo ? safeDoorGo.transform : null;
@@ -219,10 +367,13 @@ namespace HakoOnna.Art.EditorTools
                 foreach (var s in shots)
                 {
                     bool plan = s.mode == Mode.Plan1F || s.mode == Mode.Plan2F;
+                    bool ghost = s.mode == Mode.Ghost, aerial = s.mode == Mode.Aerial, dayLight = s.mode == Mode.Day || aerial, sky = UsesSky(s);
                     cam.orthographic = plan;
-                    data.renderPostProcessing = !plan;
+                    cam.clearFlags = sky ? CameraClearFlags.Skybox : CameraClearFlags.SolidColor;
+                    data.renderPostProcessing = !plan && !ghost;
                     // 第四轮：院子里的审图机位（白天 + raw）也开检查光，不然墙根的杂草在背光面一片黑
-                    spot.enabled = s.mode == Mode.Interior || IsMood(s.mode) || s.mode == Mode.Detail || (s.mode == Mode.Day && s.raw);
+                    spot.enabled = !ghost && !aerial && (s.mode == Mode.Interior || IsMood(s.mode) || s.mode == Mode.Detail || (s.mode == Mode.Day && s.raw));
+                    ghostLight.enabled = ghost;
                     // 游戏光：手电 55° / 内 25°、射程 16 m、强度 25（2026-11-19 用户定的 25，Codex 那边原来是 5，待改）；检查光：大角度补光
                     bool mood = IsMood(s.mode);
                     if (safeDoor) safeDoor.localRotation = Quaternion.Euler(0f, s.name.Contains("safe_open") ? HouseBlockoutGenerator.SafeDoorOpenAngle : 0f, 0f);
@@ -234,11 +385,12 @@ namespace HakoOnna.Art.EditorTools
                     RenderSettings.fog = mood && fog;
                     if (moon)
                     {
-                        moon.intensity = s.mode == Mode.Day ? 1.5f : plan ? .9f : moonI;
-                        moon.color = s.mode == Mode.Day || plan ? new Color(1f, .97f, .92f) : moonC;
+                        moon.intensity = dayLight ? 1.5f : plan ? .9f : moonI;
+                        moon.color = dayLight || plan ? new Color(1f, .97f, .92f) : moonC;
                         moon.shadows = plan ? LightShadows.None : moonS;
                     }
-                    Color amb = s.mode == Mode.Day ? new Color(.36f, .38f, .42f)
+                    Color amb = dayLight ? new Color(.36f, .38f, .42f)
+                        : ghost ? GhostAmbient
                         : plan ? new Color(.6f, .6f, .6f)
                         : s.mode == Mode.Interior || s.mode == Mode.Detail ? new Color(.36f, .34f, .32f) : ambColor;
                     SetAmbient(amb);
@@ -258,7 +410,7 @@ namespace HakoOnna.Art.EditorTools
                     {
                         cam.fieldOfView = s.fov;
                         cam.nearClipPlane = .05f;
-                        cam.farClipPlane = 300f;
+                        cam.farClipPlane = sky ? 1000f : 300f;
                         // 机位按 V3 旧坐标书写：室内跟着房间搬家，室外整体按比例放大
                         Vector3 pos, look;
                         if (s.mode == Mode.Day && !s.raw)
@@ -274,8 +426,15 @@ namespace HakoOnna.Art.EditorTools
                     if (s.closeDoor != null)
                         foreach (var dv in Object.FindObjectsByType<HakoOnna.Art.DoorVisual>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
                             if (dv.name == s.closeDoor) { closed = dv; dv.SetOpenImmediate(false); }
-                    try { Render(cam, s.name, w, h); }
-                    finally { if (closed != null) closed.SetOpenImmediate(closed.StartsOpen); }
+                    var gate = s.openGate ? OpenGate() : null;
+                    if (fixedGrain) Random.InitState(6024);
+                    try { Render(cam, s.name, w, h, onPixels); }
+                    finally
+                    {
+                        if (closed != null) closed.SetOpenImmediate(closed.StartsOpen);
+                        if (gate != null)
+                            foreach (var (t, p, r) in gate) { t.localPosition = p; t.localRotation = r; }
+                    }
                     count++;
                 }
             }
@@ -308,7 +467,26 @@ namespace HakoOnna.Art.EditorTools
             RenderSettings.ambientProbe = sh;
         }
 
-        static void Render(Camera cam, string file, int w, int h)
+        /// <summary>第六轮：大门两扇门板绕合页往里转 100°（院子那一侧），返回原来的位置好放回去。门板上的细节是子物体，跟着转。</summary>
+        static List<(Transform t, Vector3 p, Quaternion r)> OpenGate()
+        {
+            var saved = new List<(Transform, Vector3, Quaternion)>();
+            var gate = GameObject.Find("Gate_Main");
+            if (gate == null) return saved;
+            foreach (Transform leaf in gate.transform)
+            {
+                bool left = leaf.name == "GateDoor_L";
+                if (!left && leaf.name != "GateDoor_R") continue;
+                saved.Add((leaf, leaf.localPosition, leaf.localRotation));
+                var r = leaf.GetComponent<Renderer>();
+                float half = r != null ? r.bounds.extents.x : .6f;
+                var hinge = leaf.position + gate.transform.right * (left ? -half : half);
+                leaf.RotateAround(hinge, Vector3.up, left ? -100f : 100f);
+            }
+            return saved;
+        }
+
+        static void Render(Camera cam, string file, int w, int h, System.Action<string, Color32[]> onPixels = null)
         {
             var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             rt.Create();
@@ -322,6 +500,7 @@ namespace HakoOnna.Art.EditorTools
             tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
             tex.Apply();
             RenderTexture.active = prev;
+            onPixels?.Invoke(file, tex.GetPixels32());
             // 截图正被别的程序打开（看图软件、预览）时写不进去：跳过这一张，别让整次生成以失败退出
             try { File.WriteAllBytes(Path.Combine(OutDir, file + ".png"), tex.EncodeToPNG()); }
             catch (IOException e) { Debug.LogWarning($"[Hako Art] 截图 {file}.png 写不进去（文件被占用？），跳过：{e.Message}"); }

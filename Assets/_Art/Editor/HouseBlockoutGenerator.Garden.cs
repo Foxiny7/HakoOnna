@@ -48,6 +48,16 @@ namespace HakoOnna.Art.EditorTools
                 var gr = ground.GetComponent<MeshRenderer>();
                 var b = gr.bounds;
                 gr.enabled = false;
+                // 第六轮：画出来的地面只铺到院墙。碰撞体还是原来那么大（墙外南北 5.58 m、东西 11.8 m），
+                // 墙外那几米由院外的沟盖、路面、路肩盖着（都在 y = 0），不然沟会被这块地面盖住、路面和它在同一高度上闪
+                var fence = RoomById("Fence");
+                if (fence != null)
+                {
+                    var fr = fence.r;
+                    float gx0 = Mathf.Max(b.min.x, fr.xMin), gx1 = Mathf.Min(b.max.x, fr.xMax);
+                    float gz0 = Mathf.Max(b.min.z, fr.yMin), gz1 = Mathf.Min(b.max.z, fr.yMax);
+                    b = new Bounds(new Vector3((gx0 + gx1) * .5f, b.center.y, (gz0 + gz1) * .5f), new Vector3(gx1 - gx0, b.size.y, gz1 - gz0));
+                }
                 var gmb = new MeshBatch();
                 gmb.Box(D.Ground, b.center, b.size);
                 gmb.Build(parent, "GardenGround", false);

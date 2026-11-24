@@ -34,19 +34,25 @@ namespace HakoOnna.Art.EditorTools
         // 第四轮：旧布（素色 + 格子）、毛巾、床垫布、瓷、搪瓷、旧镜子、带污渍的金属 / 塑料 / 纸（Tools~/prep_tex_r4.py 合成，全部无缝）
         public static Tex Linen, Crepe, Velour, Terry, Check, GinghamRed, GinghamGreen, Ticking, Reed, GreenMetal, RustyMetal;
         public static Tex Ceramic, MirrorOld, BlackSmudge, PlasticSmudge, Enamel, GoldDirty, BronzeOld, PaperWhite, PaperAged;
+        // 第六轮：院外的老柏油路、枯草地、锈铁皮、长苔的水泥（Poly Haven，Tools~/prep_tex_r6.py）
+        public static Tex Asphalt, FieldGrass, TinRoof, ConcreteMoss;
         static bool loaded;
 
         // =====================================================================
         // 导入设置
         // =====================================================================
-        /// <summary>AlbedoAlpha：模型的镂空 / 叶片漫反射（*_diff_a.png，透明通道 = 不透明度）；Painting：Met 的画（Clamp）。</summary>
-        enum Kind { Albedo, AlbedoAlpha, Painting, Normal, Mask, Decal }
+        /// <summary>
+        /// AlbedoAlpha：模型的镂空 / 叶片漫反射（*_diff_a.png，透明通道 = 不透明度）；Painting：Met 的画（Clamp）；
+        /// Sky：天空的经纬图 .hdr（4K、经度循环、纬度 Clamp，BC6H）。
+        /// </summary>
+        enum Kind { Albedo, AlbedoAlpha, Painting, Normal, Mask, Decal, Sky }
 
         public const string MetDir = Root + "/Met";
 
         static Kind KindOf(string path)
         {
             string f = Path.GetFileName(path);
+            if (f.EndsWith(".hdr") || f.EndsWith(".exr")) return Kind.Sky;
             if (path.StartsWith(DecalDir) || f.EndsWith("_decal.png")) return Kind.Decal;
             if (f.Contains("_nor_gl") || f.Contains("_NormalGL")) return Kind.Normal;
             if (f.Contains("_mask")) return Kind.Mask;
@@ -101,6 +107,18 @@ namespace HakoOnna.Art.EditorTools
                     imp.alphaSource = TextureImporterAlphaSource.None;
                     imp.wrapMode = TextureWrapMode.Clamp;
                     break;
+                case Kind.Sky:
+                    // 第六轮：天空经纬图。4K 不缩；经度方向循环，纬度方向 Clamp（天顶、地底不串）；BC6H 高质量（暗部渐变不出色阶）
+                    imp.textureType = TextureImporterType.Default;
+                    imp.textureShape = TextureImporterShape.Texture2D;
+                    imp.sRGBTexture = false;
+                    imp.alphaSource = TextureImporterAlphaSource.None;
+                    imp.maxTextureSize = 4096;
+                    imp.anisoLevel = 1;
+                    imp.wrapModeU = TextureWrapMode.Repeat;
+                    imp.wrapModeV = TextureWrapMode.Clamp;
+                    imp.textureCompression = TextureImporterCompression.CompressedHQ;
+                    break;
                 default:
                     imp.textureType = TextureImporterType.Default;
                     imp.sRGBTexture = true;
@@ -120,6 +138,7 @@ namespace HakoOnna.Art.EditorTools
                 case Kind.Decal: return imp.alphaIsTransparency && imp.wrapMode == TextureWrapMode.Clamp;
                 case Kind.AlbedoAlpha: return imp.sRGBTexture && imp.alphaSource == TextureImporterAlphaSource.FromInput && imp.alphaIsTransparency;
                 case Kind.Painting: return imp.sRGBTexture && imp.wrapMode == TextureWrapMode.Clamp;
+                case Kind.Sky: return imp.maxTextureSize >= 4096 && imp.wrapModeV == TextureWrapMode.Clamp && imp.textureShape == TextureImporterShape.Texture2D;
                 default: return imp.textureType == TextureImporterType.Default && imp.sRGBTexture;
             }
         }
@@ -216,6 +235,12 @@ namespace HakoOnna.Art.EditorTools
             BronzeOld = R4("ambientCG", "bronze_old", .6f, .2763f, .2021f, .1481f);
             PaperWhite = R4("ambientCG", "paper_white", .5f, .7392f, .7392f, .7392f);
             PaperAged = R4("ambientCG", "paper_aged", .5f, .6315f, .6270f, .6192f);
+            // 第六轮（院外）：尺寸来自 Poly Haven 的 dimensions，平均色由 Tools~/prep_tex_r6.py 算出
+            Asphalt = PH("asphalt_02", "diff_1k.jpg", "nor_gl_1k.jpg", "mask.png", 3f, 3f, .1120f, .1104f, .0982f);
+            FieldGrass = PH("withered_grass", "diff_1k.jpg", "nor_gl_1k.jpg", "mask.png", 2f, 2f, .4256f, .3040f, .2016f);
+            TinRoof = PH("rusty_corrugated_iron", "diff_1k.jpg", "nor_gl_1k.jpg", "mask.png", 2f, 2f, .1002f, .0246f, .0102f);
+            // 第六轮 b：原图满是黄绿的青苔，颜色压不回灰（倍数上限 1.8）；用 prep_tex_r6b.py 去掉 78% 饱和度的那张
+            ConcreteMoss = PH("concrete_moss", "grey_diff_1k.jpg", "nor_gl_1k.jpg", "mask.png", 3f, 3f, .0868f, .0841f, .0574f);
             loaded = true;
         }
 
@@ -409,6 +434,21 @@ namespace HakoOnna.Art.EditorTools
             Up(d.Dirt, MudDry, C(.30f, .24f, .17f), .3f, 1f, null, r4);
             Up(d.Moss, MudLeaves, C(.10f, .16f, .055f), .5f, 1f, new Vector2(.8f, .8f), r4);
             Up(d.Bamboo, Bamboo, C(.32f, .38f, .18f), .9f, 1f, null, r4);
+            // 第六轮：院外（村道、荒掉的梯田和田埂、仓房的锈铁皮顶、U 形沟、水泥电线杆）
+            const string r6 = "r6";
+            Up(d.Asphalt, Asphalt, C(.20f, .20f, .19f), .9f, 1f, null, r6);
+            Up(d.FieldGrass, FieldGrass, C(.36f, .31f, .22f), .8f, 1f, null, r6);
+            Up(d.FieldBank, FieldGrass, C(.25f, .24f, .16f), .8f, 1f, new Vector2(1.5f, 1.5f), r6);
+            Up(d.TinRoof, TinRoof, C(.30f, .17f, .11f), 1f, 1f, null, r6);
+            Up(d.Concrete, ConcreteMoss, C(.34f, .34f, .32f), .9f, 1f, null, "r6b");
+            Up(d.ConcretePole, WhitePlaster, C(.42f, .42f, .40f), .6f, .6f, new Vector2(1.2f, 1.2f), r6);
+            Up(d.FieldFallow, FieldGrass, C(.26f, .25f, .17f), .8f, 1f, new Vector2(2.7f, 2.7f), r6);
+            // 第六轮 b：柿子稍亮一点（第一版远看几乎看不见），还是比仏壇的红暗得多
+            Up(d.Persimmon, m =>
+            {
+                m.SetColor("_BaseColor", C(.42f, .17f, .05f));
+                m.SetFloat("_Smoothness", .5f);
+            }, "r6b");
         }
 
         /// <summary>封门后钉上去的木板：浅色杉木（比旧门板浅，一眼看出是后来钉的）。在 DM.Load 末尾调用。</summary>

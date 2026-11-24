@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: MX_NightSky
+  m_Shader: {fileID: 4800000, guid: 03a6011add401f746849c38694d4fe02, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap:
+    HakoArtRev: r6
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _Pano:
+        m_Texture: {fileID: 2800000, guid: d8505656ab2831947af9cedf0e17e13e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Desat: 0.8
+    - _Exposure: 0.16
+    - _HaloIntensity: 0.09
+    - _HaloWidth: 4.5
+    - _MoonIntensity: 3
+    - _MoonRadius: 0.62
+    - _PanoOffset: 0.19646223
+    - _VeilAmount: 0.55
+    - _VeilScale: 1.4
+    m_Colors:
+    - _HaloColor: {r: 0.55, g: 0.66, b: 0.92, a: 0}
+    - _LandAlbedo: {r: 0.16, g: 0.13, b: 0.11, a: 0.55}
+    - _Mist: {r: 0.033, g: 0.0385, b: 0.051, a: 0}
+    - _MistAmount: {r: 0.35, g: 0.55, b: 0.7, a: 2.2}
+    - _MoonColor: {r: 1, g: 0.95, b: 0.86, a: 0}
+    - _MoonDir: {r: 0.50643796, g: 0.46947163, b: -0.7232683, a: 0}
+    - _PanoMoonDir: {r: 0.45081836, g: 0.6182547, b: -0.6438353, a: 0}
+    - _PanoMoonFix: {r: 1.15, g: 0.7, b: 3.6, a: 0}
+    - _RidgeFar: {r: 0.027, g: 0.0315, b: 0.043, a: 0}
+    - _RidgeMid: {r: 0.0215, g: 0.0255, b: 0.0355, a: 0}
+    - _RidgeNear: {r: 0.0175, g: 0.0205, b: 0.029, a: 0}
+    - _Ridges: {r: 1, g: 3, b: 0.75, a: 0.34}
+    - _SkyTint: {r: 0.78, g: 0.88, b: 1.15, a: 0}
+    - _VeilColor: {r: 0.62, g: 0.7, b: 0.88, a: 0}
+    - _VeilSpeed: {r: 0.0045, g: 0.0016, b: 0, a: 0}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

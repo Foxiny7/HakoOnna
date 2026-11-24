@@ -28,6 +28,8 @@ namespace HakoOnna.Art.EditorTools
         public Material DustSheet, DustSheetOld, DustSheetTop; // 第三轮：家具上盖的防尘布（灰白、发黄两种；顶面落了灰）
         public Material Towel, TowelBlue, Ticking, Check, GinghamRed, GinghamGreen; // 第四轮：毛巾、床垫条纹布、格子被面
         public Material Enamel, PaintGreen, RustSheet;                              // 第四轮：掉瓷的搪瓷、绿漆铁皮、锈铁皮
+        // 第六轮（院外）：柏油路、枯草田、田埂、锈铁皮顶、长苔的水泥（U 形沟、挡土墙）、水泥电线杆、没人摘的柿子、竹叶面片（双面）
+        public Material Asphalt, FieldGrass, FieldBank, FieldFallow, TinRoof, Concrete, ConcretePole, Persimmon, Cable;
 
         [MenuItem("Hako/Art/2b 重建细节贴图和材质", priority = 21)]
         static void Rebuild()
@@ -162,6 +164,17 @@ namespace HakoOnna.Art.EditorTools
             d.Enamel = Mat("MD_EnamelChipped", null, null, C(.80f, .79f, .75f), .7f, one);
             d.PaintGreen = Mat("MD_PaintedMetalGreen", null, null, C(.26f, .33f, .24f), .5f, one);
             d.RustSheet = Mat("MD_RustySheet", null, null, C(.33f, .24f, .18f), .3f, one);
+            // 第六轮：院外。先建成纯色，ExternalMats.UpgradeDetail 接上贴图
+            d.Asphalt = Mat("MD_Asphalt", null, null, C(.20f, .20f, .19f), .3f, one);
+            d.FieldGrass = Mat("MD_FieldWithered", null, null, C(.36f, .31f, .22f), .1f, one);
+            d.FieldBank = Mat("MD_FieldBank", null, null, C(.25f, .24f, .16f), .1f, one);
+            d.TinRoof = Mat("MD_TinRoofRust", null, null, C(.30f, .17f, .11f), .3f, one);
+            d.Concrete = Mat("MD_ConcreteMoss", null, null, C(.36f, .36f, .30f), .2f, one);
+            d.ConcretePole = Mat("MD_ConcretePole", null, null, C(.42f, .42f, .40f), .2f, one);
+            d.Persimmon = Mat("MD_PersimmonDark", null, null, C(.30f, .12f, .045f), .45f, one);
+            d.FieldFallow = Mat("MD_FieldFallow", null, null, C(.26f, .25f, .17f), .1f, one); // 第六轮 b：梯田隔一层换这个（深一点、纹理大一点），台阶才分得出来
+            // 第六轮 c：电线、进户线。原来借的 MD_BlackGloss 光滑度 0.8，细线被手电一照闪成一串白点（线比一个像素还细，高光一格亮一格暗）
+            d.Cable = Mat("MD_Cable", null, null, C(.035f, .035f, .033f), .2f, one);
             // 第二轮：大部分材质换成 CC0 贴图（只升级一次，见 ExternalMats）
             ExternalMats.UpgradeDetail(d);
             AssetDatabase.SaveAssets();

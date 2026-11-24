@@ -29,7 +29,8 @@ namespace HakoOnna.Art.EditorTools
             moon.shadows = LightShadows.Soft;
             RenderSettings.sun = moon;
 
-            RenderSettings.skybox = null;
+            // 第六轮（2026-11-24）：夜空天空盒（云、月亮、远山），见 SkyBuilder。环境光仍是下面的 Flat，天空不参与
+            SkyBuilder.Apply(moon);
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.07f, 0.078f, 0.105f); // 2026-11-23 用户实机后两次要求调亮，“至少能看清自己的房间”：(.011, .013, .02) → (.022, .026, .04) → 现在
             RenderSettings.fog = true;
@@ -71,9 +72,10 @@ namespace HakoOnna.Art.EditorTools
             camGo.transform.SetPositionAndRotation(HouseBlockoutGenerator.MapOldPoint(new Vector3(2.7f, 1.6f, 1f)), Quaternion.Euler(5f, 10f, 0f));
             camGo.tag = "MainCamera";
             var cam = camGo.AddComponent<Camera>();
-            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.clearFlags = CameraClearFlags.Skybox; // 第六轮：和探索者相机（Explorer.prefab）一样清成天空盒
             cam.backgroundColor = new Color(0.01f, 0.012f, 0.02f);
             cam.nearClipPlane = 0.05f;
+            cam.farClipPlane = 1000f;
             cam.fieldOfView = 75f;
             cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
         }

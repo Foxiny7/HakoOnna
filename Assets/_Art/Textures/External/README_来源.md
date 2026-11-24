@@ -1,4 +1,4 @@
-# 外部资源来源（第二轮贴图，第三轮模型和古画，2026-11-19；第四轮贴图和模型，2026-11-20；第五轮院子的枝叶和石头，2026-11-21）
+# 外部资源来源（第二轮贴图，第三轮模型和古画，2026-11-19；第四轮贴图和模型，2026-11-20；第五轮院子的枝叶和石头，2026-11-21；第六轮院墙外和夜空，2026-11-24）
 
 这里的贴图全部是 **CC0（公有领域）**：可以商用、可以改、不用署名。记下来源是为了以后换分辨率、追溯和替换。
 材质怎么接、颜色怎么校准见 `Assets/_Art/Editor/ExternalMats.cs`；处理脚本在 `Assets/_Art/Tools~/`（Unity 不导入这个文件夹）。
@@ -227,3 +227,58 @@ make_textures.py 生成：血字四句（ここから出して / 開けるな / 
 | prep_tex_r5.py | 把叶片、松针颜色合成三张枝叶面片贴图，打印覆盖率和平均色 |
 | decimate_fbx.py | Blender 无界面给 FBX 减面（保留物体名、材质、UV） |
 | make_props_r5.py | 画两张贴花（不是下载的）：柱时计的钟面 `Decals/T_ClockDial.png`、碁盤的线 `Decals/T_GobanGrid.png` |
+
+---
+
+# 第六轮（2026-11-24）：院墙外的风景、夜空
+
+## Poly Haven 贴图（https://polyhaven.com/a/<id> ，1K，CC0）
+
+| id | 用在哪 | 材质 |
+|---|---|---|
+| asphalt_02 | 大门外的旧柏油村道 | MD_Asphalt |
+| withered_grass | 路肩、荒掉的梯田田面；梯田的土坎（纹理放大 1.5 倍、压暗） | MD_FieldWithered、MD_FieldBank |
+| rusty_corrugated_iron | 东边铁皮仓房的墙、屋顶和披屋 | MD_TinRoofRust |
+| concrete_moss | U 形水泥沟和沟盖、北边挡土墙的压顶、仓房的水泥地基 | MD_ConcreteMoss |
+
+电线杆（MD_ConcretePole）没有新贴图，用的是已有的 white_rough_plaster 压暗。
+
+## Poly Haven HDRI（CC0）
+
+| id | 用在哪 | 处理 |
+|---|---|---|
+| kloppenheim_07_puresky（https://polyhaven.com/a/kloppenheim_07_puresky ，4K .hdr，19 MB） | 夜空：天空盒材质 `Materials/Sky/MX_NightSky.mat`，shader `Shaders/HakoNightSky.shader`（`Editor/SkyBuilder.cs` 设置） | 见下 |
+
+- 整张图转到原图里的月亮和场景的 Moonlight 同一个方位；原图的月亮比 Moonlight 高约 10°，shader 里用旁边的云盖掉，再在 Moonlight 的方向画一个月亮和一圈光晕。
+- 压暗（曝光 0.16）、去饱和 80%，上面加一层慢慢飘的薄云。
+- 下半部分画了三层远山和一道树梢线（程序化，不是贴图）。开雾的时候（探索者）远山是比雾色略亮的剪影，关雾的时候（箱女视角）按环境光打亮。
+- 比较过 kloppenheim_02_puresky（2K），没用；它和两张 2K 的试看图都留在 `Assets/_Art/Import~/r6/hdri/`。
+
+## 处理过的地方（第六轮）
+
+- mask 的合成方式和第二轮一样（R 金属度、G AO、B 0、A 光滑度，最大 512 px）；漫反射、法线原样复制。
+- HDRI 原样复制，导入设置在 `ExternalMats`（Kind.Sky：线性、最大 4096、U 重复 V 夹紧、高质量压缩）。
+
+## 暂存和脚本（第六轮新增，`Assets/_Art/Tools~/`）
+
+下载的原文件在 `Assets/_Art/Import~/r6/`（Unity 不导入）。验收后可以删掉。
+
+| 脚本 | 做什么 |
+|---|---|
+| dl_ph.py（第二轮的） | 下载四组贴图（diff / nor_gl / arm 1K），校验 md5 |
+| dl_ph_hdri.py | 按 Poly Haven API 的文件清单下载 HDRI（.hdr，指定分辨率），校验 md5 |
+| prep_tex_r6.py | 复制漫反射、法线、HDRI，合成 mask，打印漫反射的线性平均色（写进 `ExternalMats`） |
+| hdri_moon_stats.py | 量 HDRI 里月亮周围的亮度和地平线附近的亮度，用来定月亮的位置和盖掉它的范围 |
+
+## 第六轮 b（同一天，看了第一批截图后改的）
+
+第一批图里杉林是一根根透光的细杆（借的黑松针面片只有 18% 是实的）、竹子没有叶、U 形沟发黄。这次没有新下载，三张面片是脚本画的，颜色都取自已经下载的 CC0 贴图：
+
+| 文件（`Foliage/<名字>/<名字>_diff_a.png`，一张四格） | 画的是什么 | 颜色取自 | 材质 |
+|---|---|---|---|
+| cedar_spray | 杉的枝叶：一根主枝两边排满往前伸的绳状小枝（第四格是发红褐的枯枝） | 第五轮的 pine_sapling_small（Poly Haven，CC0） | MX_SugiSpray |
+| bamboo_spray | 竹叶：一根细枝上一扇扇的长披针形叶 | LeafSet022（ambientCG，CC0） | MX_BambooSpray |
+| susuki_tuft | 芒草（薄）：一丛往外弯的枯叶加几根穗子（第四格是矮的枯草） | withered_grass（Poly Haven，CC0） | MX_SusukiTuft |
+
+- `PolyHaven/concrete_moss/concrete_moss_grey_diff_1k.jpg`：concrete_moss 漫反射的去饱和副本（只留 22% 的饱和度）。原图偏黄，材质的调色上限（每个通道最多乘 1.8）拉不回灰，U 形沟和沟盖看起来是黄的；MD_ConcreteMoss 改用这张。
+- 脚本：`Tools~/prep_tex_r6b.py`（在 `Assets/_Art` 下运行：`python -I Tools~/prep_tex_r6b.py Import~ Textures/External`），每张面片打印“实的”像素占比（杉 0.42–0.44、竹 0.29–0.36、芒草 0.12–0.28）。

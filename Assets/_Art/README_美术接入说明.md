@@ -164,7 +164,47 @@
 - **台所↔土蔵**：`HouseGraph` 现在是 **27 条**相邻（原来 26 条 + 这一条，类型 `Yard`）。土蔵不再是只连着風呂的死胡同。**程序的 `HiderRoutes` 手写表还是 26 条，要么加上这一条，要么直接改成读 `HouseGraph`。**
 - **认路的微光**（`HouseBlockoutGenerator.Landmarks.cs`，`Lighting/Landmarks/Landmark_<房间>`）：玄関、台所、風呂、土蔵、寝室、二階和室这六间宽 10.9 m，比雾里看得见的距离（7.5 m）还宽。每间在房间中央离地 2.3 m 加一盏朝下的暖色聚光（强度 4、射程 3.4 m、115°、不投影），只照亮灯下一小圈地面，照不到墙、也漏不到楼下。雾、环境光、手电都没动。
 - **沿墙放不下的三件大件**改成中央家具组：手压泵（台所）、糸車（納戸）、木马（子供部屋）。
-- **给程序的两条小建议**（不是美术能改的）：探索者相机的远裁剪面现在是 1000 m，雾里 7.5 m 外就看不见，改成 40 m 左右能省渲染（箱女视角关了雾，要留长一点）；`Docs/HakoOnna_Map_V3_Spec.md` 的容器表已按这一版更新。
+- **给程序的两条小建议**（不是美术能改的）：探索者相机的远裁剪面现在是 1000 m，雾里 7.5 m 外就看不见，改成 40 m 左右能省渲染（箱女视角关了雾，要留长一点）——**第六轮起作废**：院外的树在 5–190 m 外，雾里是天空前面的剪影，远裁至少留 250 m（见下一节）；`Docs/HakoOnna_Map_V3_Spec.md` 的容器表已按这一版更新。
+
+## 第六轮：院墙外的风景、夜空（2026-11-24）
+
+- **用户定的**：设定 A“山坡上的废村”，推荐项全部照做：雾不变、不放探索者的车、路灯只是摆设（不亮）。设定见美术圣经 3.5。用户看了第二批截图后定稿（2026-11-24）。
+- **只是视觉，玩法没动**：全在 `Dressing/Outskirts` 下（9 个网格），没有碰撞体、不投影、没有灯、没有脚本。大门、`EscapeZone_Gate`、`Ground_Garden`、`Gameplay` 和 HEAD 比对过：位置、碰撞体都一样；整个场景还是 7 盏灯、760 个碰撞体。容器 45 个：0 变动。EditMode 测试 88/88 通过。**程序不用接任何东西。**
+- **代码**：
+  - `HouseBlockoutGenerator.Outskirts.cs`：院外地面（北坡、东西两边、8 层梯田和尽头的陡坡）、U 形沟和沟盖、旧柏油村道和路肩、梯田的芒草和灌木、电线杆、电线、剪断的进户线。
+  - `HouseBlockoutGenerator.Outskirts2.cs`：北坡杉林、谷边的树、东西两边的林子、西墙外竹林、柿子树、西边邻家空屋、东边铁皮仓房。摆放高度靠临时加在院外地面上的碰撞体往下打射线，摆完就删。
+  - `SkyBuilder.cs` + `Shaders/HakoNightSky.shader` → `Materials/Sky/MX_NightSky.mat`：夜空（kloppenheim_07 的云、月亮、三层远山）。
+  - `AtmosphereBuilder.cs`：`RenderSettings.skybox` 换成夜空；场景里的预览相机改成按天空盒清屏、远裁 1000 m（和 `Explorer.prefab` 一样）。环境光（Flat）、月光、雾、曝光都没改。
+  - `HouseBlockoutGenerator.Garden.cs`：院子地面的**网格**只铺到院墙（以前伸到墙外，会盖住沟、和路面在同一高度上闪）；`Ground_Garden` 的**碰撞体**没动。
+  - `DetailMats.cs` / `ExternalMats.cs`：新材质 MD_Asphalt、MD_FieldWithered、MD_FieldBank、MD_FieldFallow、MD_TinRoofRust、MD_ConcreteMoss、MD_ConcretePole、MD_PersimmonDark、MD_Cable；枝叶面片 MX_SugiSpray、MX_BambooSpray、MX_SusukiTuft（`Flora.cs` 的 `FloraMat`）。
+  - 素材（4 组 Poly Haven 贴图、1 张 HDRI、3 张自己画的面片）见 `Textures/External/README_来源.md` 第六轮。
+- **数量**（生成日志 `[Hako Art] 院外风景` 两行）：
+  - 北坡杉 493 棵（离墙近的几排细做）、谷边 110 棵（一丛丛、高矮不齐）、东西两边 202 棵；竹 92 根（竹叶面片 3238 张）；柿子 121 个；梯田田边芒草 1489 丛、田里 513 丛、灌木 172 丛。
+  - 一共 153,816 个三角形、9 个渲染器、41 个子网格：
+
+    | 网格 | 三角形 | 子网格 |
+    |---|---|---|
+    | Outskirts_CedarHill | 52,392 | 2 |
+    | Outskirts_SideTrees（含柿子树） | 28,640 | 5 |
+    | Outskirts_Bamboo | 23,872 | 2 |
+    | Outskirts_Ground | 15,778 | 8 |
+    | Outskirts_ValleyTrees | 11,494 | 2 |
+    | Outskirts_Grass | 11,258 | 3 |
+    | Outskirts_PolesAndWires | 9,092 | 5 |
+    | Outskirts_NeighbourRuin | 830 | 7 |
+    | Outskirts_Barn | 460 | 7 |
+
+  - **比计划多**：计划是约 15 万三角形、约 20 个 draw call。三角形多 2.5%；draw call 最多 41 个（每个网格每种材质一个：地面 8 种，两间房子各 7 种），是计划的两倍。都走 SRP Batcher，实际开销不大；要压回 20 左右得把材质拼成图集，这次没做。
+- **网格文件**：院外的网格接在生成顺序的最后，`HouseDetail_Meshes_05.asset` 从 16 MB 涨到 43 MB，新增 `HouseDetail_Meshes_06.asset`（5 MB），仓库多了约 32 MB。前面几个文件只是顺序变了（按网格内容比对过，只有 `GardenGround` 真的变了）。
+- **天空和屋里的光**：天空不参与环境光。屋里三个机位有 / 没有天空盒的平均亮度：居間 0.0181 → 0.0182、座敷 0.0241 → 0.0241、土蔵 0.0162 → 0.0162。场景没有烘焙光照，反射用的是 Unity 内置的默认反射，不是夜空。**以后要是烘焙光照，默认反射会换成夜空**，屋里的亮面（漆器、玻璃、金属）会跟着变；到时把 Lighting → Environment → Environment Reflections 的 Source 改成 Custom，指定原来的立方体贴图。
+- **审图机位**（`ArtSnapshot.OutskirtsShots`；菜单“Hako/Art/9b 院外风景截图检查”，命令行 `ArtSnapshot.GenerateAndShootOutskirts`，约 1 分钟）：
+  - 院子里 9 个（大门关着 / 开着 / 门里抬头、南院、东院、后院、后院东北角、后院竹林、西边），路上 4 个（往西、往东、回头看大门、仓房），高处 4 张；生成时还记下 12 个近景（`r6_*`）。
+  - 前缀：`out_` 探索者（夜 + 雾 + 手电），`outghost_` 箱女视角（照 GhostSight.cs），`rev_r6_` 检查光，`revout_r6_` / `revghost_r6_` 近景的探索者 / 箱女视角，`aerial_` 高处（白天的光）。
+- **已知问题**：
+  - `Ground_Garden` 的碰撞体本来就伸出墙外（南北 5.58 m、东西 11.8 m），在 y = 0 盖着墙外的路面、路肩和 U 形沟。出了大门如果能往两边走，走到沟上（沟盖以外）脚下是空的沟、人却踩在沟面上；走出碰撞体的范围就会掉下去（以前也一样，院外从来没有碰撞体）。出了大门能不能走、能走多远是玩法定的，这个碰撞体美术没动；要放人出去，得把它收到墙内、院外另做碰撞体。
+  - 北坡从高处看像一块平顶的台地（只在 `aerial_` 审图里看得到；院子里只看得到近处的杉）。
+  - 生成日志里的 `Failed extracting collision mesh … non-finite value`（48 条，`Furn_*` 网格）以前就有，和这一轮无关。
+- **给程序的提醒**：探索者相机远裁不要小于 250 m（现在的 1000 m 不用改），不然院外的树和山会被裁掉。
 
 ## 给程序（GPT）的接口
 
