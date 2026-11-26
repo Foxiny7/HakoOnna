@@ -48,7 +48,7 @@ namespace HakoOnna.Art.EditorTools
         static bool IsMood(Mode m) => m == Mode.Mood || m == Mode.MoodX || m == Mode.OutX;
 
         /// <summary>这一张清屏用天空盒（院外的机位、院外东西的白天审图）；别的照旧用纯色背景。</summary>
-        static bool UsesSky(Shot s) => s.mode == Mode.OutX || s.mode == Mode.Ghost || s.mode == Mode.Aerial || s.name.StartsWith("rev_r6_");
+        static bool UsesSky(Shot s) => s.mode == Mode.OutX || s.mode == Mode.Ghost || s.mode == Mode.Aerial || s.name.StartsWith("rev_r6_") || s.name.StartsWith("rev_r7_");
 
         /// <summary>
         /// 第六轮：只生成场景、拍院外的机位（10 个视点 × 探索者 / 箱女视角、路上 3 个、高处 4 张、生成时记下的 r6_ 特写），
@@ -68,6 +68,25 @@ namespace HakoOnna.Art.EditorTools
             AddRuinShots(shots, true);
             ShootList(shots);
             SkyAB();
+        }
+
+        /// <summary>
+        /// 第七轮：只生成场景、拍主庭园陈设的机位（生成时记下的 r7_：隔着玻璃门从縁側往外看的 7 张、院子里的特写和全景），
+        /// 每个机位白天、探索者视角、箱女视角各一张。
+        /// 命令行：Unity -batchmode -executeMethod HakoOnna.Art.EditorTools.ArtSnapshot.GenerateAndShootGarden -quit
+        /// </summary>
+        public static void GenerateAndShootGarden()
+        {
+            HouseBlockoutGenerator.Generate();
+            ShootGarden();
+        }
+
+        [MenuItem("Hako/Art/9d 主庭园陈设截图检查", priority = 93)]
+        public static void ShootGarden()
+        {
+            var shots = new List<Shot>();
+            AddRuinShots(shots, true, "r7_");
+            ShootList(shots);
         }
 
         static IEnumerable<Shot> OutskirtsShots()
@@ -105,12 +124,13 @@ namespace HakoOnna.Art.EditorTools
         /// 生成时记下的审图机位（RuinShots）。院外的（r6_）：白天看形状（清屏用天空盒），探索者视角、箱女视角各一张；
         /// 别的照第三～五轮的规矩。onlyOutskirts = true 时只要 r6_ 的。
         /// </summary>
-        static void AddRuinShots(List<Shot> shots, bool onlyOutskirts)
+        static void AddRuinShots(List<Shot> shots, bool onlyOutskirts, string onlyPrefix = "r6_")
         {
             foreach (var (name, pos, look) in HouseBlockoutGenerator.RuinShots)
             {
-                if (name.StartsWith("r6_"))
+                if (name.StartsWith("r6_") || name.StartsWith("r7_"))
                 {
+                    if (onlyOutskirts && !name.StartsWith(onlyPrefix)) continue;
                     shots.Add(new Shot("rev_" + name, Mode.Day, pos, look) { raw = true });
                     shots.Add(new Shot("revout_" + name, Mode.OutX, pos, look, 75f) { raw = true });
                     shots.Add(new Shot("revghost_" + name, Mode.Ghost, pos, look, 75f) { raw = true });

@@ -137,7 +137,15 @@ namespace HakoOnna.Art.EditorTools
             d.PlasticRed = Mat("MD_PlasticRed", null, null, C(.48f, .05f, .04f), .55f, one);
             d.Black = Mat("MD_BlackGloss", null, null, C(.015f, .015f, .015f), .8f, one);
             d.Water = Mat("MD_WaterDark", null, null, C(.01f, .012f, .015f), .97f, one);
-            d.WindowGlass = GlassMat("MD_WindowGlass", new Color(.55f, .62f, .66f, .16f), .88f);
+            // 2026-11-26 用户定：换成更透的。原来 (.55, .62, .66, .16) 被强度 60 的手电一照是一整片白，隔着縁側的玻璃门看不到院子；
+            // 现在手电只在玻璃上留一个亮点（高光还在）。GlassMat 遇到已有的材质原样返回，所以颜色在这里补一次。
+            var windowGlass = new Color(.28f, .32f, .34f, .05f);
+            d.WindowGlass = GlassMat("MD_WindowGlass", windowGlass, .88f);
+            if (d.WindowGlass.GetColor("_BaseColor") != windowGlass)
+            {
+                d.WindowGlass.SetColor("_BaseColor", windowGlass);
+                EditorUtility.SetDirty(d.WindowGlass);
+            }
             d.BambooDry = Mat("MD_BambooDry", null, null, C(.50f, .43f, .27f), .38f, one);
             d.MapleLeaf = Mat("MD_MapleLeaf", null, null, C(.40f, .07f, .035f), .25f, one);
             d.Moss = Mat("MD_Moss", null, null, C(.10f, .16f, .055f), .08f, one);

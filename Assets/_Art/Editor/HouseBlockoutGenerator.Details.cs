@@ -67,6 +67,9 @@ namespace HakoOnna.Art.EditorTools
             // 第六轮（2026-11-24）：院墙外的风景（只是视觉：没有碰撞体、不投影、不加灯；Outskirts.cs / Outskirts2.cs）。
             // 放在最后建：新网格接在生成顺序的最后，前面几个网格文件的内容不跟着变
             BuildOutskirts(ArtKit.Empty(dressing, "Outskirts", Vector3.zero));
+            // 第七轮（2026-11-26）：主庭园（縁側玻璃门外）的陈设（不加灯；实心的东西有挡块 Blocker_Garden7_*；GardenDressing.cs / GardenDressing2.cs）。
+            // 也接在最后：前面的网格内容不跟着变
+            BuildGardenDressing(garden);
             SaveDetailMeshes();
         }
 
