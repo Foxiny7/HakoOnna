@@ -385,6 +385,8 @@ namespace HakoOnna.Art.EditorTools
                 var d = kura / nk - main / nm;
                 proxy.kuraDirection = Mathf.Abs(d.x) > Mathf.Abs(d.z) ? new Vector3(Mathf.Sign(d.x), 0f, 0f) : new Vector3(0f, 0f, Mathf.Sign(d.z));
             }
+            // 2026-11-26：探索者视图（你在这里、院子、出口、金庫、仏壇；MapExplorer.cs）
+            BuildMapExplorerView(proxy, gameplay, rooms);
             proxy.Refresh();
             rootT.gameObject.SetActive(false);
         }

@@ -206,6 +206,33 @@
   - 生成日志里的 `Failed extracting collision mesh … non-finite value`（48 条，`Furn_*` 网格）以前就有，和这一轮无关。
 - **给程序的提醒**：探索者相机远裁不要小于 250 m（现在的 1000 m 不用改），不然院外的树和山会被裁掉。
 
+## 探索者地图（2026-11-26）
+
+- **起因**：用户 2026-11-23 定探索者也要地图（方案见 `Docs/HakoOnna_ExplorerMap_Proposal.md`）：按键打开的 HUD 地图，界面自带，不占背包格；画房子、容器、金庫和仏壇、“你在这里”；没有代价（能走能跑，不出声）。2026-11-26 用户又定：容器没开过是黄色，开过是绿色。什么算“开过”还是【待定】，以 2026-11-26 那版玩法文档为准。
+- **做法**：不另做模型，在箱女用的 `HouseMapProxy` 上加一个“探索者视图”（`SetExplorerView`）。箱女那边看到的和以前一样。
+  - **你在这里**：每个有地板的房间一块红色高亮地板，一共 22 块（二楼两个楼梯井没有地板）。`Highlight(room)` 只亮一间。
+  - **探索者专用的东西**都挂在 `groups[0]/ExplorerOnly` 下，平时关着：
+    - 院子地面和围墙，大门处留口；
+    - 三道竹篱笆，范围取 `Structure/GardenFences` 的碰撞体；
+    - 3 个出口：玄関口、勝手口、表門。每个出口是门洞里一条白门槛，加门外一个尖朝外的白箭头；
+    - 金庫（青色），仏壇（紫色）。
+  - **出口是自动找的**：一楼不是窗的开口里，只有一个房间挨着的那些，再加围墙的大门。钉死的旧门、玻璃拉门、窗都不算。找到的不是 3 个时，生成日志会警告。
+  - **名字挂点**：`landmarks` / `landmarkLabels`，3 个出口加金庫、仏壇。写法和房间名一样，由玩法用 OnGUI 写。
+  - **容器**：探索者视图一打开，全部刷成 `HouseMapProxy.ExplorerUnopened`（黄）。玩法再按每个人自己的记录，把开过的刷成 `ExplorerOpened`（绿）。绿色比黄色暗一截，分不清红绿的玩家靠亮度也能分开。
+  - **后院的两条蓝线不画**（風呂↔土蔵、台所↔土蔵）：它们表示箱女一次转移够得着，不是能走的路。土蔵留在原地，用 `Explode(gap, 0)`。
+- **场景里只多了地图**：
+  - 全是内置立方体，没有碰撞体，不投影。
+  - 细节网格文件按网格内容和 HEAD 比对过，没有变。容器 45 个：0 变动。
+  - 新材质：`Materials/Detail/MP_MapHere / Ground / Fence / Bamboo / Exit / Safe / Altar.mat`，都用 `HakoOnna/MapUnlit`。
+- **代码**：
+  - `Scripts/HouseMapProxy.cs`：新增 `Highlight`、`SetExplorerView`、`ExplorerView`、`roomHighlights`、`explorerOnly`、`landmarks`、`landmarkLabels` 和两个颜色常量。
+  - `Editor/HouseBlockoutGenerator.MapExplorer.cs`：生成这些东西，在 `BuildMapProxy` 的最后调用。
+- **审图**：
+  - 菜单“Hako/Art/9c 3D 地图截图检查（箱女 / 探索者视图）”，命令行 `MapSnapshot.GenerateAndShoot`（含重新生成，约 3 分钟）。
+  - 出 6 张图到 `Docs/screenshots/detail/`：`map_ghost_all`（箱女视图，用来确认没变），`map_explorer_1F_ima`、`_1F_yard`、`_2F`、`_all`、`_top`。
+  - 房间名是玩法用 OnGUI 写的，相机拍不到。所以每张图旁边存了一个 `.json`，记下字的位置；`python -I Assets/_Art/Tools~/map_labels.py` 把字和颜色说明叠上去，出 `*_labeled.png`。
+- **接入步骤**：见下面“给程序”的“探索者地图”一节。
+
 ## 给程序（GPT）的接口
 
 场景中所有对象按名称查找，层级如下：
@@ -223,7 +250,7 @@ House_Blockout
 │   ├─ EscapeZone_Gate
 │   ├─ HouseGraph (HouseGraph)                  房间、相邻关系、容器在哪个房间
 │   ├─ RoomVantages/Vantage_<房间>              每个有容器的房间一个俯视机位
-│   └─ HouseMapProxy (HouseMapProxy)            3D 地图用的简化房子，默认关着
+│   └─ HouseMapProxy (HouseMapProxy)            3D 地图用的简化房子，默认关着；箱女和探索者共用（探索者视图 2026-11-26）
 ├─ Props
 ├─ Doors              所有能开关的门（DoorVisual），程序在运行时挂逻辑
 │   ├─ Door_<房间A>_<房间B>/{Leaf_0..n, Rail}   推拉门，默认开着；室外一侧写 Outside
@@ -405,6 +432,189 @@ map.Show(false);                  // 关地图
 
 **4. 楼梯**
 - 不用改代码。`Step_NN` 的名字和位置没变（`HouseFoley` 照旧）；`WalkRamp` 加宽到 3.48 m。
+
+### 探索者地图：`HouseMapProxy` 的探索者视图（2026-11-26）
+对应 `Docs/HakoOnna_ExplorerMap_Proposal.md` 第 3 节。
+
+**已定的规则**：
+- 按键打开的 HUD 地图，探索者界面自带，不是物品。
+- 画房子、容器、金庫、仏壇、你在这里。
+- 开着能走能跑，不出声，不给箱女能量；不影响手电。
+- 容器没开过是黄色、开过是绿色（用户 2026-11-26 定）。什么算“开过”、视野里看到队友开过的怎么算是【待定】，以 2026-11-26 那版玩法文档为准。
+- 不新增网络数据：地图的一切都只在本地。
+
+**美术给的接口**
+```csharp
+var map   = session.Map;                         // 和箱女同一个 HouseMapProxy
+var graph = session.Routes;
+map.SetExplorerView(true);                       // 探索者视图：院子、围墙、竹篱笆、3 个出口、金庫、仏壇；后院两条线不画；容器全刷成黄色
+map.SetExplorerView(false);                      // 箱女视图：和以前一样（容器去掉颜色）
+map.Highlight(room);                             // 你在这里：只亮这一间（红）；-1 全关。房间没变时什么都不做，可以每帧调
+map.Tint(box, HouseMapProxy.ExplorerOpened);     // 开过的刷绿；没开过的黄色是 HouseMapProxy.ExplorerUnopened
+map.roomHighlights[room]                         // 和 graph.rooms 一一对应；二楼两个楼梯井没有地板，是 null（这两个不写名字）
+map.landmarks[i].position, map.landmarkLabels[i] // 玄関口、勝手口、表門、金庫、仏壇的名字挂点（地面高度，写法同 roomAnchors）
+```
+- 探索者专用的东西挂在一楼那一组下面（`groups[0]/ExplorerOnly`），`ShowGroup(0, false)` 时会跟着藏起来。
+- `SetExplorerView(true)` 会把**所有**容器先刷回黄色。所以先调它，再按自己的记录刷绿。`Tint` 本身不分视图，什么时候都能调。
+- 图上没有人、物品、秘密出口和候选地毯；容器里有什么、有没有人，图上看不出来。
+
+**程序要做的事（可以直接照抄给 ChatGPT）**
+
+1. **打开 / 关闭**：写在 `NetworkPlayer` 里，只在本地 owner、角色是 `Role.Explorer` 时生效。
+   - 按 `Tab`【占位键位】切换。
+   - 正在搜索容器（`searching >= 0` 或 `requested >= 0`）、开着保险箱面板时，按 `Tab` 没反应。
+   - 镜头距离和楼层错开高度沿用箱女的 `mapOrbitDistance`（28）和 `mapFloorGap`（5）。
+   - 全屏显示，和箱女一样（方案第 5 节第 3 问还没回答，我建议全屏）。要改成只占画面一角，设 `mapCamera.rect` 就行。
+```csharp
+private Camera mapCamera;
+private bool Mapping => mapCamera && mapCamera.enabled;
+private float mapOrbit, mapElevation, mapZoom;
+private Vector3 mapCenter;
+
+private void ShowExplorerMap(bool open)
+{
+    var map = session.Map;
+    if (!mapCamera)
+    {
+        // 照抄箱女的地图相机（NetworkHider.ShowMap）
+        mapCamera = new GameObject("Explorer map camera").AddComponent<Camera>();
+        mapCamera.transform.SetParent(transform, false);
+        mapCamera.clearFlags = CameraClearFlags.SolidColor;
+        mapCamera.backgroundColor = new Color(.025f, .032f, .04f);
+        mapCamera.farClipPlane = 100;
+        mapCamera.GetUniversalAdditionalCameraData().renderPostProcessing = false;
+        mapCamera.enabled = false;
+    }
+    if (open)
+    {
+        map.SetExplorerView(true);                      // 先切视图（容器全变黄）……
+        map.Show(true);
+        map.Explode(session.Config.mapFloorGap, 0f);    // 二楼抬高；土蔵留在原地，院子里的路才对得上
+        foreach (int box in 自己的开箱记录)              // ……再刷绿（记录怎么来见第 6 步）
+            map.Tint(box, HouseMapProxy.ExplorerOpened);
+        int room = session.Routes.RoomAt(transform.position);
+        FilterMap(room >= 0 && session.Routes.rooms[room].floor == 1 ? 1 : 0);   // 只看自己这一层
+        mapOrbit = yaw;                                 // 屏幕上方 = 打开时面朝的方向
+        mapElevation = 55f;
+        mapZoom = session.Config.mapOrbitDistance;
+        mapCenter = MapTarget();
+    }
+    else
+    {
+        map.Highlight(-1);
+        map.Show(false);
+    }
+    mapCamera.enabled = open;
+    playerCamera.enabled = !open;   // 只关 Camera 组件，别关它的 GameObject：上面挂着 AudioListener、HouseAmbience 和被抓后的补光
+}
+
+private void FilterMap(int floor)   // 0 = 一楼（含土蔵、院子）、1 = 二楼、2 = 全部；和箱女的 Filter 一样
+{
+    var map = session.Map;
+    map.ShowGroup(0, floor != 1);
+    map.ShowGroup(1, floor != 0);
+    map.ShowGroup(2, floor != 1);
+}
+
+// 镜头对准哪里：在房间里对准房间中心；在院子里，或者自己那一层被藏起来时，对准自己的位置
+private Vector3 MapTarget()
+{
+    var map = session.Map;
+    int room = session.Routes.RoomAt(transform.position);
+    var anchor = room >= 0 ? map.roomAnchors[room] : null;
+    return anchor && anchor.gameObject.activeInHierarchy
+        ? anchor.position
+        : new Vector3(transform.position.x, map.transform.position.y, transform.position.z);
+}
+```
+
+2. **每帧**：地图开着（`Mapping`）时执行，放在 `Update` 里读移动键之前。
+```csharp
+if (Mapping)
+{
+    var kb = Keyboard.current;
+    var mouse = Mouse.current;
+    if (kb.zKey.wasPressedThisFrame) FilterMap(0);
+    if (kb.xKey.wasPressedThisFrame) FilterMap(1);
+    if (kb.cKey.wasPressedThisFrame) FilterMap(2);
+    if (mouse.rightButton.isPressed)
+    {
+        var d = mouse.delta.ReadValue();
+        mapOrbit += d.x * .35f;
+        mapElevation = Mathf.Clamp(mapElevation - d.y * .35f, 15, 85);
+    }
+    mapZoom = Mathf.Clamp(mapZoom - mouse.scroll.ReadValue().y * .025f, 10, 70);
+    session.Map.Highlight(session.Routes.RoomAt(transform.position));   // 你在这里；院子里、屋外是 -1，全不亮
+    mapCenter = Vector3.Lerp(mapCenter, MapTarget(), 1 - Mathf.Exp(-6 * Time.unscaledDeltaTime));   // 走到别的房间时镜头跟过去
+    var rot = Quaternion.Euler(mapElevation, mapOrbit, 0);
+    mapCamera.transform.SetPositionAndRotation(mapCenter - rot * Vector3.forward * mapZoom, rot);
+}
+```
+
+3. **开着地图时的输入**
+   - 光标保持锁定。地图不用鼠标指东西；现在 `Update` 里光标一解锁就不读移动键了，所以打开地图时不要解锁光标。
+   - `WASD`、`Shift`、空格照常。
+   - 鼠标不转视角：`Mapping` 时跳过改 `yaw` / `pitch` 的那段。按住右键拖动是转地图。
+   - `E`、`F`、`G`、`R` 不起作用：`Mapping` 时不调 `UpdateSearchInput`。
+   - 滚轮给地图缩放，不换物品：`ReadEquipmentKeys` 里 `Mapping` 时跳过滚轮。数字键换物品、`T` 开关手电照常。
+   - `Tab` 关闭。`Esc` 也关闭；`Esc` 照旧会解锁光标，和现在一样。
+
+4. **自动关**：下面这些情况调 `ShowExplorerMap(false)`。放在 `Update` 开头的 `if (grabFace || IsBlackedOut) return;` 之前。
+   - 被抓（`grabFace`）、黑屏（`IsBlackedOut`）、被拉进容器；
+   - 死亡或转化（角色不再是 `Role.Explorer`）；
+   - 开始搜索，或者打开保险箱面板。
+
+5. **名字**：照箱女地图的 `OnGUI` 写法。
+```csharp
+if (Mapping)
+{
+    var map = session.Map;
+    var graph = session.Routes;
+    for (int i = 0; i < map.roomAnchors.Length; i++)
+    {
+        var a = map.roomAnchors[i];
+        if (!a || !a.gameObject.activeInHierarchy || !map.roomHighlights[i]) continue;   // 楼梯井不写
+        var p = mapCamera.WorldToScreenPoint(a.position + Vector3.up);
+        if (p.z <= 0) continue;
+        GUI.Label(new Rect(p.x - 25, Screen.height - p.y, 90, 24), graph.rooms[i].label);
+    }
+    for (int i = 0; i < map.landmarks.Length; i++)
+    {
+        var l = map.landmarks[i];
+        if (!l || !l.gameObject.activeInHierarchy) continue;
+        var p = mapCamera.WorldToScreenPoint(l.position + Vector3.up);
+        if (p.z <= 0) continue;
+        GUI.Label(new Rect(p.x - 25, Screen.height - p.y, 90, 24), map.landmarkLabels[i]);
+    }
+}
+```
+
+6. **容器刷绿**【待定】
+   - 每个探索者在本地记一份“开过的容器”。容器下标用 `Array.IndexOf(graph.containers, container.GetComponentInChildren<ContainerVisual>())`，见上面“房间图”一节。
+   - 什么算开过、视野里看到队友开过的怎么算，以 2026-11-26 那版玩法文档为准。
+   - 美术这边只要求两件事：打开地图时先 `SetExplorerView(true)`，再把记录里的刷成 `ExplorerOpened`；地图开着时记录变了，就 `Tint` 那一个。
+   - 只能用这名玩家自己知道的东西：自己开的，自己看见的。不能用服务器上别人的搜索记录，否则违反“服务器只给每个角色下发它该知道的内容”（V1.2 第 4 节）。
+
+7. **箱女那边**：`NetworkHider.ShowMap(true)` 里，在 `Map.Show(open)` 之前加一句 `Map.SetExplorerView(false);`，其余不变。同一台客户端可能先当探索者、后来变成箱人，所以打开箱女地图时要把探索者视图关掉。
+
+8. **键位冲突**【待定】：蹲下还没做。如果蹲下用 `C`，会和地图的 `C`（看全部楼层）冲突。建议蹲下用左 `Ctrl`，这样地图开着时也能蹲着走。
+
+**验收**
+1. 探索者按 `Tab` 打开地图，按 `Tab` 或 `Esc` 关闭。搜索容器、输保险箱密码时按 `Tab` 没反应。被抓、黑屏、转化时地图自动关。
+2. 打开时：
+   - 只显示自己这一层，镜头对准自己的房间；
+   - 屏幕上方是打开时面朝的方向；
+   - 自己的房间是红的。走到隔壁，红色和镜头跟着换；在院子里没有红色。
+3. 开着地图时：
+   - 能走能跑（`WASD`、`Shift`、空格），鼠标不转视角；
+   - `E`、`F`、`G`、`R` 和滚轮换物品不起作用；
+   - 右键拖动转地图，滚轮缩放，`Z` / `X` / `C` 换楼层。
+4. 打开地图前手电开着，关上地图后还开着。
+5. 容器：没开过是黄色，开过是绿色。箱女藏在里面、里面有什么、别人（自己没看见）开过的，都看不出来。
+6. 图上没有任何人，没有秘密出口和候选地毯。
+7. 院子、围墙、竹篱笆、3 个出口（玄関口、勝手口、表門）、金庫、仏壇都在图上，出口、金庫、仏壇有名字。后院两条蓝线不显示，土蔵在原地。
+8. 没有新增网络数据（同步变量、RPC）。
+9. 箱女的地图和以前一样：后院蓝线在，没有院子和出口，容器按能不能转移上色。
 
 ### 保险箱（金庫）的模型（2026-11-23）
 对应 V1.3 第 9.1 节。`Gameplay/Safe_Kinko`（居間北墙）现在是一只绿漆铸铁保险箱，代码在 `Editor/HouseBlockoutGenerator.Safe.cs`。
