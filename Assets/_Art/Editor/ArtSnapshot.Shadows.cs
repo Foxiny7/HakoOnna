@@ -12,7 +12,7 @@ namespace HakoOnna.Art.EditorTools
 {
     /// <summary>
     /// 阴影检查（2026-11-26）：照探索者在游戏里看到的样子拍——相机和 Explorer.prefab 一样（75°、近裁 0.04、不开 HDR、清屏用天空盒），
-    /// 手电不在相机正中，而是和 NetworkPlayer.Inspection.cs 一样在眼睛的左下前方（-0.17, -0.19, 0.47），所以手电的影子拍得到
+    /// 手电不在相机正中，而是和 NetworkPlayer.Inspection.cs 的 PlaceBeam 一样在眼睛正下方（平视 45 cm，近处收回 19 cm），所以手电的影子拍得到
     /// （Mood / MoodX 机位的手电就在镜头上，影子全被物体自己挡住）。每个机位拍“开手电 / 关手电”两张。
     /// 不重新生成场景，直接打开存好的 House_Blockout。截图在 Docs/screenshots/shadows/&lt;组名&gt;_&lt;机位&gt;_on|off.jpg。
     /// 命令行：Unity -batchmode -executeMethod HakoOnna.Art.EditorTools.ArtSnapshot.ShootShadowCheck -quit
@@ -25,6 +25,7 @@ namespace HakoOnna.Art.EditorTools
     ///   time（N = 每个机位连画 N 帧计时；单次误差约 1 ms，同一组在文件里多写几遍、取中位数才可靠）、shots（0 = 只计时不出图）、
     ///   moonStr（月光阴影强度）、expo（后处理曝光，调高几档只为看清暗处的影子）、
     ///   beam（手电强度）、beamPos（手电相对眼睛的位置 x:y:z）、aim（1 = 手电照向视线正中看到的那一点，不和视线平行）、
+    ///   drop / dropAim（发光点在眼睛正下方 drop 米，照向视线前方 dropAim 米，近处和被挡时收回；默认 0.45 / 6，和游戏一样；drop=0 = 旧位置）、
     ///   arms（1 = 加上第一人称手臂和手电筒的替身，看会不会挡光）、
     ///   only（只拍这几个机位，逗号分隔）、states（on / off，只拍开或关手电的那张）、ghost（1 = 箱女视角，照 GhostSight.cs）、
     ///   face（1 = 不拍机位，只拍开箱突脸的两张特写）。
@@ -35,8 +36,10 @@ namespace HakoOnna.Art.EditorTools
         const string ShadowScenePath = "Assets/_Art/Scenes/House_Blockout.unity";
         const string ShadowRendererPath = "Assets/Settings/PC_Renderer.asset";
 
-        /// <summary>手电相对眼睛的位置：灯身 (-.17, -.19, .36) + 灯头往前 .11（NetworkPlayer.Inspection.cs）。</summary>
+        /// <summary>2026-11-26 以前手电相对眼睛的位置：灯身 (-.17, -.19, .36) + 灯头往前 .11。现在只在 drop=0 时用。</summary>
         static readonly Vector3 GameBeamOffset = new Vector3(-.17f, -.19f, .47f);
+        /// <summary>现在游戏里的摆法（NetworkPlayer.PlaceBeam）：平视看远处时发光点在眼睛正下方 45 cm。</summary>
+        const float GameBeamDrop = .45f;
 
         struct ShadowView
         {
@@ -69,6 +72,20 @@ namespace HakoOnna.Art.EditorTools
             yield return new ShadowView("garden", new Vector3(17f, 1.6f, -6.2f) * k, new Vector3(16f, 1.8f, 1f) * k);
             yield return new ShadowView("forecourt", new Vector3(2.12f, 1.17f, -6.72f) * k, new Vector3(6.36f, 1.06f, -.71f) * k);
             yield return new ShadowView("backyard", new Vector3(1.06f, 1.2f, 22.27f) * k, new Vector3(4.6f, .85f, 16.6f) * k);
+
+            // 站在容器跟前（InteractPoint，眼睛 1.45 m）看着它：检视容器时手电照不照得到
+            var boxes = GameObject.Find("House_Blockout/Containers");
+            if (boxes != null)
+                foreach (var kind in new[] { "Tansu", "Nagamochi", "Tsuzura" })
+                    foreach (Transform c in boxes.transform)
+                    {
+                        var ip = c.Find("InteractPoint");
+                        if (ip == null || !c.name.Contains("_" + kind + "_")) continue;
+                        var col = c.GetComponentInChildren<Collider>();
+                        var centre = col != null ? col.bounds.center : c.position + Vector3.up * .5f;
+                        yield return new ShadowView("box_" + kind.ToLowerInvariant(), ip.position + Vector3.up * 1.45f, centre);
+                        break;
+                    }
 
             // 六间大房间的微光：站在灯下那圈光的斜外面 3.2 m，看灯下的地面和家具
             var landmarks = GameObject.Find("House_Blockout/Lighting/Landmarks");
@@ -219,6 +236,11 @@ namespace HakoOnna.Art.EditorTools
                                 float reach = Physics.Raycast(v.pos, fwd, out var seen, 30f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) ? Mathf.Max(seen.distance, .5f) : 30f;
                                 beamGo.transform.rotation = Quaternion.LookRotation(v.pos + fwd * reach - beamGo.transform.position, camGo.transform.up);
                             }
+                            // 默认和游戏一样（NetworkPlayer.PlaceBeam）：发光点在眼睛正下方，见 PlaceBeamLikeSource。
+                            // drop=米 换一个高度试；drop=0 或者给了 beamPos = 用上面固定的位置（2026-11-26 以前的摆法）
+                            float dropNow = kv.TryGetValue("drop", out var dr) ? F(dr) : kv.ContainsKey("beamPos") ? 0f : GameBeamDrop;
+                            if (dropNow > 0f)
+                                PlaceBeamLikeSource(camGo.transform, beamGo.transform, dropNow, kv.TryGetValue("dropAim", out var da) ? F(da) : 6f);
                             foreach (bool on in new[] { true, false })
                             {
                                 if (!string.IsNullOrEmpty(states) && states != (on ? "on" : "off")) continue;
@@ -258,6 +280,32 @@ namespace HakoOnna.Art.EditorTools
                     if (ps != null) ps.Clear(true);
             }
             Debug.Log($"[Hako Art] 阴影检查 {count} 张（{sets.Count} 组，{views.Count} 个机位，开 / 关手电）→ {outDir}");
+        }
+
+        /// <summary>
+        /// 起源引擎（flashlighteffect.cpp，CFlashlightEffect::UpdateLightNew）的手电摆法，换成这个游戏的尺寸：
+        /// 发光点在眼睛正下方 drop 米（Valve 是 20 英寸 = 51 cm），不往左右偏；低头时往眼睛收（Valve 收到 8 英寸）；
+        /// 光束照向视线前方 aim 米处的一点，不和视线平行；
+        /// 眼睛到发光点之间有东西挡着，或者要照的东西离得很近时，发光点收回眼睛旁边（现在的位置）。
+        /// Valve 的原版在离墙 3.25 m 以内时把灯沿光束往后拉；这里改成往眼睛收，因为往后拉会让自己的身体挡光。
+        /// </summary>
+        static void PlaceBeamLikeSource(Transform cam, Transform beamT, float drop, float aim)
+        {
+            const float nearDrop = .19f, forward = .30f;
+            Vector3 eye = cam.position, f = cam.forward, up = cam.up;
+            const int mask = Physics.DefaultRaycastLayers;
+            float d = Mathf.Lerp(drop, nearDrop, Mathf.Clamp01(-f.y));
+            // 视线正中看到的东西有多远：0.8 m 以内收回眼睛旁边，2 m 以外放到最低
+            float seen = Physics.SphereCast(eye, .08f, f, out var hit, 30f, mask, QueryTriggerInteraction.Ignore) ? hit.distance : 30f;
+            // 从低处的发光点往前照的那条路上，2.5 m 以内有没有东西挡着（齐腰的箱子、屏风）
+            Vector3 low = eye - up * d + f * forward;
+            var toAim = (eye + f * aim - low).normalized;
+            if (Physics.SphereCast(low - toAim * .2f, .2f, toAim, out var block, 2.7f, mask, QueryTriggerInteraction.Ignore)) seen = Mathf.Min(seen, block.distance - .2f + forward);
+            d = Mathf.Lerp(nearDrop, d, Mathf.InverseLerp(.8f, 2f, seen));
+            Vector3 origin = eye - up * d + f * forward;
+            if (Physics.Linecast(eye, origin, mask, QueryTriggerInteraction.Ignore)) origin = eye - up * nearDrop + f * forward;
+            beamT.position = origin;
+            beamT.rotation = Quaternion.LookRotation(eye + f * aim - origin, up);
         }
 
         /// <summary>

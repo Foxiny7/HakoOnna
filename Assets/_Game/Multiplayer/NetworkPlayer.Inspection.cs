@@ -20,6 +20,7 @@ namespace HakoOnna.Multiplayer
         private float approach, openTime;
         private Transform lampModel;
         private Light beam;
+        private float beamDrop = .19f;
 
         private void Awake() => slots = new NetworkList<int>(null, NetworkVariableReadPermission.Owner);
 
@@ -60,10 +61,10 @@ namespace HakoOnna.Multiplayer
             emitter.localPosition = Vector3.forward * .11f;
             beam = emitter.gameObject.AddComponent<Light>();
             beam.type = LightType.Spot;
-            beam.range = 16;
-            beam.spotAngle = 55;
-            beam.innerSpotAngle = 25;
-            beam.intensity = 25;
+            beam.range = 30;
+            beam.spotAngle = 70;
+            beam.innerSpotAngle = 35;
+            beam.intensity = 60;
             beam.color = new Color(1f, .95f, .84f);
             beam.shadows = LightShadows.Soft;
             beam.enabled = false;
@@ -108,7 +109,31 @@ namespace HakoOnna.Multiplayer
                 Quaternion.Euler(lampAngles.Value.x, lampAngles.Value.y, 0);
             var eye = IsOwner ? playerCamera.transform.position : transform.position + Vector3.up * config.EyeHeight;
             lampModel.SetPositionAndRotation(eye + rotation * new Vector3(-.17f, -.19f, .36f), rotation);
+            PlaceBeam(eye, rotation);
             beam.enabled = lampOn.Value;
+        }
+
+        // The light source sits straight below the eye so that objects cast visible shadows (2026-11-26, after the
+        // Source engine flashlight): 45 cm down when looking level at something far, back up to 19 cm when looking
+        // down, when the thing in view is close, or when waist-high furniture is in the way. The model does not move.
+        private void PlaceBeam(Vector3 eye, Quaternion rotation)
+        {
+            const float lowDrop = .45f, nearDrop = .19f, ahead = .30f, aim = 6f;
+            const int mask = Physics.DefaultRaycastLayers;
+            Vector3 forward = rotation * Vector3.forward, up = rotation * Vector3.up;
+            float drop = Mathf.Lerp(lowDrop, nearDrop, Mathf.Clamp01(-forward.y));
+            float seen = Physics.SphereCast(eye, .08f, forward, out var hit, 30f, mask, QueryTriggerInteraction.Ignore)
+                ? hit.distance : 30f;
+            var low = eye - up * drop + forward * ahead;
+            var toAim = (eye + forward * aim - low).normalized;
+            if (Physics.SphereCast(low - toAim * .2f, .2f, toAim, out var block, 2.7f, mask, QueryTriggerInteraction.Ignore))
+                seen = Mathf.Min(seen, block.distance - .2f + ahead);
+            drop = Mathf.Lerp(nearDrop, drop, Mathf.InverseLerp(.8f, 2f, seen));
+            beamDrop = Mathf.Lerp(beamDrop, drop, 1f - Mathf.Exp(-10f * Time.deltaTime));
+            var origin = eye - up * beamDrop + forward * ahead;
+            if (Physics.Linecast(eye, origin, mask, QueryTriggerInteraction.Ignore))
+                origin = eye - up * nearDrop + forward * ahead;
+            beam.transform.SetPositionAndRotation(origin, Quaternion.LookRotation(eye + forward * aim - origin, up));
         }
 
         private void PrepareInspection(Transform visual)
