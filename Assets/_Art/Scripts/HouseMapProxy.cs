@@ -22,7 +22,7 @@ namespace HakoOnna.Art
 
         /// <summary>探索者视图里容器的默认颜色：没开过。</summary>
         public static readonly Color ExplorerUnopened = new Color(.95f, .8f, .25f);
-        /// <summary>探索者视图里开过的容器的颜色。什么算“开过”由玩法决定（见玩法文档），这里只给颜色。
+        /// <summary>探索者视图里开过的容器的颜色。什么算“开过”由玩法决定（见 Docs/HakoOnna_DevPlan_V1.4.md 3.7 节），这里只给颜色。
         /// 比黄色暗一截：分不清红绿的玩家靠亮度也能分开，开过的也就不那么抢眼。</summary>
         public static readonly Color ExplorerOpened = new Color(.22f, .62f, .3f);
 
