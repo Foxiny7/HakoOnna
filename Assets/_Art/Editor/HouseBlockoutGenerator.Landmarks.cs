@@ -1,4 +1,6 @@
+using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 namespace HakoOnna.Art.EditorTools
 {
@@ -7,7 +9,8 @@ namespace HakoOnna.Art.EditorTools
     /// <list type="bullet">
     /// <item><b>认路的微光</b>：宽 10.9 m 的大房间（玄関、台所、風呂、土蔵、二楼两间）比雾里看得见的距离（7.5 m）还宽，
     ///   站在门口看不到对面，房间中间一片黑。每间在吊灯的位置加一盏朝下的、快灭了的暖光，只照亮灯下一小圈地面，
-    ///   让玩家知道“房间中间在那儿”。不投影、照不到墙，不改变整体的暗度。</item>
+    ///   让玩家知道“房间中间在那儿”。照不到墙，不改变整体的暗度。
+    ///   2026-11-26 起投软阴影：原来不投影，光穿过灯下的桌子照到桌底的地面，桌子像浮着。</item>
     /// <item><b>沿墙放不下的三件大件摆到房间中间</b>：手压泵（台所）、糸車（納戸）、木马（子供部屋）。</item>
     /// </list>
     /// </summary>
@@ -33,7 +36,11 @@ namespace HakoOnna.Art.EditorTools
                 light.range = 3.4f;       // 灯下 2.3 m 是地面；照不到墙，也漏不到楼下
                 light.spotAngle = 115f;
                 light.innerSpotAngle = 50f;
-                light.shadows = LightShadows.None;
+                // 2026-11-26：投软阴影（见上）。阴影图用中档（512）：灯下只有 3.4 m，够用，也不会挤占手电的阴影图
+                light.shadows = LightShadows.Soft;
+                var data = new SerializedObject(light.GetUniversalAdditionalLightData());
+                data.FindProperty("m_AdditionalLightsShadowResolutionTier").intValue = UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierMedium;
+                data.ApplyModifiedPropertiesWithoutUndo();
             }
         }
 

@@ -28,6 +28,8 @@ namespace HakoOnna.Art.EditorTools
             moon.intensity = 0.35f;
             moon.shadows = LightShadows.Soft;
             RenderSettings.sun = moon;
+            // 2026-11-26：阴影图、环境光遮蔽的数在 ShadowSetup.cs（写进 URP 的 PC 画质档资产）
+            ShadowSetup.Apply();
 
             // 第六轮（2026-11-24）：夜空天空盒（云、月亮、远山），见 SkyBuilder。环境光仍是下面的 Flat，天空不参与
             SkyBuilder.Apply(moon);

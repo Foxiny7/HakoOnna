@@ -12,7 +12,7 @@ namespace HakoOnna.Art.EditorTools
     /// 白天 / 室内补光只在截图时临时改，结束后恢复，不会存进场景。
     /// 命令行：Unity -batchmode -executeMethod HakoOnna.Art.EditorTools.ArtSnapshot.GenerateAndShoot -quit
     /// </summary>
-    public static class ArtSnapshot
+    public static partial class ArtSnapshot
     {
         const string OutDir = "Docs/screenshots/detail";
 
